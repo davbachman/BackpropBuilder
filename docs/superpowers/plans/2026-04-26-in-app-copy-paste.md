@@ -4,7 +4,7 @@
 
 **Goal:** Add in-memory copy/paste for selected graph nodes and selected visual groups.
 
-**Architecture:** Put graph-fragment copy and paste logic in a tested domain helper, then wire keyboard shortcuts in `App.tsx`. App state will hold the in-memory clipboard fragment and paste count; the domain helper will handle cloning, id remapping, internal-edge filtering, group preservation, and position offsets.
+**Architecture:** Put graph-fragment copy and paste logic in a tested domain helper, then wire keyboard shortcuts in `App.tsx`. App state will hold the in-memory clipboard fragment and paste count; the domain helper will handle cloning, generated id/label remapping, selected-node edge filtering, group boundary preservation, and position offsets.
 
 **Tech Stack:** React 19, TypeScript, Vite, Vitest, Testing Library, `@xyflow/react`.
 

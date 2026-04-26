@@ -10,8 +10,9 @@ Backprop Builder is a Vite/React graph editor built on `@xyflow/react`. The comp
 - Paste the copied fragment with `Cmd/Ctrl+V`.
 - Keep the clipboard in app memory only; do not read from or write to the OS clipboard.
 - When copying multiple selected nodes, include only edges where both endpoints are selected.
-- When copying a selected visual group, include its member nodes, internal edges, and group metadata so paste recreates the collapsed group.
+- When copying a selected visual group, include its member nodes, internal edges, boundary edges, and group metadata so paste recreates the collapsed group with the same input/output handles.
 - Pasted nodes, edges, and groups must receive ids that do not collide with the existing graph.
+- Pasted generated source nodes and groups should advance visible labels, such as `x1` to `x2` and `Group 1` to `Group 2`.
 - Paste should offset node and group positions so the duplicate is visible.
 - Paste should select the newly pasted nodes or pasted group.
 - Paste should reset the editor back to edit mode, clear trace state and pending placement, and create one undo snapshot.
@@ -21,9 +22,9 @@ Backprop Builder is a Vite/React graph editor built on `@xyflow/react`. The comp
 
 Add a focused domain helper in `src/domain/clipboard.ts` that owns graph-fragment copy and paste behavior. `copyGraphSelection(graph, selection)` returns an in-memory clipboard fragment or `undefined` if the selection cannot be copied. `pasteGraphClipboard(graph, fragment, offset)` returns the next graph plus the selection that should become active after paste.
 
-The clipboard fragment stores cloned nodes, cloned internal edges, and optionally a cloned group. Copying selected nodes stores no group. Copying a selected group stores that group and uses the group node ids as the fragment's selected nodes. Boundary edges that connect the group to outside nodes are not copied, because pasting a self-contained fragment should not attach itself to unrelated existing nodes.
+The clipboard fragment stores cloned nodes, cloned internal edges, and optionally a cloned group. Copying selected nodes stores no group. Copying a selected group stores that group, uses the group node ids as the fragment's selected nodes, and includes boundary edges that touch the group so the copied collapsed group keeps its visible inputs and outputs.
 
-Pasting creates a node-id map from original ids to unique ids. Edges and group node ids are remapped through that map. Node and group positions are translated by the supplied paste offset. App state tracks the copied fragment and a paste count; each paste of the same fragment uses a larger offset so repeated pastes do not overlap each other.
+Pasting creates a node-id map from original ids to generated ids that follow the app's existing numbering pattern. Edges and group node ids are remapped through that map. Boundary edges keep their outside endpoint when that endpoint still exists in the current graph. Node and group positions are translated by the supplied paste offset. App state tracks the copied fragment and a paste count; each paste of the same fragment uses a larger offset so repeated pastes do not overlap each other.
 
 `App.tsx` extends its document-level keydown handler. `Cmd/Ctrl+C` copies the current node selection or selected group into React state and resets paste count. `Cmd/Ctrl+V` pushes history, pastes the fragment, selects the new nodes or group, resets phase/trace state to edit, clears pending placement, and increments paste count. Existing `Cmd/Ctrl+Z` behavior stays unchanged.
 

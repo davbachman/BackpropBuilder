@@ -1,5 +1,5 @@
 import { cloneGraph } from './engine'
-import type { GraphEdge, GraphGroup, GraphModel, GraphNode, Position } from './types'
+import type { GraphEdge, GraphGroup, GraphModel, GraphNode, NodeType, Position } from './types'
 
 export interface GraphClipboardSelection {
   nodeIds: string[]
@@ -52,18 +52,19 @@ export function pasteGraphClipboard(
   const nodeIdMap = new Map<string, string>()
 
   const pastedNodes = source.nodes.map((node) => {
-    const id = nextCopyId(node.id, usedNodeIds)
+    const { id, index } = nextNodeId(node.type, usedNodeIds)
     nodeIdMap.set(node.id, id)
     return {
       ...node,
       id,
+      label: labelForPastedNode(node, index),
       position: translatePosition(node.position, offset),
     }
   })
 
   const pastedEdges = source.edges.flatMap((edge) => {
-    const sourceId = nodeIdMap.get(edge.source)
-    const targetId = nodeIdMap.get(edge.target)
+    const sourceId = nodeIdMap.get(edge.source) ?? (usedNodeIds.has(edge.source) ? edge.source : undefined)
+    const targetId = nodeIdMap.get(edge.target) ?? (usedNodeIds.has(edge.target) ? edge.target : undefined)
     if (!sourceId || !targetId) return []
 
     return [
@@ -76,15 +77,7 @@ export function pasteGraphClipboard(
     ]
   })
 
-  const pastedGroup = source.group
-    ? {
-        ...source.group,
-        id: nextCopyId(source.group.id, usedGroupIds),
-        nodeIds: source.group.nodeIds.map((nodeId) => nodeIdMap.get(nodeId)).filter((nodeId): nodeId is string => Boolean(nodeId)),
-        position: translatePosition(source.group.position, offset),
-        dimensions: { ...source.group.dimensions },
-      }
-    : undefined
+  const pastedGroup = source.group ? createPastedGroup(source.group, usedGroupIds, nodeIdMap, offset) : undefined
 
   return {
     graph: {
@@ -111,13 +104,17 @@ function copyGroupSelection(graph: GraphModel, groupId: string): GraphClipboardF
 
   return cloneClipboardFragment({
     nodes,
-    edges: internalEdgesForNodeIds(graph, selectedNodeIdSet),
+    edges: boundaryAndInternalEdgesForNodeIds(graph, selectedNodeIdSet),
     group,
   })
 }
 
 function internalEdgesForNodeIds(graph: GraphModel, nodeIds: Set<string>): GraphEdge[] {
   return graph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+}
+
+function boundaryAndInternalEdgesForNodeIds(graph: GraphModel, nodeIds: Set<string>): GraphEdge[] {
+  return graph.edges.filter((edge) => nodeIds.has(edge.source) || nodeIds.has(edge.target))
 }
 
 function cloneClipboardFragment(fragment: GraphClipboardFragment): GraphClipboardFragment {
@@ -142,6 +139,68 @@ function translatePosition(position: Position, offset: Position): Position {
   }
 }
 
+function createPastedGroup(
+  group: GraphGroup,
+  usedGroupIds: Set<string>,
+  nodeIdMap: Map<string, string>,
+  offset: Position,
+): GraphGroup {
+  const { id, index } = nextIndexedId('group', usedGroupIds)
+
+  return {
+    ...group,
+    id,
+    label: `Group ${index}`,
+    nodeIds: group.nodeIds.map((nodeId) => nodeIdMap.get(nodeId)).filter((nodeId): nodeId is string => Boolean(nodeId)),
+    position: translatePosition(group.position, offset),
+    dimensions: { ...group.dimensions },
+  }
+}
+
+function nextNodeId(type: NodeType, usedIds: Set<string>): { id: string; index: number } {
+  return nextIndexedId(idPrefixForType(type), usedIds)
+}
+
+function labelForPastedNode(node: GraphNode, index: number): string {
+  const labelPrefix = labelPrefixForType(node.type)
+  return labelPrefix ? `${labelPrefix}${index}` : node.label
+}
+
+function idPrefixForType(type: NodeType): string {
+  if (type === 'input') return 'input'
+  if (type === 'weight') return 'weight'
+  if (type === 'bias') return 'bias'
+  if (type === 'target') return 'target'
+  if (type === 'activation') return 'activation'
+  return type
+}
+
+function labelPrefixForType(type: NodeType): string | undefined {
+  if (type === 'input') return 'x'
+  if (type === 'weight') return 'w'
+  if (type === 'bias') return 'b'
+  if (type === 'target') return 'y'
+  return undefined
+}
+
+function nextIndexedId(prefix: string, usedIds: Set<string>): { id: string; index: number } {
+  const matcher = new RegExp(`^${escapeRegExp(prefix)}-(\\d+)$`)
+  const indexes = Array.from(usedIds)
+    .map((id) => id.match(matcher)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map(Number)
+
+  let index = Math.max(0, ...indexes) + 1
+  let id = `${prefix}-${index}`
+  while (usedIds.has(id)) {
+    index += 1
+    id = `${prefix}-${index}`
+  }
+
+  usedIds.add(id)
+  return { id, index }
+}
+
 function nextCopyId(baseId: string, usedIds: Set<string>): string {
   const copyBase = `${baseId}-copy`
   if (!usedIds.has(copyBase)) {
@@ -161,4 +220,8 @@ function nextCopyId(baseId: string, usedIds: Set<string>): string {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values))
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
