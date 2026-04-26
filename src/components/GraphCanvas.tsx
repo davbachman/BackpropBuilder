@@ -32,6 +32,7 @@ import {
   nodeIdsInGroups,
   removeNodesFromVisualGroups,
   resolveVisualGroupInputHandle,
+  resolveVisualGroupOutputHandle,
   visualGroupInterface,
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
@@ -527,14 +528,26 @@ function normalizeCanvasConnection<TConnection extends Connection | Edge<Builder
   graph: GraphModel,
   connection: TConnection,
 ): TConnection {
+  let normalizedConnection = connection
+  const sourceGroupId = connection.source ? groupIdFromNodeId(connection.source) : undefined
+  if (sourceGroupId) {
+    const resolvedSource = resolveVisualGroupOutputHandle(graph, sourceGroupId, connection.sourceHandle ?? undefined)
+    if (resolvedSource) {
+      normalizedConnection = {
+        ...normalizedConnection,
+        source: resolvedSource.source,
+      }
+    }
+  }
+
   const targetGroupId = connection.target ? groupIdFromNodeId(connection.target) : undefined
-  if (!targetGroupId) return connection
+  if (!targetGroupId) return normalizedConnection
 
   const resolvedTarget = resolveVisualGroupInputHandle(graph, targetGroupId, connection.targetHandle ?? undefined)
-  if (!resolvedTarget) return connection
+  if (!resolvedTarget) return normalizedConnection
 
   return {
-    ...connection,
+    ...normalizedConnection,
     target: resolvedTarget.target,
     targetHandle: resolvedTarget.targetHandle,
   }

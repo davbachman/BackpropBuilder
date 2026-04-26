@@ -15,6 +15,7 @@ interface MergeResult {
 export interface VisualGroupHandle {
   edgeId?: string
   handleId: string
+  source?: string
   target?: string
   inputSlot?: number
 }
@@ -104,7 +105,6 @@ export function nodeIdsInGroups(graph: GraphModel): Set<string> {
 }
 
 export function visualGroupInterface(graph: GraphModel, group: GraphGroup): VisualGroupInterface {
-  const groupNodeIds = new Set(group.nodeIds)
   const nodeOrder = new Map(group.nodeIds.map((nodeId, index) => [nodeId, index]))
 
   const inputs = exposedInputSlots(graph, group)
@@ -116,10 +116,13 @@ export function visualGroupInterface(graph: GraphModel, group: GraphGroup): Visu
       inputSlot: slot.inputSlot,
     }))
 
-  const outputs = graph.edges
-    .filter((edge) => groupNodeIds.has(edge.source) && !groupNodeIds.has(edge.target))
-    .sort((first, second) => compareOutputBoundaryEdges(first, second, nodeOrder))
-    .map((edge, index) => ({ edgeId: edge.id, handleId: `out-${index}` }))
+  const outputs = exposedOutputHandles(graph, group)
+    .sort((first, second) => compareOutputHandles(first, second, nodeOrder))
+    .map((handle, index) => ({
+      ...(handle.edge ? { edgeId: handle.edge.id } : {}),
+      handleId: `out-${index}`,
+      source: handle.source,
+    }))
 
   return { inputs, outputs }
 }
@@ -139,6 +142,20 @@ export function resolveVisualGroupInputHandle(
     target: handle.target,
     targetHandle: `in-${handle.inputSlot}`,
   }
+}
+
+export function resolveVisualGroupOutputHandle(
+  graph: GraphModel,
+  groupId: string,
+  handleId: string | undefined,
+): { source: string } | undefined {
+  const group = graph.groups?.find((candidate) => candidate.id === groupId)
+  if (!group) return undefined
+
+  const handle = visualGroupInterface(graph, group).outputs.find((candidate) => candidate.handleId === handleId)
+  if (!handle?.source) return undefined
+
+  return { source: handle.source }
 }
 
 interface ExposedInputSlot {
@@ -170,6 +187,34 @@ function exposedInputSlots(graph: GraphModel, group: GraphGroup): ExposedInputSl
 
 function inputSlotKey(target: string, inputSlot: number): string {
   return `${target}:${inputSlot}`
+}
+
+interface ExposedOutputHandle {
+  source: string
+  edge?: GraphEdge
+}
+
+function exposedOutputHandles(graph: GraphModel, group: GraphGroup): ExposedOutputHandle[] {
+  const groupNodeIds = new Set(group.nodeIds)
+  const outgoingBySource = new Map<string, GraphEdge[]>()
+
+  for (const edge of graph.edges) {
+    outgoingBySource.set(edge.source, [...(outgoingBySource.get(edge.source) ?? []), edge])
+  }
+
+  return group.nodeIds.flatMap((nodeId) => {
+    const node = graph.nodes.find((candidate) => candidate.id === nodeId)
+    if (!node || node.type === 'loss') return []
+
+    const outgoing = outgoingBySource.get(node.id) ?? []
+    const boundaryEdges = outgoing.filter((edge) => !groupNodeIds.has(edge.target))
+    if (boundaryEdges.length > 0) {
+      return boundaryEdges.map((edge) => ({ source: node.id, edge }))
+    }
+
+    if (outgoing.length === 0) return [{ source: node.id }]
+    return []
+  })
 }
 
 function collapsedPositionForNodes(nodes: GraphNode[]): Position {
@@ -218,14 +263,14 @@ function compareInputSlots(
   )
 }
 
-function compareOutputBoundaryEdges(
-  first: { id: string; source: string },
-  second: { id: string; source: string },
+function compareOutputHandles(
+  first: { source: string; edge?: GraphEdge },
+  second: { source: string; edge?: GraphEdge },
   nodeOrder: Map<string, number>,
 ): number {
   return (
     (nodeOrder.get(first.source) ?? 0) - (nodeOrder.get(second.source) ?? 0) ||
-    first.id.localeCompare(second.id)
+    (first.edge?.id ?? '').localeCompare(second.edge?.id ?? '')
   )
 }
 
