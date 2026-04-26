@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Position as FlowPosition } from '@xyflow/react'
 import { describe, expect, it, vi } from 'vitest'
 import appCss from './App.css?raw'
 import builderEdgeSource from './components/BuilderEdge.tsx?raw'
+import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
 import { MIN_NODE_HEIGHT, NODE_WIDTH, heightForInputCount } from './domain/engine'
 import { scalarValue } from './domain/tensor'
@@ -188,6 +190,28 @@ describe('Backprop Builder app', () => {
   it('does not create React Flow edge label bubbles', () => {
     expect(builderEdgeSource).not.toMatch(/EdgeLabelRenderer/)
     expect(builderEdgeSource).not.toMatch(/edge-label/)
+  })
+
+  it('adds a selected class to selected wire paths', () => {
+    const { container } = render(
+      <svg>
+        <BuilderEdge
+          id="selected-edge"
+          source="x"
+          target="mul"
+          selected
+          sourceX={0}
+          sourceY={0}
+          targetX={120}
+          targetY={40}
+          sourcePosition={FlowPosition.Right}
+          targetPosition={FlowPosition.Left}
+          data={{ showGradient: true, active: false, phase: 'edit' }}
+        />
+      </svg>,
+    )
+
+    expect(container.querySelector('path.builder-edge')).toHaveClass('is-selected')
   })
 
   it('moves from the last real backward computation to parameter updates instead of leaf inputs', async () => {

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { MIN_NODE_HEIGHT, NODE_WIDTH } from './engine'
 import { createStarterGraph } from './examples'
-import { explodeVisualGroup, mergeNodesIntoVisualGroup, moveVisualGroup, visualGroupInterface } from './grouping'
+import {
+  explodeVisualGroup,
+  mergeNodesIntoVisualGroup,
+  moveVisualGroup,
+  resolveVisualGroupInputHandle,
+  visualGroupInterface,
+} from './grouping'
 
 describe('visual graph grouping', () => {
   it('merges selected nodes into editor metadata without changing computation nodes or edges', () => {
@@ -57,10 +63,38 @@ describe('visual graph grouping', () => {
     const groupInterface = visualGroupInterface(grouped, group!)
 
     expect(groupInterface.inputs).toEqual([
-      { edgeId: 'x-mul', handleId: 'in-0' },
-      { edgeId: 'w-mul', handleId: 'in-1' },
-      { edgeId: 'b-add', handleId: 'in-2' },
+      { edgeId: 'x-mul', handleId: 'in-0', target: 'mul', inputSlot: 0 },
+      { edgeId: 'w-mul', handleId: 'in-1', target: 'mul', inputSlot: 1 },
+      { edgeId: 'b-add', handleId: 'in-2', target: 'add', inputSlot: 1 },
     ])
     expect(groupInterface.outputs).toEqual([{ edgeId: 'add-act', handleId: 'out-0' }])
+  })
+
+  it('keeps a collapsed group input exposed after its boundary edge is deleted', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
+    const group = grouped.groups?.[0]
+    expect(group).toBeDefined()
+
+    const disconnected = {
+      ...grouped,
+      edges: grouped.edges.filter((edge) => edge.id !== 'x-mul'),
+    }
+
+    const groupInterface = visualGroupInterface(disconnected, group!)
+
+    expect(groupInterface.inputs).toEqual([
+      { handleId: 'in-0', target: 'mul', inputSlot: 0 },
+      { edgeId: 'w-mul', handleId: 'in-1', target: 'mul', inputSlot: 1 },
+      { edgeId: 'b-add', handleId: 'in-2', target: 'add', inputSlot: 1 },
+    ])
+  })
+
+  it('resolves a group input handle to its internal node input slot', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
+
+    expect(resolveVisualGroupInputHandle(grouped, 'group-1', 'in-1')).toEqual({
+      target: 'mul',
+      targetHandle: 'in-1',
+    })
   })
 })

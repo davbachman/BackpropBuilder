@@ -454,6 +454,12 @@
   filter: drop-shadow(0 0 4px rgba(15, 118, 110, 0.35));
 }
 
+.builder-edge.is-selected {
+  stroke: var(--update);
+  stroke-width: 3.8;
+  filter: drop-shadow(0 0 5px rgba(124, 58, 237, 0.45));
+}
+
 .builder-edge.is-backward {
   stroke: var(--backward);
 }

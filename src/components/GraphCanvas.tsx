@@ -6,7 +6,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
-  addEdge,
   useReactFlow,
   useEdgesState,
   useNodesState,
@@ -27,7 +26,14 @@ import {
   inputArityForNode,
   isFlexibleInputNodeType,
 } from '../domain/engine'
-import { groupForNode, nodeIdsInGroups, removeNodesFromVisualGroups, visualGroupInterface } from '../domain/grouping'
+import { canConnectGraphNodes, connectGraphNodes } from '../domain/graphEditing'
+import {
+  groupForNode,
+  nodeIdsInGroups,
+  removeNodesFromVisualGroups,
+  resolveVisualGroupInputHandle,
+  visualGroupInterface,
+} from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type {
   ActivationKind,
@@ -150,7 +156,6 @@ function GraphCanvasInner({
           width: group.dimensions.width,
           height: group.dimensions.height,
           selected: group.id === selectedGroupId,
-          connectable: false,
           data: {
             group,
             inputCount: groupInterface?.inputs.length ?? 0,
@@ -382,41 +387,21 @@ function GraphCanvasInner({
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      if (!connection.source || !connection.target) return
-      if (isGroupNodeId(connection.source) || isGroupNodeId(connection.target)) return
-      const target = graph.nodes.find((node) => node.id === connection.target)
-      if (!target) return
-      const slot = Number(connection.targetHandle?.replace('in-', '') ?? nextOpenSlot(graph, target))
-      const id = `${connection.source}-${connection.target}-${slot}-${Date.now()}`
-      const graphEdge = { id, source: connection.source, target: connection.target, inputSlot: slot }
-      onGraphChange({ ...graph, edges: [...graph.edges, graphEdge] })
-      setEdges((existing) =>
-        addEdge(
-          {
-            ...connection,
-            id,
-            type: 'builderEdge',
-            sourceHandle: 'out',
-            targetHandle: `in-${slot}`,
-          },
-          existing,
-        ),
+      const graphConnection = normalizeCanvasConnection(graph, connection)
+      const nextGraph = connectGraphNodes(
+        graph,
+        graphConnection,
+        (source, target, inputSlot) => `${source}-${target}-${inputSlot}-${Date.now()}`,
       )
+      if (!nextGraph) return
+      onGraphChange(nextGraph)
     },
-    [graph, onGraphChange, setEdges],
+    [graph, onGraphChange],
   )
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge<BuilderEdgeData>) => {
-      if (!connection.source || !connection.target || connection.source === connection.target) return false
-      if (isGroupNodeId(connection.source) || isGroupNodeId(connection.target)) return false
-      const target = graph.nodes.find((node) => node.id === connection.target)
-      if (!target) return false
-      const slot = Number(connection.targetHandle?.replace('in-', '') ?? nextOpenSlot(graph, target))
-      const arity = inputArityForNode(target)
-      if (slot < 0 || slot >= arity) return false
-      if (graph.edges.some((edge) => edge.target === target.id && (edge.inputSlot ?? 0) === slot)) return false
-      return !createsCycle(graph, connection.source, connection.target)
+      return canConnectGraphNodes(graph, normalizeCanvasConnection(graph, connection))
     },
     [graph],
   )
@@ -528,14 +513,6 @@ function GraphCanvasInner({
   )
 }
 
-function nextOpenSlot(graph: GraphModel, target: GraphNode): number {
-  const used = new Set(graph.edges.filter((edge) => edge.target === target.id).map((edge) => edge.inputSlot ?? 0))
-  for (let slot = 0; slot < inputArityForNode(target); slot += 1) {
-    if (!used.has(slot)) return slot
-  }
-  return 0
-}
-
 function minimumInputCountForNode(graph: GraphModel, node: GraphNode): number {
   if (!isFlexibleInputNodeType(node.type)) return inputArityForNode(node)
 
@@ -546,22 +523,21 @@ function minimumInputCountForNode(graph: GraphModel, node: GraphNode): number {
   return Math.max(2, highestConnectedSlot + 1)
 }
 
-function createsCycle(graph: GraphModel, sourceId: string, targetId: string): boolean {
-  const outgoing = new Map<string, string[]>()
-  for (const edge of graph.edges) {
-    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target])
+function normalizeCanvasConnection<TConnection extends Connection | Edge<BuilderEdgeData>>(
+  graph: GraphModel,
+  connection: TConnection,
+): TConnection {
+  const targetGroupId = connection.target ? groupIdFromNodeId(connection.target) : undefined
+  if (!targetGroupId) return connection
+
+  const resolvedTarget = resolveVisualGroupInputHandle(graph, targetGroupId, connection.targetHandle ?? undefined)
+  if (!resolvedTarget) return connection
+
+  return {
+    ...connection,
+    target: resolvedTarget.target,
+    targetHandle: resolvedTarget.targetHandle,
   }
-  outgoing.set(sourceId, [...(outgoing.get(sourceId) ?? []), targetId])
-  const stack = [targetId]
-  const visited = new Set<string>()
-  while (stack.length > 0) {
-    const id = stack.pop()!
-    if (id === sourceId) return true
-    if (visited.has(id)) continue
-    visited.add(id)
-    stack.push(...(outgoing.get(id) ?? []))
-  }
-  return false
 }
 
 function groupNodeId(groupId: string): string {
