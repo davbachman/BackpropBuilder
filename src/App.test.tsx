@@ -596,6 +596,7 @@ describe('Backprop Builder app', () => {
       width: `${NODE_WIDTH}px`,
       height: `${MIN_NODE_HEIGHT}px`,
     })
+    expect(container.querySelectorAll('.visual-group-node .source-handle.group-handle')).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: /Explode group/i }))
 

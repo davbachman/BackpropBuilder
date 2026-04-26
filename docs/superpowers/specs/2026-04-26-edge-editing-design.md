@@ -19,6 +19,8 @@ Backprop Builder uses `@xyflow/react` for canvas interaction. `GraphCanvas.tsx` 
 
 `visualGroupInterface` will expose group input handles from the group's internal input slots. Existing boundary edges keep their current handle order. When a boundary edge is deleted, the target node slot is still exposed as an unconnected group input handle, so the user can reconnect into the group. Dropping a wire onto a group input handle will resolve that visual handle back to the hidden internal node input before replacement validation runs.
 
+Group outputs follow the same rule: a grouped node with no outgoing edge exposes a collapsed-group output handle, and dragging from that visual handle resolves back to the hidden internal source node.
+
 ## Testing
 
 - Add a BuilderEdge test for the selected class.

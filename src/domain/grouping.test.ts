@@ -6,8 +6,10 @@ import {
   mergeNodesIntoVisualGroup,
   moveVisualGroup,
   resolveVisualGroupInputHandle,
+  resolveVisualGroupOutputHandle,
   visualGroupInterface,
 } from './grouping'
+import type { GraphModel } from './types'
 
 describe('visual graph grouping', () => {
   it('merges selected nodes into editor metadata without changing computation nodes or edges', () => {
@@ -67,7 +69,7 @@ describe('visual graph grouping', () => {
       { edgeId: 'w-mul', handleId: 'in-1', target: 'mul', inputSlot: 1 },
       { edgeId: 'b-add', handleId: 'in-2', target: 'add', inputSlot: 1 },
     ])
-    expect(groupInterface.outputs).toEqual([{ edgeId: 'add-act', handleId: 'out-0' }])
+    expect(groupInterface.outputs).toEqual([{ edgeId: 'add-act', handleId: 'out-0', source: 'add' }])
   })
 
   it('keeps a collapsed group input exposed after its boundary edge is deleted', () => {
@@ -96,5 +98,25 @@ describe('visual graph grouping', () => {
       target: 'mul',
       targetHandle: 'in-1',
     })
+  })
+
+  it('exposes and resolves group outputs for internal nodes with no outgoing edge', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'input-1', type: 'input', label: 'x1', position: { x: 40, y: 60 }, params: { value: 1 } },
+        { id: 'weight-1', type: 'weight', label: 'w1', position: { x: 40, y: 220 }, params: { value: 0.5 } },
+      ],
+      edges: [],
+    }
+    const grouped = mergeNodesIntoVisualGroup(graph, ['input-1', 'weight-1']).graph
+
+    const groupInterface = visualGroupInterface(grouped, grouped.groups![0])
+
+    expect(groupInterface.outputs).toEqual([
+      { handleId: 'out-0', source: 'input-1' },
+      { handleId: 'out-1', source: 'weight-1' },
+    ])
+    expect(resolveVisualGroupOutputHandle(grouped, 'group-1', 'out-1')).toEqual({ source: 'weight-1' })
   })
 })
