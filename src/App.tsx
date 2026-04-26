@@ -69,6 +69,7 @@ const PASTE_OFFSET_STEP = 36
 
 interface HistorySnapshot {
   graph: GraphModel
+  visualizationGraph: GraphModel
   initialParams: Record<string, TensorValue>
   selectedNodeIds: string[]
   selectedGroupId?: string
@@ -87,6 +88,7 @@ function speedSliderValueToDelay(value: number): number {
 
 function App(): ReactElement {
   const [graph, setGraph] = useState<GraphModel>(() => createEmptyGraph())
+  const [visualizationGraph, setVisualizationGraph] = useState<GraphModel>(() => createEmptyGraph())
   const [initialParams, setInitialParams] = useState<Record<string, TensorValue>>({})
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>()
@@ -126,6 +128,7 @@ function App(): ReactElement {
   const snapshotCurrentState = useCallback(
     (): HistorySnapshot => ({
       graph: cloneGraph(graph),
+      visualizationGraph: cloneGraph(visualizationGraph),
       initialParams: cloneParameterValueMap(initialParams),
       selectedNodeIds: [...selectedNodeIds],
       selectedGroupId,
@@ -149,6 +152,7 @@ function App(): ReactElement {
       selectedNodeIds,
       traceIndex,
       traceSteps,
+      visualizationGraph,
     ],
   )
 
@@ -159,6 +163,7 @@ function App(): ReactElement {
 
   const restoreSnapshot = useCallback((snapshot: HistorySnapshot) => {
     setGraph(cloneGraph(snapshot.graph))
+    setVisualizationGraph(cloneGraph(snapshot.visualizationGraph))
     setInitialParams(cloneParameterValueMap(snapshot.initialParams))
     setSelectedNodeIds([...snapshot.selectedNodeIds])
     setSelectedGroupId(snapshot.selectedGroupId)
@@ -252,6 +257,7 @@ function App(): ReactElement {
     pushHistory()
     const evaluated = safeForward(nextGraph)
     setGraph(evaluated.graph)
+    setVisualizationGraph(evaluated.graph)
     setInitialParams(parameterValues(nextGraph))
     selectSingleNode(evaluated.graph.nodes.find((node) => node.type === 'activation')?.id)
     setPhase('edit')
@@ -273,6 +279,9 @@ function App(): ReactElement {
       setTraceIndex(nextIndex)
       setPhase(traceSteps[nextIndex].phase)
       selectSingleNode(traceSteps[nextIndex].nodeId)
+      if (traceSteps[nextIndex].phase === 'loss') {
+        setVisualizationGraph(cloneGraph(graph))
+      }
       return
     }
 
@@ -285,6 +294,9 @@ function App(): ReactElement {
       setPhase(forward.steps[0]?.phase ?? 'forward')
       selectSingleNode(forward.steps[0]?.nodeId)
       setCurrentLoss(forward.loss ?? null)
+      if (forward.steps.length === 0) {
+        setVisualizationGraph(forward.graph)
+      }
       appendAction('Started forward pass')
       return
     }
@@ -305,6 +317,7 @@ function App(): ReactElement {
       pushHistory()
       const updated = updateParameters(graph, graph.learningRate)
       const refreshed = safeForward(updated.graph)
+      setVisualizationGraph(refreshed.graph)
       setGraph({
         ...refreshed.graph,
         nodes: refreshed.graph.nodes.map((node) => ({
@@ -334,6 +347,7 @@ function App(): ReactElement {
     const result = runTrainingStep(graph, graph.learningRate)
     const updateSteps = result.steps.filter((step) => step.phase === 'update')
     setGraph(result.graph)
+    setVisualizationGraph(result.graph)
     setTraceSteps(updateSteps)
     setTraceIndex(0)
     setPhase('update')
@@ -366,6 +380,7 @@ function App(): ReactElement {
       pseudocode: ['for step in range(10):', '  loss = forward()', '  loss.backward()', '  update_parameters()'],
     }
     setGraph(nextGraph)
+    setVisualizationGraph(nextGraph)
     setTraceSteps([summaryStep])
     setTraceIndex(0)
     setPhase('update')
@@ -401,6 +416,14 @@ function App(): ReactElement {
       ...existing,
       nodes: existing.nodes.map((node) =>
         node.id === nodeId ? { ...node, params: { ...node.params, value }, value } : node,
+      ),
+    }))
+    setVisualizationGraph((existing) => ({
+      ...existing,
+      nodes: existing.nodes.map((node) =>
+        node.id === nodeId && (node.type === 'input' || node.type === 'target')
+          ? { ...node, params: { ...node.params, value }, value }
+          : node,
       ),
     }))
     setPhase('edit')
@@ -445,7 +468,9 @@ function App(): ReactElement {
         }),
       }
       setInitialParams(parameterValues(next))
-      return safeForward(next).graph
+      const evaluated = safeForward(next)
+      setVisualizationGraph(evaluated.graph)
+      return evaluated.graph
     })
     appendAction('Randomized parameters')
   }
@@ -627,7 +652,7 @@ function App(): ReactElement {
       />
 
       <aside className="right-panel">
-        {showVisualization ? <VisualizationPanel graph={graph} /> : null}
+        {showVisualization ? <VisualizationPanel graph={visualizationGraph} /> : null}
 
         <section className="inspector-card">
           <p className="eyebrow">Inspector</p>

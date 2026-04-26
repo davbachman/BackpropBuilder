@@ -1,12 +1,16 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import appCss from '../App.css?raw'
 import { forwardPass } from '../domain/engine'
 import { scalarValue, tensorValue } from '../domain/tensor'
 import type { GraphModel } from '../domain/types'
 import { VisualizationPanel } from './VisualizationPanel'
 
 describe('VisualizationPanel', () => {
+  it('does not force all target points to use one CSS fill color', () => {
+    expect(appCss).not.toMatch(/\.visualization-target-point\s*{[^}]*\bfill\s*:/)
+  })
+
   it('plots target data points and current predictions for a single-input network', () => {
     const graph = forwardPass(singleInputGraph()).graph
     const { container } = render(<VisualizationPanel graph={graph} />)
@@ -16,27 +20,42 @@ describe('VisualizationPanel', () => {
     expect(screen.getByText('Target data')).toBeInTheDocument()
     expect(screen.getByText('Predictions')).toBeInTheDocument()
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(3)
-    expect(container.querySelectorAll('.visualization-prediction-point')).toHaveLength(3)
+    expect(container.querySelector('.visualization-prediction-line')).toHaveAttribute('data-sample-count', '80')
   })
 
-  it('shows a two-input heatmap with a switch between target and current predictions', async () => {
-    const user = userEvent.setup()
+  it('keeps target point positions fixed when only predictions change', () => {
+    const firstGraph = forwardPass(singleInputGraph()).graph
+    const secondGraph = forwardPass(singleInputGraph({ weight: 10, bias: 10 })).graph
+    const { container, rerender } = render(<VisualizationPanel graph={firstGraph} />)
+    const firstTargetPositions = targetPointPositions(container)
+
+    rerender(<VisualizationPanel graph={secondGraph} />)
+
+    expect(targetPointPositions(container)).toEqual(firstTargetPositions)
+  })
+
+  it('overlays target data points on a sampled prediction heatmap for two-input networks', () => {
     const graph = forwardPass(twoInputGraph()).graph
     const { container } = render(<VisualizationPanel graph={graph} />)
 
-    expect(screen.getByRole('img', { name: /Target heatmap/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Target/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(4)
-
-    await user.click(screen.getByRole('button', { name: /Predictions/i }))
-
-    expect(screen.getByRole('img', { name: /Prediction heatmap/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Predictions/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(4)
+    expect(screen.getByRole('img', { name: /Two-input prediction heatmap/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Target/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Predictions/i })).not.toBeInTheDocument()
+    expect(screen.getByText('x-axis: x1')).toBeInTheDocument()
+    expect(screen.getByText('y-axis: x2')).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(625)
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(4)
   })
 })
 
-function singleInputGraph(): GraphModel {
+function targetPointPositions(container: HTMLElement): Array<{ cx: string | null; cy: string | null }> {
+  return Array.from(container.querySelectorAll('.visualization-target-point')).map((point) => ({
+    cx: point.getAttribute('cx'),
+    cy: point.getAttribute('cy'),
+  }))
+}
+
+function singleInputGraph(values: { weight?: number; bias?: number } = {}): GraphModel {
   return {
     learningRate: 0.1,
     nodes: [
@@ -47,8 +66,8 @@ function singleInputGraph(): GraphModel {
         position: { x: 40, y: 80 },
         params: { value: tensorValue([3], [0, 1, 2]) },
       },
-      { id: 'w', type: 'weight', label: 'w', position: { x: 40, y: 240 }, params: { value: scalarValue(2) } },
-      { id: 'b', type: 'bias', label: 'b', position: { x: 320, y: 240 }, params: { value: scalarValue(1) } },
+      { id: 'w', type: 'weight', label: 'w', position: { x: 40, y: 240 }, params: { value: scalarValue(values.weight ?? 2) } },
+      { id: 'b', type: 'bias', label: 'b', position: { x: 320, y: 240 }, params: { value: scalarValue(values.bias ?? 1) } },
       { id: 'mul', type: 'multiply', label: 'x * w', position: { x: 320, y: 120 }, params: {} },
       { id: 'add', type: 'add', label: 'xw + b', position: { x: 600, y: 160 }, params: {} },
       {
@@ -80,14 +99,14 @@ function twoInputGraph(): GraphModel {
         type: 'input',
         label: 'x1',
         position: { x: 40, y: 80 },
-        params: { value: tensorValue([2, 2], [0, 1, 0, 1]) },
+        params: { value: tensorValue([4], [0, 1, 0, 1]) },
       },
       {
         id: 'x2',
         type: 'input',
         label: 'x2',
         position: { x: 40, y: 240 },
-        params: { value: tensorValue([2, 2], [0, 0, 1, 1]) },
+        params: { value: tensorValue([4], [0, 0, 1, 1]) },
       },
       { id: 'add', type: 'add', label: 'x1 + x2', position: { x: 340, y: 160 }, params: {} },
       {
@@ -95,7 +114,7 @@ function twoInputGraph(): GraphModel {
         type: 'target',
         label: 'y',
         position: { x: 340, y: 340 },
-        params: { value: tensorValue([2, 2], [0, 1, 1, 2]) },
+        params: { value: tensorValue([4], [0, 1, 1, 2]) },
       },
       { id: 'loss', type: 'loss', label: 'loss', position: { x: 620, y: 220 }, params: {} },
     ],

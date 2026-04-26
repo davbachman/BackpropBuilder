@@ -627,15 +627,8 @@
 }
 
 .visualization-target-point {
-  fill: var(--loss);
   stroke: #fff;
-  stroke-width: 1.5;
-}
-
-.visualization-prediction-point {
-  fill: var(--accent);
-  stroke: #fff;
-  stroke-width: 1.2;
+  stroke-width: 1.6;
 }
 
 .visualization-meta-row {
@@ -647,8 +640,7 @@
   font: 11px var(--font-mono);
 }
 
-.visualization-legend,
-.segmented-control {
+.visualization-legend {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -678,40 +670,9 @@
   background: var(--accent);
 }
 
-.segmented-control {
-  justify-content: flex-end;
-}
-
-.segmented-control button {
-  min-height: 30px;
-  padding: 5px 8px;
-  font-size: 12px;
-}
-
-.segmented-control button[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-}
-
-.visualization-heatmap {
-  display: grid;
-  width: 100%;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-}
-
 .visualization-heatmap-cell {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  color: #111827;
-  font: 11px var(--font-mono);
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 0.4;
 }
 
 .visualization-empty {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Position as FlowPosition } from '@xyflow/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -99,6 +99,32 @@ describe('Backprop Builder app', () => {
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1800)
     } finally {
       setTimeoutSpy.mockRestore()
+    }
+  })
+
+  it('updates visualization predictions when Play reaches a completed forward pass', async () => {
+    vi.useFakeTimers()
+
+    try {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Load starter example/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Show visualization/i }))
+      const initialPrediction = visualizationPredictionPath()
+
+      fireEvent.change(screen.getByDisplayValue('0.5'), { target: { value: '1' } })
+      expect(visualizationPredictionPath()).toBe(initialPrediction)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+      for (let index = 0; index < 4; index += 1) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(900)
+        })
+      }
+
+      expect(visualizationPredictionPath()).not.toBe(initialPrediction)
+    } finally {
+      vi.useRealTimers()
     }
   })
 
@@ -874,3 +900,7 @@ describe('Backprop Builder app', () => {
     expect(click).toHaveBeenCalled()
   })
 })
+
+function visualizationPredictionPath(): string | null | undefined {
+  return document.querySelector('.visualization-prediction-line')?.getAttribute('d')
+}
