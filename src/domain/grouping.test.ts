@@ -63,4 +63,23 @@ describe('visual graph grouping', () => {
     ])
     expect(groupInterface.outputs).toEqual([{ edgeId: 'add-act', handleId: 'out-0' }])
   })
+
+  it('keeps a collapsed group input exposed after its boundary edge is deleted', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
+    const group = grouped.groups?.[0]
+    expect(group).toBeDefined()
+
+    const disconnected = {
+      ...grouped,
+      edges: grouped.edges.filter((edge) => edge.id !== 'x-mul'),
+    }
+
+    const groupInterface = visualGroupInterface(disconnected, group!)
+
+    expect(groupInterface.inputs).toEqual([
+      { handleId: 'in-0' },
+      { edgeId: 'w-mul', handleId: 'in-1' },
+      { edgeId: 'b-add', handleId: 'in-2' },
+    ])
+  })
 })

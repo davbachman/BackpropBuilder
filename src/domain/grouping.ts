@@ -5,7 +5,7 @@ import {
   inputArityForNode,
   isFlexibleInputNodeType,
 } from './engine'
-import type { GraphGroup, GraphModel, GraphNode, Position } from './types'
+import type { GraphEdge, GraphGroup, GraphModel, GraphNode, Position } from './types'
 
 interface MergeResult {
   graph: GraphModel
@@ -13,7 +13,7 @@ interface MergeResult {
 }
 
 export interface VisualGroupHandle {
-  edgeId: string
+  edgeId?: string
   handleId: string
 }
 
@@ -105,10 +105,9 @@ export function visualGroupInterface(graph: GraphModel, group: GraphGroup): Visu
   const groupNodeIds = new Set(group.nodeIds)
   const nodeOrder = new Map(group.nodeIds.map((nodeId, index) => [nodeId, index]))
 
-  const inputs = graph.edges
-    .filter((edge) => groupNodeIds.has(edge.target) && !groupNodeIds.has(edge.source))
-    .sort((first, second) => compareInputBoundaryEdges(first, second, nodeOrder))
-    .map((edge, index) => ({ edgeId: edge.id, handleId: `in-${index}` }))
+  const inputs = exposedInputSlots(graph, group)
+    .sort((first, second) => compareInputSlots(first, second, nodeOrder))
+    .map((slot, index) => ({ edgeId: slot.edge?.id, handleId: `in-${index}` }))
 
   const outputs = graph.edges
     .filter((edge) => groupNodeIds.has(edge.source) && !groupNodeIds.has(edge.target))
@@ -116,6 +115,37 @@ export function visualGroupInterface(graph: GraphModel, group: GraphGroup): Visu
     .map((edge, index) => ({ edgeId: edge.id, handleId: `out-${index}` }))
 
   return { inputs, outputs }
+}
+
+interface ExposedInputSlot {
+  target: string
+  inputSlot: number
+  edge?: GraphEdge
+}
+
+function exposedInputSlots(graph: GraphModel, group: GraphGroup): ExposedInputSlot[] {
+  const groupNodeIds = new Set(group.nodeIds)
+  const incomingByTargetSlot = new Map<string, GraphEdge>()
+
+  for (const edge of graph.edges) {
+    if (!groupNodeIds.has(edge.target)) continue
+    incomingByTargetSlot.set(inputSlotKey(edge.target, edge.inputSlot ?? 0), edge)
+  }
+
+  return group.nodeIds.flatMap((nodeId) => {
+    const node = graph.nodes.find((candidate) => candidate.id === nodeId)
+    if (!node) return []
+
+    return Array.from({ length: inputArityForNode(node) }).flatMap<ExposedInputSlot>((_, inputSlot) => {
+      const edge = incomingByTargetSlot.get(inputSlotKey(node.id, inputSlot))
+      if (edge && groupNodeIds.has(edge.source)) return []
+      return [{ target: node.id, inputSlot, edge }]
+    })
+  })
+}
+
+function inputSlotKey(target: string, inputSlot: number): string {
+  return `${target}:${inputSlot}`
 }
 
 function collapsedPositionForNodes(nodes: GraphNode[]): Position {
@@ -152,15 +182,15 @@ function groupIndexFromId(groupId: string): number {
   return Number(groupId.match(/^group-(\d+)$/)?.[1] ?? 1)
 }
 
-function compareInputBoundaryEdges(
-  first: { id: string; target: string; inputSlot?: number },
-  second: { id: string; target: string; inputSlot?: number },
+function compareInputSlots(
+  first: { target: string; inputSlot: number; edge?: GraphEdge },
+  second: { target: string; inputSlot: number; edge?: GraphEdge },
   nodeOrder: Map<string, number>,
 ): number {
   return (
     (nodeOrder.get(first.target) ?? 0) - (nodeOrder.get(second.target) ?? 0) ||
-    (first.inputSlot ?? 0) - (second.inputSlot ?? 0) ||
-    first.id.localeCompare(second.id)
+    first.inputSlot - second.inputSlot ||
+    (first.edge?.id ?? '').localeCompare(second.edge?.id ?? '')
   )
 }
 

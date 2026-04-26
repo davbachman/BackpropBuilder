@@ -23,7 +23,7 @@ export function BuilderEdge(props: EdgeProps): ReactElement {
     <BaseEdge
       path={edgePath}
       markerEnd={props.markerEnd}
-      className={`builder-edge ${data?.active ? 'is-active' : ''} ${isBackward ? 'is-backward' : ''}`}
+      className={`builder-edge ${data?.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${isBackward ? 'is-backward' : ''}`}
     />
   )
 }
