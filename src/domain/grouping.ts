@@ -15,6 +15,8 @@ interface MergeResult {
 export interface VisualGroupHandle {
   edgeId?: string
   handleId: string
+  target?: string
+  inputSlot?: number
 }
 
 export interface VisualGroupInterface {
@@ -107,7 +109,12 @@ export function visualGroupInterface(graph: GraphModel, group: GraphGroup): Visu
 
   const inputs = exposedInputSlots(graph, group)
     .sort((first, second) => compareInputSlots(first, second, nodeOrder))
-    .map((slot, index) => ({ edgeId: slot.edge?.id, handleId: `in-${index}` }))
+    .map((slot, index) => ({
+      ...(slot.edge ? { edgeId: slot.edge.id } : {}),
+      handleId: `in-${index}`,
+      target: slot.target,
+      inputSlot: slot.inputSlot,
+    }))
 
   const outputs = graph.edges
     .filter((edge) => groupNodeIds.has(edge.source) && !groupNodeIds.has(edge.target))
@@ -115,6 +122,23 @@ export function visualGroupInterface(graph: GraphModel, group: GraphGroup): Visu
     .map((edge, index) => ({ edgeId: edge.id, handleId: `out-${index}` }))
 
   return { inputs, outputs }
+}
+
+export function resolveVisualGroupInputHandle(
+  graph: GraphModel,
+  groupId: string,
+  handleId: string | undefined,
+): { target: string; targetHandle: string } | undefined {
+  const group = graph.groups?.find((candidate) => candidate.id === groupId)
+  if (!group) return undefined
+
+  const handle = visualGroupInterface(graph, group).inputs.find((candidate) => candidate.handleId === handleId)
+  if (!handle?.target || handle.inputSlot === undefined) return undefined
+
+  return {
+    target: handle.target,
+    targetHandle: `in-${handle.inputSlot}`,
+  }
 }
 
 interface ExposedInputSlot {

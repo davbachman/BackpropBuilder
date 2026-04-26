@@ -27,7 +27,13 @@ import {
   isFlexibleInputNodeType,
 } from '../domain/engine'
 import { canConnectGraphNodes, connectGraphNodes } from '../domain/graphEditing'
-import { groupForNode, nodeIdsInGroups, removeNodesFromVisualGroups, visualGroupInterface } from '../domain/grouping'
+import {
+  groupForNode,
+  nodeIdsInGroups,
+  removeNodesFromVisualGroups,
+  resolveVisualGroupInputHandle,
+  visualGroupInterface,
+} from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type {
   ActivationKind,
@@ -150,7 +156,6 @@ function GraphCanvasInner({
           width: group.dimensions.width,
           height: group.dimensions.height,
           selected: group.id === selectedGroupId,
-          connectable: false,
           data: {
             group,
             inputCount: groupInterface?.inputs.length ?? 0,
@@ -382,9 +387,10 @@ function GraphCanvasInner({
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      const graphConnection = normalizeCanvasConnection(graph, connection)
       const nextGraph = connectGraphNodes(
         graph,
-        connection,
+        graphConnection,
         (source, target, inputSlot) => `${source}-${target}-${inputSlot}-${Date.now()}`,
       )
       if (!nextGraph) return
@@ -395,7 +401,7 @@ function GraphCanvasInner({
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge<BuilderEdgeData>) => {
-      return canConnectGraphNodes(graph, connection)
+      return canConnectGraphNodes(graph, normalizeCanvasConnection(graph, connection))
     },
     [graph],
   )
@@ -515,6 +521,23 @@ function minimumInputCountForNode(graph: GraphModel, node: GraphNode): number {
     .reduce((highest, edge) => Math.max(highest, edge.inputSlot ?? 0), -1)
 
   return Math.max(2, highestConnectedSlot + 1)
+}
+
+function normalizeCanvasConnection<TConnection extends Connection | Edge<BuilderEdgeData>>(
+  graph: GraphModel,
+  connection: TConnection,
+): TConnection {
+  const targetGroupId = connection.target ? groupIdFromNodeId(connection.target) : undefined
+  if (!targetGroupId) return connection
+
+  const resolvedTarget = resolveVisualGroupInputHandle(graph, targetGroupId, connection.targetHandle ?? undefined)
+  if (!resolvedTarget) return connection
+
+  return {
+    ...connection,
+    target: resolvedTarget.target,
+    targetHandle: resolvedTarget.targetHandle,
+  }
 }
 
 function groupNodeId(groupId: string): string {

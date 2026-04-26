@@ -17,7 +17,7 @@ Backprop Builder uses `@xyflow/react` for canvas interaction. `GraphCanvas.tsx` 
 
 `GraphCanvas` will compute the target input slot for a new connection. If a slot already has an incoming edge, the connection is valid as long as replacing that edge would not create a cycle. On connect, the old edge for that target slot is removed and the new edge is appended as a single graph change.
 
-`visualGroupInterface` will expose group input handles from the group's internal input slots. Existing boundary edges keep their current handle order. When a boundary edge is deleted, the target node slot is still exposed as an unconnected group input handle, so the user can reconnect into the group.
+`visualGroupInterface` will expose group input handles from the group's internal input slots. Existing boundary edges keep their current handle order. When a boundary edge is deleted, the target node slot is still exposed as an unconnected group input handle, so the user can reconnect into the group. Dropping a wire onto a group input handle will resolve that visual handle back to the hidden internal node input before replacement validation runs.
 
 ## Testing
 
