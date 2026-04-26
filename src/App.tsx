@@ -15,6 +15,11 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from 're
 import './App.css'
 import { GraphCanvas } from './components/GraphCanvas'
 import {
+  copyGraphSelection,
+  pasteGraphClipboard,
+  type GraphClipboardFragment,
+} from './domain/clipboard'
+import {
   backwardPass,
   cloneGraph,
   formatNumber,
@@ -57,6 +62,7 @@ const MAX_PLAY_DELAY_MS = 1800
 const DEFAULT_PLAY_DELAY_MS = 900
 const DEFAULT_SPEED_SLIDER_VALUE = MIN_PLAY_DELAY_MS + MAX_PLAY_DELAY_MS - DEFAULT_PLAY_DELAY_MS
 const HISTORY_LIMIT = 100
+const PASTE_OFFSET_STEP = 36
 
 interface HistorySnapshot {
   graph: GraphModel
@@ -96,6 +102,8 @@ function App(): ReactElement {
   const [completedActions, setCompletedActions] = useState<string[]>([])
   const [pendingNodeType, setPendingNodeType] = useState<NodeType | undefined>()
   const [undoStack, setUndoStack] = useState<HistorySnapshot[]>([])
+  const [clipboard, setClipboard] = useState<GraphClipboardFragment | undefined>()
+  const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = validationIssues.filter((issue) => issue.code !== 'disconnected')
@@ -179,17 +187,62 @@ function App(): ReactElement {
     if (selection.nodeIds.length > 0 || selection.groupId) setPendingNodeType(undefined)
   }, [])
 
+  const copySelectionToClipboard = useCallback((): boolean => {
+    const fragment = copyGraphSelection(graph, { nodeIds: selectedNodeIds, groupId: selectedGroupId })
+    if (!fragment) return false
+
+    setClipboard(fragment)
+    setClipboardPasteCount(0)
+    return true
+  }, [graph, selectedGroupId, selectedNodeIds])
+
+  const pasteClipboard = useCallback((): boolean => {
+    if (!clipboard) return false
+
+    pushHistory()
+    const offset = PASTE_OFFSET_STEP * (clipboardPasteCount + 1)
+    const result = pasteGraphClipboard(graph, clipboard, { x: offset, y: offset })
+    setGraph(result.graph)
+    setSelectedNodeIds(result.selection.nodeIds)
+    setSelectedGroupId(result.selection.groupId)
+    setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setPendingNodeType(undefined)
+    setIsPlaying(false)
+    setClipboardPasteCount((count) => count + 1)
+    return true
+  }, [clipboard, clipboardPasteCount, graph, pushHistory])
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== 'z' || (!event.metaKey && !event.ctrlKey) || event.shiftKey) return
-      if (undoStack.length === 0) return
-      event.preventDefault()
-      undoLastAction()
+      if (event.defaultPrevented || isEditableShortcutTarget(event.target)) return
+      if ((!event.metaKey && !event.ctrlKey) || event.shiftKey) return
+
+      const key = event.key.toLowerCase()
+
+      if (key === 'z') {
+        if (undoStack.length === 0) return
+        event.preventDefault()
+        undoLastAction()
+        return
+      }
+
+      if (key === 'c') {
+        if (!copySelectionToClipboard()) return
+        event.preventDefault()
+        return
+      }
+
+      if (key === 'v') {
+        if (!pasteClipboard()) return
+        event.preventDefault()
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [undoLastAction, undoStack.length])
+  }, [copySelectionToClipboard, pasteClipboard, undoLastAction, undoStack.length])
 
   const loadGraph = useCallback((nextGraph: GraphModel, lesson?: LessonDefinition) => {
     pushHistory()
@@ -701,6 +754,12 @@ function cloneTraceSteps(steps: EvaluationTraceStep[]): EvaluationTraceStep[] {
 
 function stringArraysEqual(first: string[], second: string[]): boolean {
   return first.length === second.length && first.every((value, index) => value === second[index])
+}
+
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tagName = target.tagName.toLowerCase()
+  return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'
 }
 
 function safeForward(graph: GraphModel): { graph: GraphModel; loss?: number } {
