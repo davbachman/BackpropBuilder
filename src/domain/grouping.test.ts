@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest'
+import { MIN_NODE_HEIGHT, NODE_WIDTH } from './engine'
+import { createStarterGraph } from './examples'
+import { explodeVisualGroup, mergeNodesIntoVisualGroup, moveVisualGroup, visualGroupInterface } from './grouping'
+
+describe('visual graph grouping', () => {
+  it('merges selected nodes into editor metadata without changing computation nodes or edges', () => {
+    const graph = createStarterGraph()
+
+    const result = mergeNodesIntoVisualGroup(graph, ['x', 'w', 'mul'])
+
+    expect(result.group).toEqual(
+      expect.objectContaining({
+        id: 'group-1',
+        label: 'Group 1',
+        nodeIds: ['x', 'w', 'mul'],
+        dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
+      }),
+    )
+    expect(result.graph.nodes).toEqual(graph.nodes)
+    expect(result.graph.edges).toEqual(graph.edges)
+    expect(result.graph.groups).toHaveLength(1)
+  })
+
+  it('moves a merged group by translating the hidden member nodes with it', () => {
+    const graph = mergeNodesIntoVisualGroup(createStarterGraph(), ['x', 'w', 'mul']).graph
+    const group = graph.groups?.[0]
+    expect(group).toBeDefined()
+
+    const moved = moveVisualGroup(graph, group!.id, {
+      x: group!.position.x + 75,
+      y: group!.position.y + 40,
+    })
+
+    expect(moved.groups?.[0].position).toEqual({ x: group!.position.x + 75, y: group!.position.y + 40 })
+    expect(moved.nodes.find((node) => node.id === 'x')?.position).toEqual({ x: 115, y: 100 })
+    expect(moved.nodes.find((node) => node.id === 'w')?.position).toEqual({ x: 115, y: 300 })
+    expect(moved.nodes.find((node) => node.id === 'mul')?.position).toEqual({ x: 395, y: 200 })
+    expect(moved.edges).toEqual(graph.edges)
+  })
+
+  it('explodes a merged group back into the original visible computation nodes', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['x', 'w', 'mul']).graph
+
+    const exploded = explodeVisualGroup(grouped, 'group-1')
+
+    expect(exploded.groups).toEqual([])
+    expect(exploded.nodes.map((node) => node.id)).toEqual(grouped.nodes.map((node) => node.id))
+    expect(exploded.edges).toEqual(grouped.edges)
+  })
+
+  it('derives collapsed group inputs and outputs from boundary edges', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
+    const group = grouped.groups?.[0]
+    expect(group).toBeDefined()
+
+    const groupInterface = visualGroupInterface(grouped, group!)
+
+    expect(groupInterface.inputs).toEqual([
+      { edgeId: 'x-mul', handleId: 'in-0' },
+      { edgeId: 'w-mul', handleId: 'in-1' },
+      { edgeId: 'b-add', handleId: 'in-2' },
+    ])
+    expect(groupInterface.outputs).toEqual([{ edgeId: 'add-act', handleId: 'out-0' }])
+  })
+})
