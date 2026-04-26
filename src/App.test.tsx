@@ -251,6 +251,22 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
   })
 
+  it('copies and pastes the selected graph node with Command-C and Command-V', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+
+    fireEvent.keyDown(document, { key: 'c', metaKey: true })
+    fireEvent.keyDown(document, { key: 'v', metaKey: true })
+
+    expect(screen.getByText('9 nodes, 7 edges')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'z', metaKey: true })
+
+    expect(screen.getByText('8 nodes, 7 edges')).toBeInTheDocument()
+  })
+
   it('undoes source value edits with Command-Z', async () => {
     const user = userEvent.setup()
     render(<App />)
