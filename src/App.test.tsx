@@ -27,6 +27,19 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('button', { name: /Run 10 training steps/i })).toBeInTheDocument()
   })
 
+  it('activates the visualization panel on demand', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.queryByRole('region', { name: /Visualization panel/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await user.click(screen.getByRole('button', { name: /Show visualization/i }))
+
+    expect(screen.getByRole('region', { name: /Visualization panel/i })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
+  })
+
   it('starts with a blank canvas instead of the starter example', () => {
     render(<App />)
 
@@ -99,6 +112,76 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('z2 = z1 + b')).toBeInTheDocument()
     expect(screen.getAllByText('z3 = sigmoid(z2)').length).toBeGreaterThan(0)
     expect(screen.getByText('L = 0.5 * (z3 - y)^2')).toBeInTheDocument()
+  })
+
+  it('renders a loss dropdown and updates the displayed loss formula', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'pred', type: 'input', label: 'pred', position: { x: 80, y: 80 }, params: { value: scalarValue(0.4) } },
+        { id: 'target', type: 'target', label: 'y', position: { x: 80, y: 240 }, params: { value: scalarValue(1) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 340, y: 160 }, params: {} },
+      ],
+      edges: [
+        { id: 'pred-loss', source: 'pred', target: 'loss', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+    const onLossChange = vi.fn()
+    const noop = vi.fn()
+    const { rerender } = render(
+      <GraphCanvas
+        graph={graph}
+        showMath
+        showGradient
+        phase="edit"
+        onGraphChange={noop}
+        onSelectionChange={noop}
+        onCreateNode={noop}
+        onCancelPendingPlacement={noop}
+        onNodeValueChange={noop}
+        onActivationChange={noop}
+        onLossChange={onLossChange}
+        onGroupCreate={noop}
+        onGroupExplode={noop}
+        onGroupMove={noop}
+      />,
+    )
+    const lossSelect = screen
+      .getAllByRole('combobox', { hidden: true })
+      .find((element) => element.getAttribute('aria-label') === 'loss')
+    expect(lossSelect).toBeDefined()
+    expect(lossSelect).toHaveValue('squared-error')
+
+    fireEvent.change(lossSelect!, { target: { value: 'mse' } })
+
+    expect(onLossChange).toHaveBeenCalledWith('loss', 'mse')
+
+    rerender(
+      <GraphCanvas
+        graph={{
+          ...graph,
+          nodes: graph.nodes.map((node) =>
+            node.id === 'loss' ? { ...node, params: { ...node.params, loss: 'mse' } } : node,
+          ),
+        }}
+        showMath
+        showGradient
+        phase="edit"
+        onGraphChange={noop}
+        onSelectionChange={noop}
+        onCreateNode={noop}
+        onCancelPendingPlacement={noop}
+        onNodeValueChange={noop}
+        onActivationChange={noop}
+        onLossChange={onLossChange}
+        onGroupCreate={noop}
+        onGroupExplode={noop}
+        onGroupMove={noop}
+      />,
+    )
+
+    expect(screen.getByText('L = (pred - y)^2')).toBeInTheDocument()
   })
 
   it('accepts tensor literals in source nodes and keeps node tensor displays compact with full hover text', async () => {

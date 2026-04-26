@@ -9,6 +9,7 @@ export type NodeType =
   | 'loss'
 
 export type ActivationKind = 'identity' | 'relu' | 'sigmoid' | 'tanh'
+export type LossKind = 'squared-error' | 'mse' | 'mae' | 'binary-cross-entropy'
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
 
@@ -20,6 +21,7 @@ export interface Position {
 export interface NodeParams {
   value?: TensorValue | number
   activation?: ActivationKind
+  loss?: LossKind
   inputCount?: number
 }
 

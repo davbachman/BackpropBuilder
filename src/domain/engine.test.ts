@@ -127,6 +127,27 @@ describe('scalar autodiff engine', () => {
     expect(formulaForNode(graph.nodes[4], graph)).toBe('z2 = z1 + x3')
   })
 
+  it('uses tensor loss formulas when an incoming operation output shape is tensor', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'x', type: 'input', label: 'x', position: { x: 0, y: 0 }, params: { value: tensorValue([2], [1, 2]) } },
+        { id: 'w', type: 'weight', label: 'w', position: { x: 0, y: 140 }, params: { value: scalarValue(2) } },
+        { id: 'mul', type: 'multiply', label: 'multiply', position: { x: 240, y: 70 }, params: {} },
+        { id: 'target', type: 'target', label: 'y', position: { x: 240, y: 220 }, params: { value: scalarValue(1) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 480, y: 140 }, params: { loss: 'mse' } },
+      ],
+      edges: [
+        { id: 'x-mul', source: 'x', target: 'mul', inputSlot: 0 },
+        { id: 'w-mul', source: 'w', target: 'mul', inputSlot: 1 },
+        { id: 'mul-loss', source: 'mul', target: 'loss', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+
+    expect(formulaForNode(graph.nodes[4], graph)).toBe('L = (1/n) * Σ_i (z1_i - y_i)^2')
+  })
+
   it('supports add nodes with more than two inputs', () => {
     const graph: GraphModel = {
       learningRate: 0.1,
@@ -318,6 +339,30 @@ describe('scalar autodiff engine', () => {
     expect(forward.graph.nodes.find((node) => node.id === 'pred')?.value).toEqual(tensorValue([3], [0.5, 3, 3.5]))
     expect(forward.graph.nodes.find((node) => node.id === 'loss')?.value).toEqual(scalarValue(0.25))
     expect(forward.loss).toBeCloseTo(0.25)
+  })
+
+  it('averages selected mean squared error over tensor entries and scales gradients', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'pred', type: 'input', label: 'pred', position: { x: 0, y: 0 }, params: { value: tensorValue([3], [2, 4, 6]) } },
+        { id: 'target', type: 'target', label: 'y', position: { x: 0, y: 140 }, params: { value: tensorValue([3], [1, 1, 3]) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 260, y: 70 }, params: { loss: 'mse' } },
+      ],
+      edges: [
+        { id: 'pred-loss', source: 'pred', target: 'loss', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+
+    const lossNode = graph.nodes.find((node) => node.id === 'loss')!
+    const forward = forwardPass(graph)
+    const backward = backwardPass(forward.graph)
+
+    expect(formulaForNode(lossNode, graph)).toBe('L = (1/n) * Σ_i (pred_i - y_i)^2')
+    expect(forward.graph.nodes.find((node) => node.id === 'loss')?.value).toEqual(scalarValue(19 / 3))
+    expect(forward.loss).toBeCloseTo(19 / 3)
+    expect(backward.graph.nodes.find((node) => node.id === 'pred')?.grad).toEqual(tensorValue([3], [2 / 3, 2, 2]))
   })
 
   it('backpropagates tensor gradients and reduces broadcast scalar parameter gradients', () => {

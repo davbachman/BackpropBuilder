@@ -4,6 +4,7 @@ import {
   Calculator,
   Download,
   FastForward,
+  Eye,
   GraduationCap,
   Pause,
   Play,
@@ -14,6 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import './App.css'
 import { GraphCanvas } from './components/GraphCanvas'
+import { VisualizationPanel } from './components/VisualizationPanel'
 import {
   copyGraphSelection,
   pasteGraphClipboard,
@@ -42,6 +44,7 @@ import type {
   GraphModel,
   GraphPhase,
   LessonDefinition,
+  LossKind,
   NodeType,
   TensorValue,
 } from './domain/types'
@@ -93,6 +96,7 @@ function App(): ReactElement {
   const [showMath, setShowMath] = useState(true)
   const [showGradient, setShowGradient] = useState(true)
   const [showCode, setShowCode] = useState(false)
+  const [showVisualization, setShowVisualization] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speedSliderValue, setSpeedSliderValue] = useState(DEFAULT_SPEED_SLIDER_VALUE)
   const [epoch, setEpoch] = useState(0)
@@ -413,6 +417,17 @@ function App(): ReactElement {
     setPhase('edit')
   }, [pushHistory])
 
+  const updateLoss = useCallback((nodeId: string, loss: LossKind) => {
+    pushHistory()
+    setGraph((existing) => ({
+      ...existing,
+      nodes: existing.nodes.map((node) =>
+        node.id === nodeId ? { ...node, params: { ...node.params, loss } } : node,
+      ),
+    }))
+    setPhase('edit')
+  }, [pushHistory])
+
   const updateLearningRate = (learningRate: number) => {
     pushHistory()
     setGraph((existing) => ({ ...existing, learningRate }))
@@ -541,6 +556,15 @@ function App(): ReactElement {
             <Shuffle size={16} />
             Randomize parameters
           </button>
+          <button
+            type="button"
+            className={showVisualization ? 'panel-toggle-button is-active' : 'panel-toggle-button'}
+            aria-pressed={showVisualization}
+            onClick={() => setShowVisualization((visible) => !visible)}
+          >
+            <Eye size={16} />
+            {showVisualization ? 'Hide visualization' : 'Show visualization'}
+          </button>
         </section>
 
         <section className="panel-section toggle-stack">
@@ -596,12 +620,15 @@ function App(): ReactElement {
         onCancelPendingPlacement={clearPendingPlacement}
         onNodeValueChange={updateNodeValue}
         onActivationChange={updateActivation}
+        onLossChange={updateLoss}
         onGroupCreate={mergeSelectedNodes}
         onGroupExplode={explodeGroup}
         onGroupMove={moveGroup}
       />
 
       <aside className="right-panel">
+        {showVisualization ? <VisualizationPanel graph={graph} /> : null}
+
         <section className="inspector-card">
           <p className="eyebrow">Inspector</p>
           <h2>Current phase: {phaseLabel(phase)}</h2>

@@ -8,13 +8,15 @@ import { Box, CircleDot, Crosshair, Plus, Sigma } from 'lucide-react'
 import { useEffect, useState, type ReactElement } from 'react'
 import {
   FLEX_INPUT_HEIGHT_STEP,
+  LOSS_OPTIONS,
   MAX_FLEX_INPUT_COUNT,
   heightForInputCount,
   inputArityForNode,
   isFlexibleInputNodeType,
+  lossKindForNode,
 } from '../domain/engine'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
-import type { GraphNode, NodeType, TensorValue } from '../domain/types'
+import type { GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
 
 export interface BuilderNodeData extends Record<string, unknown> {
   graphNode: GraphNode
@@ -26,6 +28,7 @@ export interface BuilderNodeData extends Record<string, unknown> {
   onFlexibleInputAdd: (nodeId: string) => void
   onValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, value: string) => void
+  onLossChange: (nodeId: string, value: LossKind) => void
 }
 
 const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
@@ -115,6 +118,23 @@ export function BuilderNode(props: NodeProps): ReactElement {
             <option value="relu">ReLU</option>
             <option value="sigmoid">sigmoid</option>
             <option value="tanh">tanh</option>
+          </select>
+        </label>
+      ) : null}
+      {node.type === 'loss' ? (
+        <label className="node-field">
+          loss
+          <select
+            aria-label="loss"
+            className="nodrag nowheel"
+            value={lossKindForNode(node)}
+            onChange={(event) => data.onLossChange(node.id, event.target.value as LossKind)}
+          >
+            {LOSS_OPTIONS.map((option) => (
+              <option key={option.kind} value={option.kind}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
       ) : null}

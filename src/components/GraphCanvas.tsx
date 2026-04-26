@@ -41,6 +41,7 @@ import type {
   EvaluationTraceStep,
   GraphModel,
   GraphNode,
+  LossKind,
   NodeType,
   Position as GraphPosition,
   TensorValue,
@@ -78,6 +79,7 @@ interface GraphCanvasProps {
   onCancelPendingPlacement: () => void
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
+  onLossChange?: (nodeId: string, loss: LossKind) => void
   onGroupCreate: () => void
   onGroupExplode: (groupId: string) => void
   onGroupMove: (groupId: string, position: GraphPosition) => void
@@ -107,6 +109,7 @@ function GraphCanvasInner({
   onCancelPendingPlacement,
   onNodeValueChange,
   onActivationChange,
+  onLossChange,
   onGroupCreate,
   onGroupExplode,
   onGroupMove,
@@ -193,6 +196,7 @@ function GraphCanvasInner({
             onFlexibleInputAdd: addFlexibleInput,
             onValueChange: onNodeValueChange,
             onActivationChange: (nodeId: string, value: string) => onActivationChange(nodeId, value as ActivationKind),
+            onLossChange: onLossChange ?? (() => undefined),
           },
         }))
 
@@ -201,6 +205,7 @@ function GraphCanvasInner({
     [
       activeStep?.nodeId,
       onActivationChange,
+      onLossChange,
       addFlexibleInput,
       onNodeValueChange,
       onGroupExplode,
