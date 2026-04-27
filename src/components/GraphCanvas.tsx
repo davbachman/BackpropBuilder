@@ -25,9 +25,11 @@ import {
   heightForInputCount,
   inputArityForNode,
   isFlexibleInputNodeType,
+  outputArityForNode,
 } from '../domain/engine'
-import { canConnectGraphNodes, connectGraphNodes } from '../domain/graphEditing'
+import { canConnectGraphNodes, connectGraphNodes, type GraphConnection } from '../domain/graphEditing'
 import {
+  deleteVisualGroup,
   groupForNode,
   nodeIdsInGroups,
   removeNodesFromVisualGroups,
@@ -38,6 +40,7 @@ import {
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type {
   ActivationKind,
+  DatasetKind,
   EvaluationTraceStep,
   GraphModel,
   GraphNode,
@@ -80,6 +83,7 @@ interface GraphCanvasProps {
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
   onLossChange?: (nodeId: string, loss: LossKind) => void
+  onDatasetChange?: (nodeId: string, dataset: DatasetKind) => void
   onGroupCreate: () => void
   onGroupExplode: (groupId: string) => void
   onGroupMove: (groupId: string, position: GraphPosition) => void
@@ -110,6 +114,7 @@ function GraphCanvasInner({
   onNodeValueChange,
   onActivationChange,
   onLossChange,
+  onDatasetChange,
   onGroupCreate,
   onGroupExplode,
   onGroupMove,
@@ -165,7 +170,8 @@ function GraphCanvasInner({
             inputCount: groupInterface?.inputs.length ?? 0,
             outputCount: groupInterface?.outputs.length ?? 0,
             outputMetrics: (groupInterface?.outputs ?? []).map((output) => {
-              const edge = renderedGraph.edges.find((candidate) => candidate.id === output.edgeId)
+              const edgeIds = edgeIdsForVisualGroupHandle(output)
+              const edge = renderedGraph.edges.find((candidate) => edgeIds.includes(candidate.id))
               return { forward: edge?.value, gradient: edge?.grad }
             }),
             showGradient,
@@ -193,10 +199,12 @@ function GraphCanvasInner({
             formula: formulaForNode(node, renderedGraph, formatCompactTensor),
             fullFormula: formulaForNode(node, renderedGraph, formatFullTensor),
             active: activeStep?.nodeId === node.id,
+            hasIncomingValue: renderedGraph.edges.some((edge) => edge.target === node.id),
             onFlexibleInputAdd: addFlexibleInput,
             onValueChange: onNodeValueChange,
             onActivationChange: (nodeId: string, value: string) => onActivationChange(nodeId, value as ActivationKind),
             onLossChange: onLossChange ?? (() => undefined),
+            onDatasetChange: onDatasetChange ?? (() => undefined),
           },
         }))
 
@@ -206,6 +214,7 @@ function GraphCanvasInner({
       activeStep?.nodeId,
       onActivationChange,
       onLossChange,
+      onDatasetChange,
       addFlexibleInput,
       onNodeValueChange,
       onGroupExplode,
@@ -226,7 +235,7 @@ function GraphCanvasInner({
         const targetGroup = groupForNode(renderedGraph, edge.target)
         if (sourceGroup?.id && sourceGroup.id === targetGroup?.id) return []
         const sourceHandle = sourceGroup
-          ? groupInterfaces.get(sourceGroup.id)?.outputs.find((handle) => handle.edgeId === edge.id)?.handleId
+          ? groupInterfaces.get(sourceGroup.id)?.outputs.find((handle) => visualGroupHandleHasEdge(handle, edge.id))?.handleId
           : undefined
         const targetHandle = targetGroup
           ? groupInterfaces.get(targetGroup.id)?.inputs.find((handle) => handle.edgeId === edge.id)?.handleId
@@ -237,7 +246,7 @@ function GraphCanvasInner({
             id: edge.id,
             source: sourceGroup ? groupNodeId(sourceGroup.id) : edge.source,
             target: targetGroup ? groupNodeId(targetGroup.id) : edge.target,
-            sourceHandle: sourceHandle ?? 'out',
+            sourceHandle: sourceHandle ?? sourceHandleForEdge(renderedGraph, edge),
             targetHandle: targetHandle ?? `in-${edge.inputSlot ?? 0}`,
             type: 'builderEdge',
             animated: activeStep?.edgeIds.includes(edge.id),
@@ -332,16 +341,22 @@ function GraphCanvasInner({
       }
 
       if (removedGroupIds.length > 0) {
-        onGroupExplode(removedGroupIds[0])
+        nextGraph = removedGroupIds.reduce(
+          (currentGraph, groupId) => deleteVisualGroup(currentGraph, groupId),
+          nextGraph ?? graph,
+        )
+        onSelectionChange({ nodeIds: [] })
+        onCancelPendingPlacement()
       }
 
       if (removedGraphNodeIds.length > 0) {
         const removed = new Set(removedGraphNodeIds)
+        const sourceGraph = nextGraph ?? graph
         nextGraph = {
-          ...graph,
-          nodes: graph.nodes.filter((node) => !removed.has(node.id)),
-          edges: graph.edges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)),
-          groups: removeNodesFromVisualGroups(graph, removed),
+          ...sourceGraph,
+          nodes: sourceGraph.nodes.filter((node) => !removed.has(node.id)),
+          edges: sourceGraph.edges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)),
+          groups: removeNodesFromVisualGroups(sourceGraph, removed),
         }
         onSelectionChange({ nodeIds: [] })
         onCancelPendingPlacement()
@@ -352,7 +367,7 @@ function GraphCanvasInner({
       }
       onNodesChangeBase(changes)
     },
-    [graph, nodes, onCancelPendingPlacement, onGraphChange, onGroupExplode, onNodesChangeBase, onSelectionChange],
+    [graph, nodes, onCancelPendingPlacement, onGraphChange, onNodesChangeBase, onSelectionChange],
   )
 
   const onEdgesChange = useCallback(
@@ -529,11 +544,26 @@ function minimumInputCountForNode(graph: GraphModel, node: GraphNode): number {
   return Math.max(2, highestConnectedSlot + 1)
 }
 
-function normalizeCanvasConnection<TConnection extends Connection | Edge<BuilderEdgeData>>(
+function sourceHandleForEdge(graph: GraphModel, edge: { source: string; sourceSlot?: number }): string {
+  const source = graph.nodes.find((node) => node.id === edge.source)
+  if (!source || outputArityForNode(source) <= 1) return 'out'
+  return `out-${edge.sourceSlot ?? 0}`
+}
+
+function visualGroupHandleHasEdge(handle: { edgeId?: string; edgeIds?: string[] }, edgeId: string): boolean {
+  return edgeIdsForVisualGroupHandle(handle).includes(edgeId)
+}
+
+function edgeIdsForVisualGroupHandle(handle: { edgeId?: string; edgeIds?: string[] }): string[] {
+  if (handle.edgeIds) return handle.edgeIds
+  return handle.edgeId ? [handle.edgeId] : []
+}
+
+function normalizeCanvasConnection(
   graph: GraphModel,
-  connection: TConnection,
-): TConnection {
-  let normalizedConnection = connection
+  connection: Connection | Edge<BuilderEdgeData>,
+): GraphConnection {
+  let normalizedConnection: GraphConnection = connection
   const sourceGroupId = connection.source ? groupIdFromNodeId(connection.source) : undefined
   if (sourceGroupId) {
     const resolvedSource = resolveVisualGroupOutputHandle(graph, sourceGroupId, connection.sourceHandle ?? undefined)
@@ -541,6 +571,8 @@ function normalizeCanvasConnection<TConnection extends Connection | Edge<Builder
       normalizedConnection = {
         ...normalizedConnection,
         source: resolvedSource.source,
+        sourceHandle: resolvedSource.sourceHandle,
+        replaceEdgeId: resolvedSource.edgeId,
       }
     }
   }

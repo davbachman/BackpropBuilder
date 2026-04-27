@@ -4,19 +4,24 @@ import {
   useUpdateNodeInternals,
   type NodeProps,
 } from '@xyflow/react'
-import { Box, CircleDot, Crosshair, Plus, Sigma } from 'lucide-react'
+import { Box, CircleDot, Crosshair, Database, Plus, Sigma } from 'lucide-react'
 import { useEffect, useState, type ReactElement } from 'react'
 import {
   FLEX_INPUT_HEIGHT_STEP,
+  DATASET_OPTIONS,
   LOSS_OPTIONS,
   MAX_FLEX_INPUT_COUNT,
+  datasetForNode,
+  datasetOutputLabelForSlot,
+  datasetOutputValueForSlot,
   heightForInputCount,
   inputArityForNode,
   isFlexibleInputNodeType,
   lossKindForNode,
+  outputArityForNode,
 } from '../domain/engine'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
-import type { GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
+import type { DatasetKind, GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
 
 export interface BuilderNodeData extends Record<string, unknown> {
   graphNode: GraphNode
@@ -25,13 +30,16 @@ export interface BuilderNodeData extends Record<string, unknown> {
   formula: string
   fullFormula: string
   active: boolean
+  hasIncomingValue: boolean
   onFlexibleInputAdd: (nodeId: string) => void
   onValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, value: string) => void
   onLossChange: (nodeId: string, value: LossKind) => void
+  onDatasetChange: (nodeId: string, value: DatasetKind) => void
 }
 
 const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
+  dataset: Database,
   input: CircleDot,
   weight: Sigma,
   bias: Sigma,
@@ -48,11 +56,16 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const updateNodeInternals = useUpdateNodeInternals()
   const Icon = ICON_BY_TYPE[node.type]
   const inputCount = inputArityForNode(node)
+  const outputCount = outputArityForNode(node)
   const isFlexibleInputNode = isFlexibleInputNodeType(node.type)
   const nodeHeight = node.dimensions?.height ?? heightForInputCount(inputCount)
   const canAddInput = isFlexibleInputNode && inputCount < MAX_FLEX_INPUT_COUNT
-  const isSource = node.type !== 'loss'
-  const editableValue = node.type === 'input' || node.type === 'weight' || node.type === 'bias' || node.type === 'target'
+  const isSource = outputCount > 0
+  const editableValue =
+    node.type === 'weight' ||
+    node.type === 'bias' ||
+    ((node.type === 'input' || node.type === 'target') && !data.hasIncomingValue)
+  const selectedDataset = node.type === 'dataset' ? datasetForNode(node) : undefined
   const showTypeBadge = node.label.trim().toLowerCase() !== node.type
   const valueText = formatTensorInput(node.params.value)
   const [valueDraft, setValueDraft] = useState({ source: valueText, text: valueText, valid: true })
@@ -138,6 +151,23 @@ export function BuilderNode(props: NodeProps): ReactElement {
           </select>
         </label>
       ) : null}
+      {selectedDataset ? (
+        <label className="node-field">
+          dataset
+          <select
+            aria-label="dataset"
+            className="nodrag nowheel"
+            value={selectedDataset.kind}
+            onChange={(event) => data.onDatasetChange(node.id, event.target.value as DatasetKind)}
+          >
+            {DATASET_OPTIONS.map((option) => (
+              <option key={option.kind} value={option.kind}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {editableValue ? (
         <label className="node-field">
           value
@@ -156,15 +186,51 @@ export function BuilderNode(props: NodeProps): ReactElement {
         </label>
       ) : null}
       <div className="node-metrics">
-        <TensorMetric label="out" value={node.value} />
+        {node.type === 'dataset' ? (
+          Array.from({ length: outputCount }).map((_, index) => (
+            <TensorMetric
+              key={index}
+              label={datasetOutputLabelForSlot(node, index)}
+              value={datasetOutputValueForSlot(node, index)}
+            />
+          ))
+        ) : (
+          <TensorMetric label="out" value={node.value} />
+        )}
         {node.localDerivative !== undefined ? <TensorMetric label="d local" value={node.localDerivative} /> : null}
         {data.showGradient ? <TensorMetric label="grad" value={node.grad} /> : null}
       </div>
       {isSource ? (
-        <Handle id="out" type="source" position={Position.Right} className="node-handle source-handle" />
+        Array.from({ length: outputCount }).map((_, index) => (
+          <Handle
+            key={index}
+            id={sourceHandleId(index, outputCount)}
+            type="source"
+            position={Position.Right}
+            className="node-handle source-handle"
+            style={outputCount > 1 ? { top: `${outputHandleTop(index)}px` } : undefined}
+          />
+        ))
+      ) : null}
+      {outputCount > 1 ? (
+        <div className="node-output-labels" aria-hidden="true">
+          {Array.from({ length: outputCount }).map((_, index) => (
+            <span key={index} style={{ top: `${outputHandleTop(index)}px` }}>
+              {datasetOutputLabelForSlot(node, index)}
+            </span>
+          ))}
+        </div>
       ) : null}
     </div>
   )
+}
+
+function sourceHandleId(index: number, outputCount: number): string {
+  return outputCount === 1 ? 'out' : `out-${index}`
+}
+
+function outputHandleTop(index: number): number {
+  return FLEX_INPUT_HEIGHT_STEP + index * 30
 }
 
 function TensorMetric({ label, value }: { label: string; value: TensorValue | undefined }): ReactElement {

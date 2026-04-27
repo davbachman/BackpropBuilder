@@ -1,4 +1,5 @@
 export type NodeType =
+  | 'dataset'
   | 'input'
   | 'weight'
   | 'bias'
@@ -10,6 +11,14 @@ export type NodeType =
 
 export type ActivationKind = 'identity' | 'relu' | 'sigmoid' | 'tanh'
 export type LossKind = 'squared-error' | 'mse' | 'mae' | 'binary-cross-entropy'
+export type DatasetKind =
+  | 'line-1d'
+  | 'cubic-1d'
+  | 'plane-2d'
+  | 'threshold-1d'
+  | 'circle-center'
+  | 'parabola-boundary'
+export type DatasetTask = 'regression' | 'binary-classification'
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
 
@@ -22,6 +31,7 @@ export interface NodeParams {
   value?: TensorValue | number
   activation?: ActivationKind
   loss?: LossKind
+  dataset?: DatasetKind
   inputCount?: number
 }
 
@@ -53,6 +63,7 @@ export interface GraphNode {
 export interface GraphEdge {
   id: string
   source: string
+  sourceSlot?: number
   target: string
   inputSlot?: number
   value?: TensorValue

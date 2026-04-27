@@ -1,7 +1,7 @@
 import { cloneGraph } from './engine'
 import type { EvaluationTraceStep, GraphModel, GraphPhase, NodeType } from './types'
 
-const SOURCE_TYPES = new Set<NodeType>(['input', 'weight', 'bias', 'target'])
+const SOURCE_TYPES = new Set<NodeType>(['dataset', 'input', 'weight', 'bias', 'target'])
 
 export function visibleGraphForTrace(
   graph: GraphModel,

@@ -46,6 +46,15 @@ describe('VisualizationPanel', () => {
     expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(625)
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(4)
   })
+
+  it('visualizes a network whose input and target values come from a dataset node', () => {
+    const { container } = render(<VisualizationPanel graph={datasetBackedSingleInputGraph()} />)
+
+    expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
+    expect(screen.getByText('x-axis: x')).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
+    expect(container.querySelector('.visualization-prediction-line')).toHaveAttribute('data-sample-count', '80')
+  })
 })
 
 function targetPointPositions(container: HTMLElement): Array<{ cx: string | null; cy: string | null }> {
@@ -122,6 +131,50 @@ function twoInputGraph(): GraphModel {
       { id: 'x1-add', source: 'x1', target: 'add', inputSlot: 0 },
       { id: 'x2-add', source: 'x2', target: 'add', inputSlot: 1 },
       { id: 'add-loss', source: 'add', target: 'loss', inputSlot: 0 },
+      { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+    ],
+  }
+}
+
+function datasetBackedSingleInputGraph(): GraphModel {
+  return {
+    learningRate: 0.1,
+    nodes: [
+      {
+        id: 'dataset',
+        type: 'dataset',
+        label: 'dataset',
+        position: { x: 20, y: 160 },
+        params: { dataset: 'line-1d' },
+      },
+      {
+        id: 'x',
+        type: 'input',
+        label: 'x',
+        position: { x: 260, y: 80 },
+        params: { value: tensorValue([1], [0]) },
+      },
+      { id: 'w', type: 'weight', label: 'w', position: { x: 260, y: 240 }, params: { value: scalarValue(1) } },
+      { id: 'b', type: 'bias', label: 'b', position: { x: 540, y: 240 }, params: { value: scalarValue(0) } },
+      { id: 'mul', type: 'multiply', label: 'x * w', position: { x: 540, y: 120 }, params: {} },
+      { id: 'add', type: 'add', label: 'xw + b', position: { x: 820, y: 160 }, params: {} },
+      {
+        id: 'target',
+        type: 'target',
+        label: 'y',
+        position: { x: 820, y: 340 },
+        params: { value: tensorValue([1], [0]) },
+      },
+      { id: 'loss', type: 'loss', label: 'loss', position: { x: 1100, y: 220 }, params: {} },
+    ],
+    edges: [
+      { id: 'dataset-x', source: 'dataset', sourceSlot: 0, target: 'x', inputSlot: 0 },
+      { id: 'x-mul', source: 'x', target: 'mul', inputSlot: 0 },
+      { id: 'w-mul', source: 'w', target: 'mul', inputSlot: 1 },
+      { id: 'mul-add', source: 'mul', target: 'add', inputSlot: 0 },
+      { id: 'b-add', source: 'b', target: 'add', inputSlot: 1 },
+      { id: 'add-loss', source: 'add', target: 'loss', inputSlot: 0 },
+      { id: 'dataset-target', source: 'dataset', sourceSlot: 1, target: 'target', inputSlot: 0 },
       { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
     ],
   }

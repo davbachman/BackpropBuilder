@@ -24,11 +24,13 @@ import {
 import {
   backwardPass,
   cloneGraph,
+  datasetOutputValueForSlot,
   formatNumber,
   forwardPass,
   formulaForNode,
   parameterValues,
   runTrainingStep,
+  remapDatasetOutputSlot,
   updateParameters,
   validateGraph,
 } from './domain/engine'
@@ -40,6 +42,7 @@ import { cloneTensor, scalarValue, toTensor, zeroLike } from './domain/tensor'
 import { visibleGraphForTrace } from './domain/traceVisibility'
 import type {
   ActivationKind,
+  DatasetKind,
   EvaluationTraceStep,
   GraphModel,
   GraphPhase,
@@ -50,6 +53,7 @@ import type {
 } from './domain/types'
 
 const palette: Array<{ type: NodeType; label: string }> = [
+  { type: 'dataset', label: 'Dataset' },
   { type: 'input', label: 'Input' },
   { type: 'weight', label: 'Weight' },
   { type: 'bias', label: 'Bias' },
@@ -451,6 +455,27 @@ function App(): ReactElement {
     setPhase('edit')
   }, [pushHistory])
 
+  const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
+    pushHistory()
+    const updateNode = (node: GraphModel['nodes'][number]) => {
+      if (node.id !== nodeId || node.type !== 'dataset') return node
+      const updated = { ...node, params: { ...node.params, dataset } }
+      const value = datasetOutputValueForSlot(updated, 0)
+      return { ...updated, value, grad: zeroLike(value) }
+    }
+    setGraph((existing) => ({
+      ...existing,
+      nodes: existing.nodes.map(updateNode),
+      edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
+    }))
+    setVisualizationGraph((existing) => ({
+      ...existing,
+      nodes: existing.nodes.map(updateNode),
+      edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
+    }))
+    setPhase('edit')
+  }, [pushHistory])
+
   const updateLearningRate = (learningRate: number) => {
     pushHistory()
     setGraph((existing) => ({ ...existing, learningRate }))
@@ -646,6 +671,7 @@ function App(): ReactElement {
         onNodeValueChange={updateNodeValue}
         onActivationChange={updateActivation}
         onLossChange={updateLoss}
+        onDatasetChange={updateDataset}
         onGroupCreate={mergeSelectedNodes}
         onGroupExplode={explodeGroup}
         onGroupMove={moveGroup}
@@ -819,6 +845,37 @@ function safeForward(graph: GraphModel): { graph: GraphModel; loss?: number } {
   if (issues.length > 0) return { graph: cloneGraph(graph) }
   const result = forwardPass(graph)
   return { graph: result.graph, loss: result.loss }
+}
+
+function remapDatasetOutgoingEdges(
+  graph: GraphModel,
+  nodeId: string,
+  dataset: DatasetKind,
+): GraphModel['edges'] {
+  const existingNode = graph.nodes.find((node) => node.id === nodeId && node.type === 'dataset')
+  if (!existingNode) return graph.edges
+
+  const updatedNode = { ...existingNode, params: { ...existingNode.params, dataset } }
+  return graph.edges.flatMap((edge) => {
+    if (edge.source !== nodeId) return [edge]
+
+    const nextSlot = remapDatasetOutputSlot(existingNode, updatedNode, edge.sourceSlot ?? 0)
+    if (nextSlot === undefined) return []
+
+    return [edgeWithSourceSlot(edge, nextSlot)]
+  })
+}
+
+function edgeWithSourceSlot(edge: GraphModel['edges'][number], sourceSlot: number): GraphModel['edges'][number] {
+  return {
+    id: edge.id,
+    source: edge.source,
+    ...(sourceSlot > 0 ? { sourceSlot } : {}),
+    target: edge.target,
+    inputSlot: edge.inputSlot,
+    value: edge.value,
+    grad: edge.grad,
+  }
 }
 
 export default App

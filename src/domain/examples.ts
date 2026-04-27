@@ -1,5 +1,6 @@
 import type { ActivationKind, GraphModel, GraphNode, NodeType } from './types'
-import { scalarValue } from './tensor'
+import { datasetOutputValueForSlot } from './datasets'
+import { scalarValue, zeroLike } from './tensor'
 
 const LR = 0.1
 
@@ -62,6 +63,7 @@ export function createNode(type: NodeType, index: number): GraphNode {
   const baseX = 160 + (index % 4) * 180
   const baseY = 120 + Math.floor(index / 4) * 150
   if (type === 'input') return sourceNode(`input-${index}`, type, `x${index}`, 1, baseX, baseY)
+  if (type === 'dataset') return datasetNode(`dataset-${index}`, 'dataset', baseX, baseY)
   if (type === 'weight') return sourceNode(`weight-${index}`, type, `w${index}`, 0.5, baseX, baseY)
   if (type === 'bias') return sourceNode(`bias-${index}`, type, `b${index}`, 0, baseX, baseY)
   if (type === 'target') return sourceNode(`target-${index}`, type, `y${index}`, 1, baseX, baseY)
@@ -69,6 +71,22 @@ export function createNode(type: NodeType, index: number): GraphNode {
     return { ...opNode(`activation-${index}`, type, 'activation', baseX, baseY), params: { activation: 'sigmoid' } }
   }
   return opNode(`${type}-${index}`, type, type, baseX, baseY)
+}
+
+function datasetNode(id: string, label: string, x: number, y: number): GraphNode {
+  const node: GraphNode = {
+    id,
+    type: 'dataset',
+    label,
+    position: { x, y },
+    params: { dataset: 'line-1d' },
+  }
+  const value = datasetOutputValueForSlot(node, 0)
+  return {
+    ...node,
+    value,
+    grad: zeroLike(value),
+  }
 }
 
 function sourceNode(

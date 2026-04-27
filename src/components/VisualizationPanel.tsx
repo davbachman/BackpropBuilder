@@ -271,8 +271,8 @@ function singleInputDataFor(
   predictionNode: GraphNode,
   targetNode: GraphNode,
 ): VisualizationData {
-  const input = toTensor(inputNode.params.value)
-  const target = toTensor(targetNode.params.value)
+  const input = toTensor(inputNode.value ?? inputNode.params.value)
+  const target = toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(input.data.length, target.data.length)
 
   if (!canExpandToSize(input, pointCount) || !canExpandToSize(target, pointCount)) {
@@ -313,9 +313,9 @@ function twoInputDataFor(
   predictionNode: GraphNode,
   targetNode: GraphNode,
 ): VisualizationData {
-  const firstInput = toTensor(inputNodes[0].params.value)
-  const secondInput = toTensor(inputNodes[1].params.value)
-  const target = toTensor(targetNode.params.value)
+  const firstInput = toTensor(inputNodes[0].value ?? inputNodes[0].params.value)
+  const secondInput = toTensor(inputNodes[1].value ?? inputNodes[1].params.value)
+  const target = toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(firstInput.data.length, secondInput.data.length, target.data.length)
 
   if (
@@ -438,8 +438,10 @@ function evaluatePredictionWithInputs(
   inputValues: Map<string, TensorValue>,
   sampledShape: number[],
 ): TensorValue | undefined {
+  const overriddenNodeIds = new Set([...inputValues.keys(), targetNodeId])
   const sampledGraph: GraphModel = {
     ...graph,
+    edges: graph.edges.filter((edge) => !overriddenNodeIds.has(edge.target)),
     nodes: graph.nodes.map((node) => {
       const inputValue = inputValues.get(node.id)
       if (inputValue) {

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   backwardPass,
+  DATASET_OPTIONS,
   formulaForNode,
   forwardPass,
   heightForInputCount,
   inputArityForNode,
+  outputArityForNode,
+  remapDatasetOutputSlot,
   updateParameters,
   validateGraph,
 } from './engine'
@@ -18,6 +21,88 @@ import type { GraphModel, TensorValue } from './types'
 
 function scalarOf(value: TensorValue | number | undefined): number {
   return scalarFromTensor(toTensor(value))
+}
+
+function maxLinearResidual(features: number[][], targets: number[]): number {
+  const rows = targets.map((target, index) => ({
+    inputs: [1, ...features.map((feature) => feature[index])],
+    target,
+  }))
+  const size = rows[0].inputs.length
+  const normalMatrix = Array.from({ length: size }, (_, row) =>
+    Array.from({ length: size }, (_, column) =>
+      rows.reduce((sum, entry) => sum + entry.inputs[row] * entry.inputs[column], 0),
+    ),
+  )
+  const normalTarget = Array.from({ length: size }, (_, row) =>
+    rows.reduce((sum, entry) => sum + entry.inputs[row] * entry.target, 0),
+  )
+  const coefficients = solveLinearSystem(normalMatrix, normalTarget)
+  return Math.max(
+    ...rows.map((entry) =>
+      Math.abs(entry.target - entry.inputs.reduce((sum, input, index) => sum + input * coefficients[index], 0)),
+    ),
+  )
+}
+
+function maxPolynomialResidual(feature: number[], targets: number[], degree: number): number {
+  const rows = targets.map((target, index) => ({
+    inputs: Array.from({ length: degree + 1 }, (_, power) => feature[index] ** power),
+    target,
+  }))
+  const size = degree + 1
+  const normalMatrix = Array.from({ length: size }, (_, row) =>
+    Array.from({ length: size }, (_, column) =>
+      rows.reduce((sum, entry) => sum + entry.inputs[row] * entry.inputs[column], 0),
+    ),
+  )
+  const normalTarget = Array.from({ length: size }, (_, row) =>
+    rows.reduce((sum, entry) => sum + entry.inputs[row] * entry.target, 0),
+  )
+  const coefficients = solveLinearSystem(normalMatrix, normalTarget)
+  return Math.max(
+    ...rows.map((entry) =>
+      Math.abs(entry.target - entry.inputs.reduce((sum, input, index) => sum + input * coefficients[index], 0)),
+    ),
+  )
+}
+
+function solveLinearSystem(matrix: number[][], target: number[]): number[] {
+  const rows = matrix.map((row, index) => [...row, target[index]])
+  for (let pivot = 0; pivot < rows.length; pivot += 1) {
+    const pivotRow = rows.slice(pivot).reduce((bestRow, row, offset) => {
+      const rowIndex = pivot + offset
+      return Math.abs(row[pivot]) > Math.abs(rows[bestRow][pivot]) ? rowIndex : bestRow
+    }, pivot)
+    ;[rows[pivot], rows[pivotRow]] = [rows[pivotRow], rows[pivot]]
+    const divisor = rows[pivot][pivot]
+    for (let column = pivot; column <= rows.length; column += 1) rows[pivot][column] /= divisor
+    for (let row = 0; row < rows.length; row += 1) {
+      if (row === pivot) continue
+      const factor = rows[row][pivot]
+      for (let column = pivot; column <= rows.length; column += 1) {
+        rows[row][column] -= factor * rows[pivot][column]
+      }
+    }
+  }
+  return rows.map((row) => row[rows.length])
+}
+
+function meanRadiusForClass(dataset: (typeof DATASET_OPTIONS)[number], classValue: number): number {
+  const [xValues, yValues] = dataset.featureValues
+  const radii = dataset.targetValue.data.flatMap((target, index) =>
+    target === classValue ? [Math.hypot(xValues.data[index], yValues.data[index])] : [],
+  )
+  return radii.reduce((sum, radius) => sum + radius, 0) / radii.length
+}
+
+function parabolaSeparationAccuracy(dataset: (typeof DATASET_OPTIONS)[number]): number {
+  const [xValues, yValues] = dataset.featureValues
+  const correct = dataset.targetValue.data.filter((target, index) => {
+    const prediction = yValues.data[index] > 0.55 * xValues.data[index] ** 2 - 0.65 ? 1 : 0
+    return prediction === target
+  }).length
+  return correct / dataset.targetValue.data.length
 }
 
 describe('scalar autodiff engine', () => {
@@ -48,6 +133,125 @@ describe('scalar autodiff engine', () => {
     expect(heightForInputCount(2)).toBeGreaterThanOrEqual(150)
     expect(heightForInputCount(3)).toBe(heightForInputCount(2))
     expect(heightForInputCount(4)).toBeGreaterThan(heightForInputCount(3))
+  })
+
+  it('offers one- and two-feature toy datasets for regression and binary classification', () => {
+    const taskKinds = new Set(DATASET_OPTIONS.map((dataset) => dataset.task))
+    const featureCounts = new Set(DATASET_OPTIONS.map((dataset) => dataset.featureLabels.length))
+
+    expect(taskKinds).toEqual(new Set(['regression', 'binary-classification']))
+    expect(featureCounts).toEqual(new Set([1, 2]))
+  })
+
+  it('keeps toy datasets near 20 aligned rows with deterministic noise', () => {
+    for (const dataset of DATASET_OPTIONS) {
+      expect(dataset.targetValue.shape).toEqual([20])
+      for (const feature of dataset.featureValues) {
+        expect(feature.shape).toEqual([20])
+      }
+
+      if (dataset.task === 'regression') {
+        expect(maxLinearResidual(dataset.featureValues.map((feature) => feature.data), dataset.targetValue.data)).toBeGreaterThan(0.03)
+      } else {
+        expect(new Set(dataset.targetValue.data)).toEqual(new Set([0, 1]))
+        expect(dataset.featureValues.some((feature) => feature.data.some((value) => !Number.isInteger(value)))).toBe(true)
+      }
+    }
+  })
+
+  it('includes the requested cubic, circle, and parabola toy datasets', () => {
+    const cubic = DATASET_OPTIONS.find((dataset) => dataset.kind === 'cubic-1d')
+    const circle = DATASET_OPTIONS.find((dataset) => dataset.kind === 'circle-center')
+    const parabola = DATASET_OPTIONS.find((dataset) => dataset.kind === 'parabola-boundary')
+
+    expect(cubic).toBeDefined()
+    expect(cubic?.task).toBe('regression')
+    expect(cubic?.featureValues).toHaveLength(1)
+    expect(maxPolynomialResidual(cubic!.featureValues[0].data, cubic!.targetValue.data, 3)).toBeLessThan(0.25)
+    expect(maxPolynomialResidual(cubic!.featureValues[0].data, cubic!.targetValue.data, 2)).toBeGreaterThan(1)
+
+    expect(circle).toBeDefined()
+    expect(circle?.task).toBe('binary-classification')
+    expect(circle?.featureValues).toHaveLength(2)
+    expect(meanRadiusForClass(circle!, 1)).toBeGreaterThan(1.45)
+    expect(meanRadiusForClass(circle!, 0)).toBeLessThan(0.4)
+
+    expect(parabola).toBeDefined()
+    expect(parabola?.task).toBe('binary-classification')
+    expect(parabola?.featureValues).toHaveLength(2)
+    expect(parabolaSeparationAccuracy(parabola!)).toBeGreaterThanOrEqual(0.95)
+  })
+
+  it('routes dataset feature and target outputs by source slot', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'dataset', type: 'dataset', label: 'dataset', position: { x: 0, y: 0 }, params: { dataset: 'circle-center' } },
+        { id: 'add', type: 'add', label: 'add', position: { x: 240, y: 0 }, params: {} },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 480, y: 0 }, params: {} },
+      ],
+      edges: [
+        { id: 'x1-add', source: 'dataset', sourceSlot: 0, target: 'add', inputSlot: 0 },
+        { id: 'x2-add', source: 'dataset', sourceSlot: 1, target: 'add', inputSlot: 1 },
+        { id: 'add-loss', source: 'add', target: 'loss', inputSlot: 0 },
+        { id: 'y-loss', source: 'dataset', sourceSlot: 2, target: 'loss', inputSlot: 1 },
+      ],
+    }
+
+    const forward = forwardPass(graph)
+
+    expect(inputArityForNode(graph.nodes[0])).toBe(0)
+    expect(outputArityForNode(graph.nodes[0])).toBe(3)
+    expect(forward.graph.edges.find((edge) => edge.id === 'x1-add')?.value?.shape).toEqual([20])
+    expect(forward.graph.edges.find((edge) => edge.id === 'x2-add')?.value?.shape).toEqual([20])
+    expect(forward.graph.edges.find((edge) => edge.id === 'y-loss')?.value?.shape).toEqual([20])
+    expect(formulaForNode(graph.nodes[1], graph)).toBe('z1 = x1 + x2')
+    expect(formulaForNode(graph.nodes[2], graph)).toBe('L = 0.5 * Σ_i (z1_i - y_i)^2')
+  })
+
+  it('lets input and target nodes pass through connected dataset outputs', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'dataset', type: 'dataset', label: 'dataset', position: { x: 0, y: 0 }, params: { dataset: 'line-1d' } },
+        { id: 'x', type: 'input', label: 'x', position: { x: 240, y: 0 }, params: { value: scalarValue(0) } },
+        { id: 'target', type: 'target', label: 'y', position: { x: 240, y: 160 }, params: { value: scalarValue(0) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 480, y: 80 }, params: {} },
+      ],
+      edges: [
+        { id: 'dataset-x', source: 'dataset', sourceSlot: 0, target: 'x', inputSlot: 0 },
+        { id: 'x-loss', source: 'x', target: 'loss', inputSlot: 0 },
+        { id: 'dataset-y', source: 'dataset', sourceSlot: 1, target: 'target', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+
+    const forward = forwardPass(graph)
+
+    expect(forward.graph.nodes.find((node) => node.id === 'x')?.value?.shape).toEqual([20])
+    expect(forward.graph.nodes.find((node) => node.id === 'target')?.value?.shape).toEqual([20])
+    expect(forward.graph.edges.find((edge) => edge.id === 'x-loss')?.value?.shape).toEqual([20])
+    expect(forward.graph.edges.find((edge) => edge.id === 'target-loss')?.value?.shape).toEqual([20])
+  })
+
+  it('remaps dataset output slots by role when changing feature count', () => {
+    const oneFeature: GraphModel['nodes'][number] = {
+      id: 'dataset',
+      type: 'dataset',
+      label: 'dataset',
+      position: { x: 0, y: 0 },
+      params: { dataset: 'line-1d' },
+    }
+    const twoFeature: GraphModel['nodes'][number] = {
+      ...oneFeature,
+      params: { dataset: 'circle-center' },
+    }
+
+    expect(remapDatasetOutputSlot(oneFeature, twoFeature, 0)).toBe(0)
+    expect(remapDatasetOutputSlot(oneFeature, twoFeature, 1)).toBe(2)
+    expect(remapDatasetOutputSlot(twoFeature, oneFeature, 0)).toBe(0)
+    expect(remapDatasetOutputSlot(twoFeature, oneFeature, 1)).toBeUndefined()
+    expect(remapDatasetOutputSlot(twoFeature, oneFeature, 2)).toBe(1)
   })
 
   it('computes the starter graph forward values', () => {

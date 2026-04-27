@@ -258,6 +258,11 @@
   border-color: rgba(77, 124, 15, 0.35);
 }
 
+.node-dataset {
+  min-height: 154px;
+  border-color: rgba(124, 58, 237, 0.38);
+}
+
 .visual-group-node {
   box-sizing: border-box;
   position: relative;
@@ -452,6 +457,22 @@
 .node-add-input-button:hover {
   background: var(--accent);
   color: #fff;
+}
+
+.node-output-labels {
+  position: absolute;
+  top: 0;
+  right: 14px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.node-output-labels span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
 }
 
 .builder-edge {

@@ -6,7 +6,7 @@ import appCss from './App.css?raw'
 import builderEdgeSource from './components/BuilderEdge.tsx?raw'
 import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
-import { MIN_NODE_HEIGHT, NODE_WIDTH, heightForInputCount } from './domain/engine'
+import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, heightForInputCount } from './domain/engine'
 import { scalarValue } from './domain/tensor'
 import './index.css'
 import App from './App'
@@ -208,6 +208,127 @@ describe('Backprop Builder app', () => {
     )
 
     expect(screen.getByText('L = (pred - y)^2')).toBeInTheDocument()
+  })
+
+  it('renders a dataset dropdown with toy dataset choices', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        {
+          id: 'dataset',
+          type: 'dataset',
+          label: 'dataset',
+          position: { x: 80, y: 80 },
+          params: { dataset: 'line-1d' },
+        },
+      ],
+      edges: [],
+    }
+    const onDatasetChange = vi.fn()
+    const noop = vi.fn()
+    render(
+      <GraphCanvas
+        graph={graph}
+        showMath
+        showGradient
+        phase="edit"
+        onGraphChange={noop}
+        onSelectionChange={noop}
+        onCreateNode={noop}
+        onCancelPendingPlacement={noop}
+        onNodeValueChange={noop}
+        onActivationChange={noop}
+        onLossChange={noop}
+        onDatasetChange={onDatasetChange}
+        onGroupCreate={noop}
+        onGroupExplode={noop}
+        onGroupMove={noop}
+      />,
+    )
+
+    const datasetSelect = screen
+      .getAllByRole('combobox', { hidden: true })
+      .find((element) => element.getAttribute('aria-label') === 'dataset')
+    expect(datasetSelect).toBeDefined()
+    expect(datasetSelect).toHaveValue('line-1d')
+    expect(Array.from(datasetSelect!.querySelectorAll('option')).map((option) => option.textContent)).toEqual(
+      DATASET_OPTIONS.map((option) => option.label),
+    )
+
+    fireEvent.change(datasetSelect!, { target: { value: 'circle-center' } })
+
+    expect(onDatasetChange).toHaveBeenCalledWith('dataset', 'circle-center')
+  })
+
+  it('hides value editors on input and target nodes fed by a dataset', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        {
+          id: 'dataset',
+          type: 'dataset',
+          label: 'dataset',
+          position: { x: 40, y: 80 },
+          params: { dataset: 'line-1d' },
+        },
+        {
+          id: 'x',
+          type: 'input',
+          label: 'x',
+          position: { x: 260, y: 80 },
+          params: { value: scalarValue(0) },
+        },
+        {
+          id: 'target',
+          type: 'target',
+          label: 'y',
+          position: { x: 260, y: 240 },
+          params: { value: scalarValue(0) },
+        },
+        {
+          id: 'manual-x',
+          type: 'input',
+          label: 'manual x',
+          position: { x: 260, y: 400 },
+          params: { value: scalarValue(4) },
+        },
+        {
+          id: 'manual-target',
+          type: 'target',
+          label: 'manual y',
+          position: { x: 260, y: 560 },
+          params: { value: scalarValue(5) },
+        },
+      ],
+      edges: [
+        { id: 'dataset-x', source: 'dataset', sourceSlot: 0, target: 'x', inputSlot: 0 },
+        { id: 'dataset-target', source: 'dataset', sourceSlot: 1, target: 'target', inputSlot: 0 },
+      ],
+    }
+    const noop = vi.fn()
+    render(
+      <GraphCanvas
+        graph={graph}
+        showMath
+        showGradient
+        phase="edit"
+        onGraphChange={noop}
+        onSelectionChange={noop}
+        onCreateNode={noop}
+        onCancelPendingPlacement={noop}
+        onNodeValueChange={noop}
+        onActivationChange={noop}
+        onLossChange={noop}
+        onDatasetChange={noop}
+        onGroupCreate={noop}
+        onGroupExplode={noop}
+        onGroupMove={noop}
+      />,
+    )
+
+    expect(screen.queryAllByDisplayValue('0')).toHaveLength(0)
+    expect(screen.getByDisplayValue('4')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('5')).toBeInTheDocument()
   })
 
   it('accepts tensor literals in source nodes and keeps node tensor displays compact with full hover text', async () => {

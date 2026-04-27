@@ -13,6 +13,12 @@ import type {
   ValidationIssue,
 } from './types'
 import {
+  datasetForNode,
+  datasetOutputCountForNode,
+  datasetOutputLabelForSlot,
+  datasetOutputValueForSlot,
+} from './datasets'
+import {
   addTensorsExact,
   broadcastShapeForShapes,
   broadcastShapeForTensors,
@@ -36,7 +42,18 @@ import {
   zeroLike,
 } from './tensor'
 
-const SOURCE_TYPES = new Set<NodeType>(['input', 'weight', 'bias', 'target'])
+export {
+  DATASET_OPTIONS,
+  datasetForNode,
+  datasetOutputCountForNode,
+  datasetOutputLabelForSlot,
+  datasetOutputValueForSlot,
+  isDatasetKind,
+  remapDatasetOutputSlot,
+} from './datasets'
+
+const SOURCE_TYPES = new Set<NodeType>(['dataset', 'input', 'weight', 'bias', 'target'])
+const OPTIONAL_PASSTHROUGH_TYPES = new Set<NodeType>(['input', 'target'])
 const FLEXIBLE_INPUT_TYPES = new Set<NodeType>(['multiply', 'add'])
 
 export const NODE_WIDTH = 176
@@ -55,14 +72,30 @@ export const LOSS_OPTIONS: Array<{ kind: LossKind; label: string }> = [
 ]
 
 export const inputArityByType: Record<NodeType, number> = {
-  input: 0,
+  dataset: 0,
+  input: 1,
   weight: 0,
   bias: 0,
   multiply: 2,
   add: 2,
   activation: 1,
-  target: 0,
+  target: 1,
   loss: 2,
+}
+
+export function outputArityForNode(node: GraphNode): number {
+  if (node.type === 'loss') return 0
+  if (node.type === 'dataset') return datasetOutputCountForNode(node)
+  return 1
+}
+
+export function outputLabelForNodeSlot(node: GraphNode, slot: number): string {
+  if (node.type === 'dataset') return datasetOutputLabelForSlot(node, slot)
+  return node.label
+}
+
+function isOptionalPassThroughNode(node: GraphNode): boolean {
+  return OPTIONAL_PASSTHROUGH_TYPES.has(node.type)
 }
 
 export function isFlexibleInputNodeType(type: NodeType): boolean {
@@ -99,14 +132,18 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
   const inputLabels = inputLabelsForFormula(node, graph)
   const outputLabel = outputLabelForFormula(node, graph)
   switch (node.type) {
+    case 'dataset': {
+      const dataset = datasetForNode(node)
+      return `${node.label} = ${dataset.label}`
+    }
     case 'input':
-      return `${node.label} = ${valueFormatter(node.params.value)}`
+      return `${node.label} = ${inputLabels[0] ?? valueFormatter(node.params.value)}`
     case 'weight':
       return `${node.label} = ${valueFormatter(node.params.value)}`
     case 'bias':
       return `${node.label} = ${valueFormatter(node.params.value)}`
     case 'target':
-      return `${node.label} = ${valueFormatter(node.params.value)}`
+      return `${node.label} = ${inputLabels[0] ?? valueFormatter(node.params.value)}`
     case 'multiply':
       return `${outputLabel} = ${inputLabels.join(' * ')}`
     case 'add':
@@ -156,9 +193,9 @@ function hasNonScalarIncomingValue(node: GraphNode, graph: GraphModel): boolean 
   return incomingEdges(graph, node.id).some((edge) => {
     const source = graph.nodes.find((candidate) => candidate.id === edge.source)
     if (!source) return false
-    const inferredShape = inferredShapes.get(source.id)
+    const inferredShape = outputShapeForSourceEdge(source, edge, inferredShapes)
     if (inferredShape) return inferredShape.length > 0
-    return !isScalarTensor(toTensor(source.value ?? source.params.value))
+    return !isScalarTensor(sourceValueForEdgeSource(source, edge))
   })
 }
 
@@ -169,20 +206,23 @@ function inferredOutputShapes(graph: GraphModel): Map<string, number[]> {
     const node = graph.nodes.find((candidate) => candidate.id === nodeId)
     if (!node) continue
 
+    const incoming = incomingEdges(graph, node.id)
     const existingValueShape = node.value !== undefined ? toTensor(node.value).shape : undefined
     if (SOURCE_TYPES.has(node.type)) {
-      shapeByNode.set(node.id, toTensor(node.params.value).shape)
+      shapeByNode.set(node.id, sourceShapeForNode(graph, node, incoming, shapeByNode))
       continue
     }
 
-    const incoming = incomingEdges(graph, node.id)
     const expected = inputArityForNode(node)
     if (incoming.length !== expected) {
       if (existingValueShape) shapeByNode.set(node.id, existingValueShape)
       continue
     }
 
-    const inputShapes = incoming.map((edge) => shapeByNode.get(edge.source))
+    const inputShapes = incoming.map((edge) => {
+      const source = graph.nodes.find((candidate) => candidate.id === edge.source)
+      return source ? outputShapeForSourceEdge(source, edge, shapeByNode) : undefined
+    })
     if (inputShapes.some((shape) => !shape)) {
       if (existingValueShape) shapeByNode.set(node.id, existingValueShape)
       continue
@@ -207,7 +247,7 @@ function inputLabelsForFormula(node: GraphNode, graph?: GraphModel): string[] {
   for (const edge of incomingEdges(graph, node.id)) {
     const slot = edge.inputSlot ?? 0
     labels[slot] =
-      outputLabelForFormula(graph.nodes.find((candidate) => candidate.id === edge.source), graph) ??
+      outputLabelForFormula(graph.nodes.find((candidate) => candidate.id === edge.source), graph, edge.sourceSlot ?? 0) ??
       fallback[slot] ??
       '?'
   }
@@ -216,7 +256,7 @@ function inputLabelsForFormula(node: GraphNode, graph?: GraphModel): string[] {
 }
 
 function fallbackInputLabels(node: GraphNode): string[] {
-  if (node.type === 'input' || node.type === 'weight' || node.type === 'bias' || node.type === 'target') return []
+  if (SOURCE_TYPES.has(node.type)) return []
   if (node.type === 'activation') return ['u']
   if (node.type === 'loss') return ['prediction', 'target']
   return Array.from({ length: inputArityForNode(node) }, (_, index) => inputLabelForIndex(index))
@@ -227,8 +267,9 @@ function inputLabelForIndex(index: number): string {
   return alphabet[index] ?? `input${index + 1}`
 }
 
-function outputLabelForFormula(node: GraphNode | undefined, graph?: GraphModel): string | undefined {
+function outputLabelForFormula(node: GraphNode | undefined, graph?: GraphModel, sourceSlot = 0): string | undefined {
   if (!node) return undefined
+  if (node.type === 'dataset') return datasetOutputLabelForSlot(node, sourceSlot)
   if (SOURCE_TYPES.has(node.type)) return node.label
   if (node.type === 'loss') return 'L'
   if (!graph) return 'z'
@@ -331,20 +372,35 @@ export function validateGraph(graph: GraphModel): ValidationIssue[] {
         edgeId: edge.id,
         message: 'An edge points to a node that no longer exists.',
       })
+      continue
+    }
+
+    const source = graph.nodes.find((node) => node.id === edge.source)
+    const outputSlot = edge.sourceSlot ?? 0
+    if (source && (outputSlot < 0 || outputSlot >= outputArityForNode(source))) {
+      issues.push({
+        code: 'invalid-arity',
+        nodeId: source.id,
+        edgeId: edge.id,
+        message: `${source.label} has an edge connected from unavailable output ${outputSlot + 1}.`,
+      })
     }
   }
 
   for (const node of graph.nodes) {
     const incoming = incomingEdges(graph, node.id)
     const expected = inputArityForNode(node)
-    if (incoming.length !== expected) {
+    const hasValidInputCount = isOptionalPassThroughNode(node)
+      ? incoming.length <= expected
+      : incoming.length === expected
+    if (!hasValidInputCount) {
       issues.push({
         code: 'invalid-arity',
         nodeId: node.id,
         message: `${node.label} expects ${expected} input${expected === 1 ? '' : 's'} but has ${incoming.length}.`,
       })
     }
-    if (expected > 0) {
+    if (expected > 0 && (!isOptionalPassThroughNode(node) || incoming.length > 0)) {
       for (let slot = 0; slot < expected; slot += 1) {
         if (!incoming.some((edge) => (edge.inputSlot ?? 0) === slot)) {
           issues.push({
@@ -401,17 +457,20 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
     const node = graph.nodes.find((candidate) => candidate.id === nodeId)
     if (!node) continue
 
+    const incoming = incomingEdges(graph, node.id)
     if (SOURCE_TYPES.has(node.type)) {
-      shapeByNode.set(node.id, toTensor(node.params.value).shape)
+      shapeByNode.set(node.id, sourceShapeForNode(graph, node, incoming, shapeByNode))
       continue
     }
 
-    const incoming = incomingEdges(graph, node.id)
     const expected = inputArityForNode(node)
     if (incoming.length !== expected) continue
     if (incoming.some((edge) => (edge.inputSlot ?? 0) < 0 || (edge.inputSlot ?? 0) >= expected)) continue
 
-    const inputShapes = incoming.map((edge) => shapeByNode.get(edge.source))
+    const inputShapes = incoming.map((edge) => {
+      const source = graph.nodes.find((candidate) => candidate.id === edge.source)
+      return source ? outputShapeForSourceEdge(source, edge, shapeByNode) : undefined
+    })
     if (inputShapes.some((shape) => !shape)) continue
     const outputShape = outputShapeForNode(node, inputShapes as number[][])
     if (outputShape) {
@@ -473,7 +532,7 @@ export function forwardPass(graph: GraphModel): EvaluationResult {
   for (const nodeId of order) {
     const node = mustNode(next, nodeId)
     const incoming = incomingEdges(next, nodeId)
-    const inputValues = incoming.map((edge) => toTensor(mustNode(next, edge.source).value))
+    const inputValues = incoming.map((edge) => valueForSourceEdge(next, edge))
     const computed = computeForward(node, inputValues)
 
     node.value = computed.value
@@ -487,11 +546,12 @@ export function forwardPass(graph: GraphModel): EvaluationResult {
     }
 
     for (const edge of next.edges.filter((candidate) => candidate.source === node.id)) {
-      edge.value = cloneTensor(computed.value)
-      edge.grad = zeroLike(computed.value)
+      const outputValue = sourceValueForEdgeSource(node, edge)
+      edge.value = cloneTensor(outputValue)
+      edge.grad = zeroLike(outputValue)
     }
 
-    if (inputArityForNode(node) > 0) {
+    if (!SOURCE_TYPES.has(node.type) && inputArityForNode(node) > 0) {
       steps.push(forwardStep(node, incoming, inputValues, next))
     }
   }
@@ -507,7 +567,7 @@ export function backwardPass(graph: GraphModel): EvaluationResult {
   const order = topologicalSort(next).reverse()
   const steps: EvaluationTraceStep[] = []
   for (const node of next.nodes) {
-    node.grad = zeroLike(toTensor(node.value ?? node.params.value))
+    node.grad = zeroLike(sourceDefaultValue(node))
   }
   for (const edge of next.edges) {
     edge.grad = edge.value ? zeroLike(edge.value) : undefined
@@ -525,7 +585,9 @@ export function backwardPass(graph: GraphModel): EvaluationResult {
 
     for (const contribution of contributions) {
       const source = mustNode(next, contribution.sourceId)
-      source.grad = addTensorsExact(source.grad ?? zeroLike(contribution.gradient), contribution.gradient)
+      if (source.type !== 'dataset') {
+        source.grad = addTensorsExact(source.grad ?? zeroLike(contribution.gradient), contribution.gradient)
+      }
       const edge = next.edges.find((candidate) => candidate.id === contribution.edgeId)
       if (edge) edge.grad = cloneTensor(contribution.gradient)
     }
@@ -560,7 +622,7 @@ export function updateParameters(graph: GraphModel, learningRate = graph.learnin
   }
 
   for (const node of next.nodes) {
-    node.grad = zeroLike(toTensor(node.value ?? node.params.value))
+    node.grad = zeroLike(sourceDefaultValue(node))
   }
   for (const edge of next.edges) {
     edge.grad = edge.value ? zeroLike(edge.value) : undefined
@@ -587,7 +649,7 @@ function computeForward(
   inputs: TensorValue[],
 ): { value: TensorValue; localDerivative?: TensorValue; localDerivatives: TensorValue[]; error?: TensorValue } {
   if (SOURCE_TYPES.has(node.type)) {
-    return { value: toTensor(node.params.value), localDerivatives: [] }
+    return { value: sourceForwardValue(node, inputs), localDerivatives: [] }
   }
 
   if (node.type === 'multiply') {
@@ -691,7 +753,7 @@ function computeBackward(
   downstreamGrad: TensorValue,
 ): Array<{ edgeId: string; sourceId: string; gradient: TensorValue }> {
   if (SOURCE_TYPES.has(node.type)) return []
-  const values = incoming.map((edge) => toTensor(mustNode(graph, edge.source).value))
+  const values = incoming.map((edge) => valueForSourceEdge(graph, edge))
 
   if (node.type === 'multiply') {
     return incoming.map((edge, index) => ({
@@ -810,6 +872,48 @@ function mustNode(graph: GraphModel, nodeId: string): GraphNode {
   const node = graph.nodes.find((candidate) => candidate.id === nodeId)
   if (!node) throw new Error(`Node ${nodeId} was not found.`)
   return node
+}
+
+function valueForSourceEdge(graph: GraphModel, edge: GraphEdge): TensorValue {
+  return sourceValueForEdgeSource(mustNode(graph, edge.source), edge)
+}
+
+function sourceValueForEdgeSource(source: GraphNode, edge: Pick<GraphEdge, 'sourceSlot'>): TensorValue {
+  if (source.type === 'dataset') return datasetOutputValueForSlot(source, edge.sourceSlot ?? 0)
+  return sourceDefaultValue(source)
+}
+
+function sourceDefaultValue(node: GraphNode): TensorValue {
+  if (node.type === 'dataset') return datasetOutputValueForSlot(node, 0)
+  return toTensor(node.value ?? node.params.value)
+}
+
+function sourceForwardValue(node: GraphNode, inputs: TensorValue[]): TensorValue {
+  if (isOptionalPassThroughNode(node) && inputs[0]) return cloneTensor(inputs[0])
+  return sourceDefaultValue(node)
+}
+
+function sourceShapeForNode(
+  graph: GraphModel,
+  node: GraphNode,
+  incoming: GraphEdge[],
+  shapeByNode: Map<string, number[]>,
+): number[] {
+  if (isOptionalPassThroughNode(node) && incoming.length === 1) {
+    const source = graph.nodes.find((candidate) => candidate.id === incoming[0].source)
+    const incomingShape = source ? outputShapeForSourceEdge(source, incoming[0], shapeByNode) : undefined
+    if (incomingShape) return incomingShape
+  }
+  return sourceDefaultValue(node).shape
+}
+
+function outputShapeForSourceEdge(
+  source: GraphNode,
+  edge: Pick<GraphEdge, 'sourceSlot'>,
+  shapeByNode: Map<string, number[]>,
+): number[] | undefined {
+  if (source.type === 'dataset') return datasetOutputValueForSlot(source, edge.sourceSlot ?? 0).shape
+  return shapeByNode.get(source.id)
 }
 
 function assertValid(graph: GraphModel): void {

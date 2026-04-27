@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MIN_NODE_HEIGHT, NODE_WIDTH } from './engine'
 import { createStarterGraph } from './examples'
 import {
+  deleteVisualGroup,
   explodeVisualGroup,
   mergeNodesIntoVisualGroup,
   moveVisualGroup,
@@ -57,6 +58,16 @@ describe('visual graph grouping', () => {
     expect(exploded.edges).toEqual(grouped.edges)
   })
 
+  it('deletes a merged group by removing its hidden computation nodes and incident edges', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['x', 'w', 'mul']).graph
+
+    const deleted = deleteVisualGroup(grouped, 'group-1')
+
+    expect(deleted.groups).toEqual([])
+    expect(deleted.nodes.map((node) => node.id)).toEqual(['b', 'add', 'pred', 'target', 'loss'])
+    expect(deleted.edges.map((edge) => edge.id)).toEqual(['b-add', 'add-act', 'act-loss', 'target-loss'])
+  })
+
   it('derives collapsed group inputs and outputs from boundary edges', () => {
     const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
     const group = grouped.groups?.[0]
@@ -98,6 +109,52 @@ describe('visual graph grouping', () => {
       target: 'mul',
       targetHandle: 'in-1',
     })
+  })
+
+  it('resolves a group output handle to its internal source and represented boundary edge', () => {
+    const grouped = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add']).graph
+
+    expect(resolveVisualGroupOutputHandle(grouped, 'group-1', 'out-0')).toEqual({
+      source: 'add',
+      edgeId: 'add-act',
+    })
+  })
+
+  it('uses one output handle for multiple boundary edges from the same internal output', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      groups: [
+        {
+          id: 'group-1',
+          label: 'Group 1',
+          nodeIds: ['source', 'add'],
+          position: { x: 80, y: 80 },
+          dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
+        },
+      ],
+      nodes: [
+        { id: 'source', type: 'input', label: 'x', position: { x: 0, y: 0 }, params: { value: 1 } },
+        { id: 'add', type: 'add', label: 'add', position: { x: 240, y: 0 }, params: {} },
+        { id: 'first-target', type: 'activation', label: 'a1', position: { x: 520, y: 0 }, params: { activation: 'identity' } },
+        { id: 'second-target', type: 'activation', label: 'a2', position: { x: 520, y: 160 }, params: { activation: 'identity' } },
+      ],
+      edges: [
+        { id: 'source-add', source: 'source', target: 'add', inputSlot: 0 },
+        { id: 'add-first', source: 'add', target: 'first-target', inputSlot: 0 },
+        { id: 'add-second', source: 'add', target: 'second-target', inputSlot: 0 },
+      ],
+    }
+
+    const groupInterface = visualGroupInterface(graph, graph.groups![0])
+
+    expect(groupInterface.outputs).toEqual([
+      {
+        edgeIds: ['add-first', 'add-second'],
+        handleId: 'out-0',
+        source: 'add',
+      },
+    ])
+    expect(resolveVisualGroupOutputHandle(graph, 'group-1', 'out-0')).toEqual({ source: 'add' })
   })
 
   it('exposes and resolves group outputs for internal nodes with no outgoing edge', () => {
