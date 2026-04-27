@@ -8,6 +8,7 @@ import {
   inputArityForNode,
   outputArityForNode,
   remapDatasetOutputSlot,
+  runTrainingStep,
   updateParameters,
   validateGraph,
 } from './engine'
@@ -206,7 +207,7 @@ describe('scalar autodiff engine', () => {
     expect(forward.graph.edges.find((edge) => edge.id === 'x2-add')?.value?.shape).toEqual([20])
     expect(forward.graph.edges.find((edge) => edge.id === 'y-loss')?.value?.shape).toEqual([20])
     expect(formulaForNode(graph.nodes[1], graph)).toBe('z1 = x1 + x2')
-    expect(formulaForNode(graph.nodes[2], graph)).toBe('L = 0.5 * Σ_i (z1_i - y_i)^2')
+    expect(formulaForNode(graph.nodes[2], graph)).toBe('L = (1/n) * Σ_i (z1_i - y_i)^2')
   })
 
   it('lets input and target nodes pass through connected dataset outputs', () => {
@@ -512,7 +513,7 @@ describe('scalar autodiff engine', () => {
     expect(validateGraph(badArity).some((issue) => issue.code === 'invalid-arity')).toBe(true)
   })
 
-  it('computes elementwise tensor values and reduces tensor squared-error loss', () => {
+  it('computes elementwise tensor values and defaults tensor loss to mean squared error', () => {
     const graph: GraphModel = {
       learningRate: 0.1,
       nodes: [
@@ -541,8 +542,8 @@ describe('scalar autodiff engine', () => {
     expect(forward.graph.nodes.find((node) => node.id === 'mul')?.value).toEqual(tensorValue([3], [0.5, 2, 4.5]))
     expect(forward.graph.nodes.find((node) => node.id === 'add')?.value).toEqual(tensorValue([3], [0.5, 3, 3.5]))
     expect(forward.graph.nodes.find((node) => node.id === 'pred')?.value).toEqual(tensorValue([3], [0.5, 3, 3.5]))
-    expect(forward.graph.nodes.find((node) => node.id === 'loss')?.value).toEqual(scalarValue(0.25))
-    expect(forward.loss).toBeCloseTo(0.25)
+    expect(forward.graph.nodes.find((node) => node.id === 'loss')?.value).toEqual(scalarValue(1 / 6))
+    expect(forward.loss).toBeCloseTo(1 / 6)
   })
 
   it('averages selected mean squared error over tensor entries and scales gradients', () => {
@@ -567,6 +568,45 @@ describe('scalar autodiff engine', () => {
     expect(forward.graph.nodes.find((node) => node.id === 'loss')?.value).toEqual(scalarValue(19 / 3))
     expect(forward.loss).toBeCloseTo(19 / 3)
     expect(backward.graph.nodes.find((node) => node.id === 'pred')?.grad).toEqual(tensorValue([3], [2 / 3, 2, 2]))
+  })
+
+  it('defaults tensor losses to mean squared error so dataset regression trains with the standard learning rate', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'dataset', type: 'dataset', label: 'dataset', position: { x: 0, y: 0 }, params: { dataset: 'line-1d' } },
+        { id: 'x', type: 'input', label: 'x', position: { x: 240, y: 0 }, params: { value: scalarValue(0) } },
+        { id: 'w', type: 'weight', label: 'w', position: { x: 240, y: 140 }, params: { value: scalarValue(0.5) } },
+        { id: 'b', type: 'bias', label: 'b', position: { x: 480, y: 200 }, params: { value: scalarValue(-0.3) } },
+        { id: 'mul', type: 'multiply', label: 'x * w', position: { x: 480, y: 60 }, params: {} },
+        { id: 'add', type: 'add', label: 'xw + b', position: { x: 720, y: 120 }, params: {} },
+        { id: 'pred', type: 'activation', label: 'activation', position: { x: 960, y: 120 }, params: { activation: 'identity' } },
+        { id: 'target', type: 'target', label: 'y', position: { x: 960, y: 280 }, params: { value: scalarValue(0) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 1200, y: 200 }, params: {} },
+      ],
+      edges: [
+        { id: 'dataset-x', source: 'dataset', sourceSlot: 0, target: 'x', inputSlot: 0 },
+        { id: 'x-mul', source: 'x', target: 'mul', inputSlot: 0 },
+        { id: 'w-mul', source: 'w', target: 'mul', inputSlot: 1 },
+        { id: 'mul-add', source: 'mul', target: 'add', inputSlot: 0 },
+        { id: 'b-add', source: 'b', target: 'add', inputSlot: 1 },
+        { id: 'add-pred', source: 'add', target: 'pred', inputSlot: 0 },
+        { id: 'pred-loss', source: 'pred', target: 'loss', inputSlot: 0 },
+        { id: 'dataset-target', source: 'dataset', sourceSlot: 1, target: 'target', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+    const lossNode = graph.nodes.find((node) => node.id === 'loss')!
+
+    expect(formulaForNode(lossNode, graph)).toBe('L = (1/n) * Σ_i (z3_i - y_i)^2')
+
+    let trained = graph
+    for (let step = 0; step < 100; step += 1) {
+      trained = runTrainingStep(trained).graph
+    }
+
+    expect(scalarOf(trained.nodes.find((node) => node.id === 'w')?.params.value)).toBeCloseTo(1.9964160401, 6)
+    expect(scalarOf(trained.nodes.find((node) => node.id === 'b')?.params.value)).toBeCloseTo(1.015112782, 6)
   })
 
   it('backpropagates tensor gradients and reduces broadcast scalar parameter gradients', () => {
@@ -595,10 +635,10 @@ describe('scalar autodiff engine', () => {
 
     const backward = backwardPass(forwardPass(graph).graph)
 
-    expect(backward.graph.nodes.find((node) => node.id === 'pred')?.grad).toEqual(tensorValue([3], [-1, 0, -1]))
-    expect(backward.graph.nodes.find((node) => node.id === 'x')?.grad).toEqual(tensorValue([3], [-2, 0, -2]))
-    expect(backward.graph.nodes.find((node) => node.id === 'w')?.grad).toEqual(scalarValue(-4))
-    expect(backward.graph.nodes.find((node) => node.id === 'b')?.grad).toEqual(scalarValue(-2))
+    expect(backward.graph.nodes.find((node) => node.id === 'pred')?.grad).toEqual(tensorValue([3], [-2 / 3, 0, -2 / 3]))
+    expect(backward.graph.nodes.find((node) => node.id === 'x')?.grad).toEqual(tensorValue([3], [-4 / 3, 0, -4 / 3]))
+    expect(backward.graph.nodes.find((node) => node.id === 'w')?.grad).toEqual(scalarValue(-8 / 3))
+    expect(backward.graph.nodes.find((node) => node.id === 'b')?.grad).toEqual(scalarValue(-4 / 3))
     expect(backward.graph.nodes.find((node) => node.id === 'target')?.grad).toEqual(tensorValue([3], [0, 0, 0]))
   })
 })

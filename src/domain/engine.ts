@@ -70,6 +70,7 @@ export const LOSS_OPTIONS: Array<{ kind: LossKind; label: string }> = [
   { kind: 'mae', label: 'Mean absolute error' },
   { kind: 'binary-cross-entropy', label: 'Binary cross entropy' },
 ]
+const TENSOR_LOSS_OPTIONS = LOSS_OPTIONS.filter((option) => option.kind !== 'squared-error')
 
 export const inputArityByType: Record<NodeType, number> = {
   dataset: 0,
@@ -151,14 +152,27 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
     case 'activation':
       return `${outputLabel} = ${node.params.activation ?? 'identity'}(${inputLabels[0]})`
     case 'loss':
-      return lossFormula(lossKindForNode(node), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
+      return lossFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
   }
 }
 
-export function lossKindForNode(node: GraphNode): LossKind {
+export function lossOptionsForNode(node: GraphNode, graph?: GraphModel): Array<{ kind: LossKind; label: string }> {
+  if (node.type === 'loss' && graph && hasNonScalarIncomingValue(node, graph)) return TENSOR_LOSS_OPTIONS
+  return LOSS_OPTIONS
+}
+
+export function lossKindForNode(node: GraphNode, graph?: GraphModel): LossKind {
+  return lossKindForOptions(node, lossOptionsForNode(node, graph))
+}
+
+function lossKindForInputs(node: GraphNode, inputs: TensorValue[]): LossKind {
+  return lossKindForOptions(node, inputs.some((input) => !isScalarTensor(input)) ? TENSOR_LOSS_OPTIONS : LOSS_OPTIONS)
+}
+
+function lossKindForOptions(node: GraphNode, options: Array<{ kind: LossKind; label: string }>): LossKind {
   const selected = node.params.loss
-  if (selected && LOSS_OPTIONS.some((option) => option.kind === selected)) return selected
-  return 'squared-error'
+  if (selected && options.some((option) => option.kind === selected)) return selected
+  return options[0]?.kind ?? 'squared-error'
 }
 
 function lossLabel(kind: LossKind): string {
@@ -676,7 +690,7 @@ function computeForward(
     return { value, localDerivative: derivative, localDerivatives: [derivative] }
   }
 
-  return computeLossForward(lossKindForNode(node), inputs[0], inputs[1])
+  return computeLossForward(lossKindForInputs(node, inputs), inputs[0], inputs[1])
 }
 
 function computeLossForward(
@@ -784,7 +798,7 @@ function computeBackward(
 
   const prediction = values[0]
   const target = values[1]
-  const predictionDerivative = lossGradient(lossKindForNode(node), prediction, target)
+  const predictionDerivative = lossGradient(lossKindForInputs(node, values), prediction, target)
   return [
     {
       edgeId: incoming[0].id,
@@ -934,14 +948,14 @@ function forwardStep(node: GraphNode, incoming: GraphEdge[], inputValues: Tensor
     phase,
     nodeId: node.id,
     edgeIds: incoming.map((edge) => edge.id),
-    title: phase === 'loss' ? `Compute ${lossLabel(lossKindForNode(node)).toLowerCase()}` : `Evaluate ${node.label}`,
+    title: phase === 'loss' ? `Compute ${lossLabel(lossKindForNode(node, graph)).toLowerCase()}` : `Evaluate ${node.label}`,
     explanation:
       phase === 'loss'
         ? 'The loss compares the prediction with the target and turns the error into a positive scalar.'
         : `${node.label} receives ${isTensorStep ? 'tensor' : 'scalar'} inputs, applies its formula, and stores one ${isTensorStep ? 'tensor' : 'scalar'} output for downstream nodes.`,
     formula: formulaForNode(node, graph),
     calculation,
-    pseudocode: pseudocodeForNode(node),
+    pseudocode: pseudocodeForNode(node, graph),
   }
 }
 
@@ -971,7 +985,7 @@ function backwardStep(
     explanation: 'The incoming gradient is multiplied by local derivatives and accumulated on upstream nodes.',
     formula: derivativeFormula(node, graph),
     calculation: `incoming gradient ${formatNumber(downstreamGrad)} -> ${contributionText}`,
-    pseudocode: ['g = node.grad', ...pseudocodeForBackward(node)],
+    pseudocode: ['g = node.grad', ...pseudocodeForBackward(node, graph)],
   }
 }
 
@@ -1006,7 +1020,7 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
 }
 
 function lossCalculationForForward(node: GraphNode, inputs: TensorValue[]): string {
-  const kind = lossKindForNode(node)
+  const kind = lossKindForInputs(node, inputs)
   const error = node.cache?.error ?? subtractTensors(inputs[0], inputs[1])
   const denominator = meanDenominator(error)
   if (kind === 'mse') {
@@ -1036,7 +1050,7 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
     if (activation === 'tanh') return `dz/d${inputLabels[0]} = 1 - tanh(${inputLabels[0]})^2`
     return `dz/d${inputLabels[0]} = 1`
   }
-  if (node.type === 'loss') return lossDerivativeFormula(lossKindForNode(node), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
+  if (node.type === 'loss') return lossDerivativeFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
   return 'Gradient accumulates here.'
 }
 
@@ -1054,14 +1068,14 @@ function lossDerivativeFormula(kind: LossKind, inputLabels: string[], isTensor: 
   return `dL/d${prediction}${suffix} = ${prediction}${suffix} - ${target}${suffix}`
 }
 
-function pseudocodeForNode(node: GraphNode): string[] {
+function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'input') return [`${node.label} = ${formatNumber(node.params.value)}`]
   if (node.type === 'weight' || node.type === 'bias') return [`${node.label} = Parameter(${formatNumber(node.params.value)})`]
   if (node.type === 'target') return [`${node.label} = ${formatNumber(node.params.value)}`]
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
-  const lossKind = lossKindForNode(node)
+  const lossKind = lossKindForNode(node, graph)
   if (lossKind === 'mse') return ['loss = mean((prediction - target) ** 2)']
   if (lossKind === 'mae') return ['loss = mean(abs(prediction - target))']
   if (lossKind === 'binary-cross-entropy') {
@@ -1070,11 +1084,11 @@ function pseudocodeForNode(node: GraphNode): string[] {
   return ['loss = 0.5 * sum((prediction - target) ** 2)']
 }
 
-function pseudocodeForBackward(node: GraphNode): string[] {
+function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['for each input i:', '  input_i.grad += g * product(other inputs)']
   if (node.type === 'add') return ['for each input:', '  input.grad += g']
   if (node.type === 'activation') return ['u.grad += g * local_derivative']
-  if (node.type === 'loss') return lossBackwardPseudocode(lossKindForNode(node))
+  if (node.type === 'loss') return lossBackwardPseudocode(lossKindForNode(node, graph))
   return ['accumulate gradient']
 }
 

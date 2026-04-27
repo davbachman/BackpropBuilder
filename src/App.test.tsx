@@ -9,7 +9,7 @@ import { GraphCanvas } from './components/GraphCanvas'
 import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
 import { createStarterGraph } from './domain/examples'
 import { createProjectStateFile } from './domain/session'
-import { scalarValue } from './domain/tensor'
+import { scalarValue, tensorValue } from './domain/tensor'
 import './index.css'
 import App from './App'
 import type { GraphModel } from './domain/types'
@@ -21,7 +21,9 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
     expect(screen.getByText(/Node palette/i)).toBeInTheDocument()
     expect(screen.getByText(/Graph canvas/i)).toBeInTheDocument()
-    expect(screen.getByText(/Inspector/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Inspector/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/Current step/i)).toBeInTheDocument()
+    expect(screen.getByText(/Validation/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Load starter example/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Step$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step backward/i })).not.toBeInTheDocument()
@@ -98,11 +100,31 @@ describe('Backprop Builder app', () => {
       await user.click(screen.getByRole('button', { name: /Load starter example/i }))
 
       const speedSlider = screen.getByLabelText('Speed')
-      fireEvent.change(speedSlider, { target: { value: '250' } })
+      fireEvent.change(speedSlider, { target: { value: '50' } })
 
       await user.click(screen.getByRole('button', { name: 'Play' }))
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 1800)
+    } finally {
+      setTimeoutSpy.mockRestore()
+    }
+  })
+
+  it('uses a 5x faster top playback speed at the right edge of the speed slider', async () => {
+    const user = userEvent.setup()
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+
+    try {
+      render(<App />)
+
+      await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+
+      const speedSlider = screen.getByLabelText('Speed')
+      fireEvent.change(speedSlider, { target: { value: '1800' } })
+
+      await user.click(screen.getByRole('button', { name: 'Play' }))
+
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 50)
     } finally {
       setTimeoutSpy.mockRestore()
     }
@@ -214,6 +236,53 @@ describe('Backprop Builder app', () => {
     )
 
     expect(screen.getByText('L = (pred - y)^2')).toBeInTheDocument()
+  })
+
+  it('limits tensor-valued loss dropdowns to batch losses and defaults to mean squared error', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'pred', type: 'input', label: 'pred', position: { x: 80, y: 80 }, params: { value: tensorValue([2], [0.4, 0.7]) } },
+        { id: 'target', type: 'target', label: 'y', position: { x: 80, y: 240 }, params: { value: tensorValue([2], [1, 0]) } },
+        { id: 'loss', type: 'loss', label: 'loss', position: { x: 340, y: 160 }, params: {} },
+      ],
+      edges: [
+        { id: 'pred-loss', source: 'pred', target: 'loss', inputSlot: 0 },
+        { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+      ],
+    }
+    const noop = vi.fn()
+    render(
+      <GraphCanvas
+        graph={graph}
+        showMath
+        showGradient
+        phase="edit"
+        onGraphChange={noop}
+        onSelectionChange={noop}
+        onCreateNode={noop}
+        onCancelPendingPlacement={noop}
+        onNodeValueChange={noop}
+        onActivationChange={noop}
+        onLossChange={noop}
+        onGroupCreate={noop}
+        onGroupExplode={noop}
+        onGroupMove={noop}
+      />,
+    )
+
+    const lossSelect = screen
+      .getAllByRole('combobox', { hidden: true })
+      .find((element) => element.getAttribute('aria-label') === 'loss')
+
+    expect(lossSelect).toBeDefined()
+    expect(lossSelect).toHaveValue('mse')
+    expect(Array.from(lossSelect!.querySelectorAll('option')).map((option) => option.value)).toEqual([
+      'mse',
+      'mae',
+      'binary-cross-entropy',
+    ])
+    expect(screen.getByText('L = (1/n) * Σ_i (pred_i - y_i)^2')).toBeInTheDocument()
   })
 
   it('renders a dataset dropdown with toy dataset choices', () => {

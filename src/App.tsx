@@ -66,7 +66,7 @@ const palette: Array<{ type: NodeType; label: string }> = [
   { type: 'loss', label: 'Loss' },
 ]
 
-const MIN_PLAY_DELAY_MS = 250
+const MIN_PLAY_DELAY_MS = 50
 const MAX_PLAY_DELAY_MS = 1800
 const DEFAULT_PLAY_DELAY_MS = 900
 const DEFAULT_SPEED_SLIDER_VALUE = MIN_PLAY_DELAY_MS + MAX_PLAY_DELAY_MS - DEFAULT_PLAY_DELAY_MS
@@ -707,13 +707,6 @@ function App(): ReactElement {
         {showVisualization ? <VisualizationPanel graph={visualizationGraph} /> : null}
 
         <section className="inspector-card">
-          <p className="eyebrow">Inspector</p>
-          <h2>Current phase: {phaseLabel(phase)}</h2>
-          <p>{activeStep?.explanation ?? 'Edit the graph, load an example, or step through the tensor computation.'}</p>
-          <div className={`phase-badge phase-${phase}`}>{phaseLabel(phase)}</div>
-        </section>
-
-        <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>
           <div className="formula-box">
@@ -789,14 +782,6 @@ function App(): ReactElement {
       </footer>
     </main>
   )
-}
-
-function phaseLabel(phase: GraphPhase): string {
-  if (phase === 'edit') return 'Edit graph'
-  if (phase === 'forward') return 'Forward pass'
-  if (phase === 'loss') return 'Loss computation'
-  if (phase === 'backward') return 'Backward pass'
-  return 'Update parameters'
 }
 
 function labelForType(type: NodeType): string {

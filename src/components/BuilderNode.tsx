@@ -29,6 +29,8 @@ export interface BuilderNodeData extends Record<string, unknown> {
   showGradient: boolean
   formula: string
   fullFormula: string
+  lossKind?: LossKind
+  lossOptions?: Array<{ kind: LossKind; label: string }>
   active: boolean
   hasIncomingValue: boolean
   onFlexibleInputAdd: (nodeId: string) => void
@@ -66,6 +68,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
     node.type === 'bias' ||
     ((node.type === 'input' || node.type === 'target') && !data.hasIncomingValue)
   const selectedDataset = node.type === 'dataset' ? datasetForNode(node) : undefined
+  const lossKind = data.lossKind ?? lossKindForNode(node)
+  const lossOptions = data.lossOptions ?? LOSS_OPTIONS
   const showTypeBadge = node.label.trim().toLowerCase() !== node.type
   const valueText = formatTensorInput(node.params.value)
   const [valueDraft, setValueDraft] = useState({ source: valueText, text: valueText, valid: true })
@@ -140,10 +144,10 @@ export function BuilderNode(props: NodeProps): ReactElement {
           <select
             aria-label="loss"
             className="nodrag nowheel"
-            value={lossKindForNode(node)}
+            value={lossKind}
             onChange={(event) => data.onLossChange(node.id, event.target.value as LossKind)}
           >
-            {LOSS_OPTIONS.map((option) => (
+            {lossOptions.map((option) => (
               <option key={option.kind} value={option.kind}>
                 {option.label}
               </option>

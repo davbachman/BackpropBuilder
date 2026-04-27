@@ -25,6 +25,8 @@ import {
   heightForInputCount,
   inputArityForNode,
   isFlexibleInputNodeType,
+  lossKindForNode,
+  lossOptionsForNode,
   outputArityForNode,
 } from '../domain/engine'
 import { canConnectGraphNodes, connectGraphNodes, type GraphConnection } from '../domain/graphEditing'
@@ -198,6 +200,8 @@ function GraphCanvasInner({
             showGradient,
             formula: formulaForNode(node, renderedGraph, formatCompactTensor),
             fullFormula: formulaForNode(node, renderedGraph, formatFullTensor),
+            lossKind: node.type === 'loss' ? lossKindForNode(node, renderedGraph) : undefined,
+            lossOptions: node.type === 'loss' ? lossOptionsForNode(node, renderedGraph) : undefined,
             active: activeStep?.nodeId === node.id,
             hasIncomingValue: renderedGraph.edges.some((edge) => edge.target === node.id),
             onFlexibleInputAdd: addFlexibleInput,
