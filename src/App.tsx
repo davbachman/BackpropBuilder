@@ -2,6 +2,7 @@ import '@xyflow/react/dist/style.css'
 import {
   BookOpen,
   Calculator,
+  ChevronDown,
   Download,
   FastForward,
   Eye,
@@ -72,6 +73,9 @@ const DEFAULT_PLAY_DELAY_MS = 900
 const DEFAULT_SPEED_SLIDER_VALUE = MIN_PLAY_DELAY_MS + MAX_PLAY_DELAY_MS - DEFAULT_PLAY_DELAY_MS
 const HISTORY_LIMIT = 100
 const PASTE_OFFSET_STEP = 36
+const SHOW_MATH_LAYER = true
+const SHOW_GRADIENT_LAYER = true
+const SHOW_CODE_LAYER = false
 
 interface HistorySnapshot {
   graph: GraphModel
@@ -99,10 +103,8 @@ function App(): ReactElement {
   const [phase, setPhase] = useState<GraphPhase>('edit')
   const [traceSteps, setTraceSteps] = useState<EvaluationTraceStep[]>([])
   const [traceIndex, setTraceIndex] = useState(0)
-  const [showMath, setShowMath] = useState(true)
-  const [showGradient, setShowGradient] = useState(true)
-  const [showCode, setShowCode] = useState(false)
   const [showVisualization, setShowVisualization] = useState(false)
+  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speedSliderValue, setSpeedSliderValue] = useState(DEFAULT_SPEED_SLIDER_VALUE)
   const [epoch, setEpoch] = useState(0)
@@ -544,9 +546,9 @@ function App(): ReactElement {
         epoch,
         currentLoss,
         display: {
-          showMath,
-          showGradient,
-          showCode,
+          showMath: SHOW_MATH_LAYER,
+          showGradient: SHOW_GRADIENT_LAYER,
+          showCode: SHOW_CODE_LAYER,
           showVisualization,
         },
       }),
@@ -556,6 +558,11 @@ function App(): ReactElement {
   const chooseProjectStateFile = () => {
     setImportError(undefined)
     importInputRef.current?.click()
+  }
+
+  const runFileMenuAction = (action: () => void) => {
+    setIsFileMenuOpen(false)
+    action()
   }
 
   const importProjectState = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -581,9 +588,6 @@ function App(): ReactElement {
     setTraceIndex(nextState.traceIndex)
     setEpoch(nextState.epoch)
     setCurrentLoss(nextState.currentLoss)
-    setShowMath(nextState.display.showMath)
-    setShowGradient(nextState.display.showGradient)
-    setShowCode(nextState.display.showCode)
     setShowVisualization(nextState.display.showVisualization)
     setPendingNodeType(undefined)
     setIsPlaying(false)
@@ -592,15 +596,71 @@ function App(): ReactElement {
 
   return (
     <main className="app-shell">
-      <aside className="left-panel">
-        <div className="brand">
+      <header className="top-bar">
+        <div className="top-brand">
           <div className="brand-mark">BB</div>
-          <div>
-            <p className="eyebrow">Tensor autodiff lab</p>
-            <h1>Backprop Builder</h1>
-          </div>
+          <h1>Backprop Builder</h1>
         </div>
 
+        <div className="top-actions">
+          <div className="file-menu">
+            <button
+              type="button"
+              className="topbar-button"
+              aria-haspopup="menu"
+              aria-expanded={isFileMenuOpen}
+              onClick={() => setIsFileMenuOpen((open) => !open)}
+            >
+              File
+              <ChevronDown size={15} />
+            </button>
+            {isFileMenuOpen ? (
+              <div className="file-menu-panel" role="menu" aria-label="File">
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => loadGraph(createEmptyGraph()))}>
+                  <RotateCcw size={15} />
+                  New
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(saveProjectState)}>
+                  <Download size={15} />
+                  Save
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(chooseProjectStateFile)}>
+                  <Upload size={15} />
+                  Import
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => loadGraph(createStarterGraph()))}>
+                  <BookOpen size={15} />
+                  Starter
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className={showVisualization ? 'topbar-button panel-toggle-button is-active' : 'topbar-button panel-toggle-button'}
+            aria-pressed={showVisualization}
+            onClick={() => setShowVisualization((visible) => !visible)}
+          >
+            <Eye size={16} />
+            {showVisualization ? 'Hide visualization' : 'Show visualization'}
+          </button>
+          <button type="button" className="topbar-button" onClick={randomizeParameters}>
+            <Shuffle size={16} />
+            Randomize parameters
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            aria-label="Import state file"
+            style={{ display: 'none' }}
+            onChange={importProjectState}
+          />
+          {importError ? <p className="import-error" role="alert">{importError}</p> : null}
+        </div>
+      </header>
+
+      <aside className="left-panel">
         <section className="panel-section">
           <p className="eyebrow">Node palette</p>
           <div className="palette-grid">
@@ -621,63 +681,6 @@ function App(): ReactElement {
             <p className="placement-hint">Click the graph canvas to place {labelForType(pendingNodeType)}.</p>
           ) : null}
         </section>
-
-        <section className="panel-section action-stack">
-          <button type="button" className="primary-button" onClick={() => loadGraph(createStarterGraph())}>
-            <BookOpen size={16} />
-            Load starter example
-          </button>
-          <button type="button" onClick={() => loadGraph(createEmptyGraph())}>
-            <RotateCcw size={16} />
-            Reset
-          </button>
-          <button type="button" onClick={randomizeParameters}>
-            <Shuffle size={16} />
-            Randomize parameters
-          </button>
-          <button type="button" onClick={saveProjectState}>
-            <Download size={16} />
-            Save state
-          </button>
-          <button type="button" onClick={chooseProjectStateFile}>
-            <Upload size={16} />
-            Import state
-          </button>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json,.json"
-            aria-label="Import state file"
-            style={{ display: 'none' }}
-            onChange={importProjectState}
-          />
-          {importError ? <p className="import-error" role="alert">{importError}</p> : null}
-          <button
-            type="button"
-            className={showVisualization ? 'panel-toggle-button is-active' : 'panel-toggle-button'}
-            aria-pressed={showVisualization}
-            onClick={() => setShowVisualization((visible) => !visible)}
-          >
-            <Eye size={16} />
-            {showVisualization ? 'Hide visualization' : 'Show visualization'}
-          </button>
-        </section>
-
-        <section className="panel-section toggle-stack">
-          <label>
-            <input type="checkbox" checked={showMath} onChange={(event) => setShowMath(event.target.checked)} />
-            Show math layer
-          </label>
-          <label>
-            <input type="checkbox" checked={showGradient} onChange={(event) => setShowGradient(event.target.checked)} />
-            Show gradient layer
-          </label>
-          <label>
-            <input type="checkbox" checked={showCode} onChange={(event) => setShowCode(event.target.checked)} />
-            Show code layer
-          </label>
-        </section>
-
       </aside>
 
       <GraphCanvas
@@ -686,8 +689,8 @@ function App(): ReactElement {
         activeStep={activeStep}
         selectedNodeIds={selectedNodeIds}
         selectedGroupId={selectedGroupId}
-        showMath={showMath}
-        showGradient={showGradient}
+        showMath={SHOW_MATH_LAYER}
+        showGradient={SHOW_GRADIENT_LAYER}
         phase={phase}
         pendingNodeType={pendingNodeType}
         onGraphChange={applyGraphChange}
@@ -717,24 +720,6 @@ function App(): ReactElement {
             <strong>Mini calculation</strong>
             <span>{activeStep?.calculation ?? 'Numbers will appear here as each node evaluates.'}</span>
           </div>
-          {showCode ? (
-            <pre className="code-layer">
-              {(activeStep?.pseudocode ?? starterPseudocode()).join('\n')}
-            </pre>
-          ) : null}
-        </section>
-
-        <section className="inspector-card">
-          <p className="eyebrow">Validation</p>
-          {validationIssues.length === 0 ? (
-            <p className="valid-message">Graph is ready for a full forward and backward pass.</p>
-          ) : (
-            <ul className="issue-list">
-              {validationIssues.slice(0, 5).map((issue, index) => (
-                <li key={`${issue.code}-${issue.nodeId ?? issue.edgeId ?? 'graph'}-${index}`}>{issue.message}</li>
-              ))}
-            </ul>
-          )}
         </section>
 
       </aside>
@@ -805,18 +790,6 @@ function idPrefixForType(type: NodeType): string {
   if (type === 'target') return 'target'
   if (type === 'activation') return 'activation'
   return type
-}
-
-function starterPseudocode(): string[] {
-  return [
-    'z = x * w',
-    'a = z + b',
-    'pred = sigmoid(a)',
-    'loss = 0.5 * (pred - y)**2',
-    'loss.backward()',
-    'w -= lr * w.grad',
-    'b -= lr * b.grad',
-  ]
 }
 
 function cloneParameterValueMap(values: Record<string, TensorValue>): Record<string, TensorValue> {

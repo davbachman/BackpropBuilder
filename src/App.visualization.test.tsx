@@ -17,7 +17,7 @@ describe('Backprop Builder visualization data edits', () => {
   it('updates two-input target point colors immediately when target values change', () => {
     const { container } = render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Load starter example/i }))
+    fireFileMenuItem(/^Starter$/i)
     fireEvent.click(screen.getByRole('button', { name: /Show visualization/i }))
     const firstTargetPoint = () => container.querySelector('.visualization-target-point')
     const initialFill = firstTargetPoint()?.getAttribute('fill')
@@ -27,6 +27,11 @@ describe('Backprop Builder visualization data edits', () => {
     expect(firstTargetPoint()?.getAttribute('fill')).not.toBe(initialFill)
   })
 })
+
+function fireFileMenuItem(name: RegExp): void {
+  fireEvent.click(screen.getByRole('button', { name: /^File$/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name }))
+}
 
 function createTwoInputGraph(): GraphModel {
   return {

@@ -19,12 +19,17 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Show visualization/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
     expect(screen.getByText(/Node palette/i)).toBeInTheDocument()
     expect(screen.getByText(/Graph canvas/i)).toBeInTheDocument()
     expect(screen.queryByText(/Inspector/i)).not.toBeInTheDocument()
     expect(screen.getByText(/Current step/i)).toBeInTheDocument()
-    expect(screen.getByText(/Validation/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Load starter example/i })).toBeInTheDocument()
+    expect(screen.queryByText(/Validation/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Show math layer/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Show gradient layer/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Show code layer/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Step$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step backward/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step forward/i })).not.toBeInTheDocument()
@@ -35,13 +40,28 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('button', { name: /Download session summary/i })).not.toBeInTheDocument()
   })
 
+  it('shows project actions inside the File menu', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /^File$/i }))
+
+    expect(screen.getByRole('menuitem', { name: /^New$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^Save$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^Import$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^Starter$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Load starter example/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Save state/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Import state/i })).not.toBeInTheDocument()
+  })
+
   it('activates the visualization panel on demand', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     expect(screen.queryByRole('region', { name: /Visualization panel/i })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /Show visualization/i }))
 
     expect(screen.getByRole('region', { name: /Visualization panel/i })).toBeInTheDocument()
@@ -54,7 +74,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
     expect(screen.queryByText(/x = 2\.000/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/w = 0\.500/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/Add exactly one loss node/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Add exactly one loss node/i)).not.toBeInTheDocument()
   })
 
   it('locks the workspace to the viewport and makes sidebars scroll internally', () => {
@@ -64,24 +84,27 @@ describe('Backprop Builder app', () => {
     const leftPanel = container.querySelector('.left-panel')
     const rightPanel = container.querySelector('.right-panel')
     const flowShell = container.querySelector('.flow-shell')
+    const paletteGrid = container.querySelector('.palette-grid')
 
     expect(getComputedStyle(document.documentElement).height).toBe('100%')
     expect(getComputedStyle(document.body).height).toBe('100%')
     expect(getComputedStyle(document.body).overflow).toBe('hidden')
     expect(getComputedStyle(shell!).height).toBe('100vh')
+    expect(getComputedStyle(shell!).gridTemplateColumns).toBe('220px minmax(560px, 1fr) 340px')
     expect(getComputedStyle(shell!).overflow).toBe('hidden')
     expect(getComputedStyle(leftPanel!).overflowY).toBe('auto')
     expect(getComputedStyle(rightPanel!).overflowY).toBe('auto')
     expect(getComputedStyle(leftPanel!).minHeight).toBe('0px')
     expect(getComputedStyle(rightPanel!).minHeight).toBe('0px')
     expect(getComputedStyle(flowShell!).minHeight).toBe('0px')
+    expect(getComputedStyle(paletteGrid!).gridTemplateColumns).toBe('1fr')
   })
 
   it('loads the starter graph and runs a full training step', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     expect(screen.getByText(/x = 2/i)).toBeInTheDocument()
     expect(screen.getByText(/w = 0.500/i)).toBeInTheDocument()
 
@@ -97,7 +120,7 @@ describe('Backprop Builder app', () => {
     try {
       render(<App />)
 
-      await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+      await chooseFileMenuItem(user, /^Starter$/i)
 
       const speedSlider = screen.getByLabelText('Speed')
       fireEvent.change(speedSlider, { target: { value: '50' } })
@@ -117,7 +140,7 @@ describe('Backprop Builder app', () => {
     try {
       render(<App />)
 
-      await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+      await chooseFileMenuItem(user, /^Starter$/i)
 
       const speedSlider = screen.getByLabelText('Speed')
       fireEvent.change(speedSlider, { target: { value: '1800' } })
@@ -136,7 +159,7 @@ describe('Backprop Builder app', () => {
     try {
       render(<App />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Load starter example/i }))
+      fireFileMenuItem(/^Starter$/i)
       fireEvent.click(screen.getByRole('button', { name: /Show visualization/i }))
       const initialPrediction = visualizationPredictionPath()
 
@@ -160,7 +183,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     expect(screen.getByText('z1 = x * w')).toBeInTheDocument()
     expect(screen.getByText('z2 = z1 + b')).toBeInTheDocument()
@@ -410,7 +433,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     const xInput = screen.getByDisplayValue('2')
     fireEvent.change(xInput, { target: { value: '[1,2,3]' } })
@@ -429,7 +452,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -440,7 +463,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -458,7 +481,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     for (let index = 0; index < 5; index += 1) {
       await user.click(screen.getByRole('button', { name: /^Step$/i }))
     }
@@ -478,7 +501,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -523,7 +546,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     for (let index = 0; index < 8; index += 1) {
       await user.click(screen.getByRole('button', { name: /^Step$/i }))
     }
@@ -584,7 +607,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     fireEvent.keyDown(document, { key: 'c', metaKey: true })
     fireEvent.keyDown(document, { key: 'v', metaKey: true })
@@ -600,7 +623,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     const xInput = screen.getByDisplayValue('2')
     fireEvent.change(xInput, { target: { value: '[1,2,3]' } })
 
@@ -615,7 +638,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
 
     expect(screen.getByText('Epoch 1')).toBeInTheDocument()
@@ -673,7 +696,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
     await user.click(screen.getByRole('button', { name: /^Weight$/i }))
     expect(screen.getByText(/Click the graph canvas to place Weight/i)).toBeInTheDocument()
 
@@ -691,7 +714,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     const nodeControls = container.querySelectorAll('.react-flow__node input, .react-flow__node select')
     expect(nodeControls.length).toBeGreaterThan(0)
@@ -1041,7 +1064,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     expect(screen.queryByText('Selected node')).not.toBeInTheDocument()
     expect(screen.getByText(/Formula/i)).toBeInTheDocument()
@@ -1051,7 +1074,7 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+    await chooseFileMenuItem(user, /^Starter$/i)
 
     const xTitle = Array.from(container.querySelectorAll('.builder-node .node-title-row strong')).find(
       (element) => element.textContent?.trim() === 'x',
@@ -1088,9 +1111,9 @@ describe('Backprop Builder app', () => {
       const user = userEvent.setup()
       render(<App />)
 
-      await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+      await chooseFileMenuItem(user, /^Starter$/i)
       await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
-      await user.click(screen.getByRole('button', { name: /Save state/i }))
+      await chooseFileMenuItem(user, /^Save$/i)
 
       expect(createObjectURL).toHaveBeenCalled()
       const blob = createObjectURL.mock.calls[0]?.[0]
@@ -1120,8 +1143,8 @@ describe('Backprop Builder app', () => {
       epoch: 7,
       currentLoss: 0.123456,
       display: {
-        showMath: true,
-        showGradient: true,
+        showMath: false,
+        showGradient: false,
         showCode: true,
         showVisualization: false,
       },
@@ -1138,6 +1161,9 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText(/Current loss 0.123/i)).toBeInTheDocument()
     expect(screen.getByText(/x = 2/i)).toBeInTheDocument()
     expect(screen.getByText(/w = 0.500/i)).toBeInTheDocument()
+    expect(screen.getByText('z1 = x * w')).toBeInTheDocument()
+    expect(screen.getAllByText(/^grad /).length).toBeGreaterThan(0)
+    expect(screen.queryByText('loss.backward()')).not.toBeInTheDocument()
   })
 
   it('shows an error and keeps the current graph when import fails', async () => {
@@ -1155,6 +1181,16 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
   })
 })
+
+async function chooseFileMenuItem(user: ReturnType<typeof userEvent.setup>, name: RegExp): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /^File$/i }))
+  await user.click(screen.getByRole('menuitem', { name }))
+}
+
+function fireFileMenuItem(name: RegExp): void {
+  fireEvent.click(screen.getByRole('button', { name: /^File$/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name }))
+}
 
 function visualizationPredictionPath(): string | null | undefined {
   return document.querySelector('.visualization-prediction-line')?.getAttribute('d')

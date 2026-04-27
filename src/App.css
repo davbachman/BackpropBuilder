@@ -2,10 +2,90 @@
   height: 100vh;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(560px, 1fr) 340px;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: 220px minmax(560px, 1fr) 340px;
+  grid-template-rows: 58px minmax(0, 1fr) auto;
   background: var(--page-bg);
   overflow: hidden;
+}
+
+.top-bar {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(24, 33, 47, 0.06);
+  z-index: 30;
+}
+
+.top-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.top-brand h1 {
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.top-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.topbar-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.file-menu {
+  position: relative;
+}
+
+.file-menu-panel {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 40;
+  width: 190px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+}
+
+.file-menu-panel button {
+  min-height: 34px;
+  justify-content: flex-start;
+  border-color: transparent;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.file-menu-panel button:hover {
+  background: var(--accent-soft);
+}
+
+.import-error {
+  color: var(--loss);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .left-panel,
@@ -65,7 +145,7 @@
 
 .palette-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 12px;
 }
@@ -710,7 +790,7 @@
 
 @media (max-width: 1250px) {
   .app-shell {
-    grid-template-columns: 250px minmax(520px, 1fr) 310px;
+    grid-template-columns: 220px minmax(520px, 1fr) 310px;
   }
 
   .control-bar {
