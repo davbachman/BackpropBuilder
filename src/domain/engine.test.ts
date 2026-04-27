@@ -13,7 +13,7 @@ import {
 } from './engine'
 import {
   createNode,
-  createReluGateLessonGraph,
+  createReluGateGraph,
   createStarterGraph,
 } from './examples'
 import { scalarFromTensor, scalarValue, tensorValue, toTensor } from './tensor'
@@ -471,7 +471,7 @@ describe('scalar autodiff engine', () => {
   })
 
   it('stops upstream gradient for a negative ReLU gate', () => {
-    const forward = forwardPass(createReluGateLessonGraph())
+    const forward = forwardPass(createReluGateGraph())
     const backward = backwardPass(forward.graph)
 
     const relu = backward.graph.nodes.find((node) => node.id === 'relu')

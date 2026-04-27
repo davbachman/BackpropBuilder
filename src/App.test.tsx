@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Position as FlowPosition } from '@xyflow/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,7 +6,9 @@ import appCss from './App.css?raw'
 import builderEdgeSource from './components/BuilderEdge.tsx?raw'
 import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
-import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, heightForInputCount } from './domain/engine'
+import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
+import { createStarterGraph } from './domain/examples'
+import { createProjectStateFile } from './domain/session'
 import { scalarValue } from './domain/tensor'
 import './index.css'
 import App from './App'
@@ -25,6 +27,10 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('button', { name: /Step backward/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step forward/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Run 10 training steps/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lesson drawer/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Lesson progress/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Session$/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Download session summary/i })).not.toBeInTheDocument()
   })
 
   it('activates the visualization panel on demand', async () => {
@@ -995,13 +1001,13 @@ describe('Backprop Builder app', () => {
     expect(appCss).toMatch(/\.react-flow__edge\.animated\s+path\.builder-edge\.is-backward\s*{[^}]*animation-direction:\s*reverse;/)
   })
 
-  it('records lesson actions and prepares a JSON summary download', async () => {
-    const createObjectURL = vi.fn(() => 'blob:summary')
+  it('downloads a reloadable JSON project state file', async () => {
+    const createObjectURL = vi.fn<(object: Blob | MediaSource) => string>(() => 'blob:state')
     const revokeObjectURL = vi.fn()
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
     const click = vi.fn()
     const originalCreateElement = document.createElement.bind(document)
-    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
       const element = originalCreateElement(tagName)
       if (tagName === 'a') {
         Object.defineProperty(element, 'click', { value: click })
@@ -1009,16 +1015,75 @@ describe('Backprop Builder app', () => {
       return element
     })
 
-    const user = userEvent.setup()
+    try {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByRole('button', { name: /Load starter example/i }))
+      await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
+      await user.click(screen.getByRole('button', { name: /Save state/i }))
+
+      expect(createObjectURL).toHaveBeenCalled()
+      const blob = createObjectURL.mock.calls[0]?.[0]
+      if (!(blob instanceof Blob)) throw new Error('Expected state export to create a Blob.')
+      const saved = JSON.parse(await blob.text())
+      expect(saved.kind).toBe('backprop-builder-state')
+      expect(saved.version).toBe(1)
+      expect(saved.state.graph.nodes.find((node: { id: string }) => node.id === 'w')?.params.value).toBeDefined()
+      expect(saved.state.epoch).toBe(1)
+      expect(click).toHaveBeenCalled()
+    } finally {
+      createElementSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('imports a saved project state and restores visible workspace state', async () => {
+    const importedGraph = forwardPass(createStarterGraph()).graph
+    const projectFile = createProjectStateFile({
+      graph: importedGraph,
+      visualizationGraph: importedGraph,
+      initialParameterValues: parameterValues(importedGraph),
+      selectedNodeIds: ['pred'],
+      phase: 'update',
+      traceSteps: [],
+      traceIndex: 0,
+      epoch: 7,
+      currentLoss: 0.123456,
+      display: {
+        showMath: true,
+        showGradient: true,
+        showCode: true,
+        showVisualization: false,
+      },
+    })
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /Lesson drawer/i }))
-    await user.click(screen.getByRole('button', { name: /Start Lesson 1/i }))
-    await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
-    await user.click(screen.getByRole('button', { name: /Download session summary/i }))
+    fireEvent.change(screen.getByLabelText(/Import state file/i), {
+      target: {
+        files: [new File([JSON.stringify(projectFile)], 'saved-state.json', { type: 'application/json' })],
+      },
+    })
 
-    expect(createObjectURL).toHaveBeenCalled()
-    expect(click).toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByText(/Epoch 7/i)).toBeInTheDocument())
+    expect(screen.getByText(/Current loss 0.123/i)).toBeInTheDocument()
+    expect(screen.getByText(/x = 2/i)).toBeInTheDocument()
+    expect(screen.getByText(/w = 0.500/i)).toBeInTheDocument()
+  })
+
+  it('shows an error and keeps the current graph when import fails', async () => {
+    render(<App />)
+
+    expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/Import state file/i), {
+      target: {
+        files: [new File(['not json'], 'broken.json', { type: 'application/json' })],
+      },
+    })
+
+    await waitFor(() => expect(screen.getByText(/Import failed/i)).toBeInTheDocument())
+    expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
   })
 })
 
