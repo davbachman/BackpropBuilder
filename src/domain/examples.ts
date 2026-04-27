@@ -13,7 +13,7 @@ export function createStarterGraph(): GraphModel {
   })
 }
 
-export function createReluGateLessonGraph(): GraphModel {
+export function createReluGateGraph(): GraphModel {
   return createSingleNeuronGraph('relu', {
     x: 2,
     w: -1.1,

@@ -5,14 +5,14 @@ import {
   Download,
   FastForward,
   Eye,
-  GraduationCap,
   Pause,
   Play,
   RotateCcw,
   Shuffle,
   StepForward,
+  Upload,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactElement } from 'react'
 import './App.css'
 import { GraphCanvas } from './components/GraphCanvas'
 import { VisualizationPanel } from './components/VisualizationPanel'
@@ -36,8 +36,11 @@ import {
 } from './domain/engine'
 import { createEmptyGraph, createNode, createStarterGraph } from './domain/examples'
 import { explodeVisualGroup, mergeNodesIntoVisualGroup, moveVisualGroup } from './domain/grouping'
-import { lessons } from './domain/lessons'
-import { createSessionSummary, downloadSessionSummary } from './domain/session'
+import {
+  createProjectStateFile,
+  downloadProjectStateFile,
+  parseProjectStateFile,
+} from './domain/session'
 import { cloneTensor, scalarValue, toTensor, zeroLike } from './domain/tensor'
 import { visibleGraphForTrace } from './domain/traceVisibility'
 import type {
@@ -46,7 +49,6 @@ import type {
   EvaluationTraceStep,
   GraphModel,
   GraphPhase,
-  LessonDefinition,
   LossKind,
   NodeType,
   TensorValue,
@@ -82,8 +84,6 @@ interface HistorySnapshot {
   traceIndex: number
   epoch: number
   currentLoss: number | null
-  currentLesson?: LessonDefinition
-  completedActions: string[]
 }
 
 function speedSliderValueToDelay(value: number): number {
@@ -107,13 +107,12 @@ function App(): ReactElement {
   const [speedSliderValue, setSpeedSliderValue] = useState(DEFAULT_SPEED_SLIDER_VALUE)
   const [epoch, setEpoch] = useState(0)
   const [currentLoss, setCurrentLoss] = useState<number | null>(null)
-  const [lessonOpen, setLessonOpen] = useState(false)
-  const [currentLesson, setCurrentLesson] = useState<LessonDefinition | undefined>()
-  const [completedActions, setCompletedActions] = useState<string[]>([])
   const [pendingNodeType, setPendingNodeType] = useState<NodeType | undefined>()
   const [undoStack, setUndoStack] = useState<HistorySnapshot[]>([])
   const [clipboard, setClipboard] = useState<GraphClipboardFragment | undefined>()
   const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
+  const [importError, setImportError] = useState<string | undefined>()
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = validationIssues.filter((issue) => issue.code !== 'disconnected')
@@ -124,10 +123,6 @@ function App(): ReactElement {
     () => visibleGraphForTrace(graph, traceSteps, traceIndex, phase),
     [graph, phase, traceIndex, traceSteps],
   )
-
-  const appendAction = useCallback((action: string) => {
-    setCompletedActions((actions) => [...actions, action])
-  }, [])
 
   const snapshotCurrentState = useCallback(
     (): HistorySnapshot => ({
@@ -141,12 +136,8 @@ function App(): ReactElement {
       traceIndex,
       epoch,
       currentLoss,
-      currentLesson,
-      completedActions: [...completedActions],
     }),
     [
-      completedActions,
-      currentLesson,
       currentLoss,
       epoch,
       graph,
@@ -176,8 +167,6 @@ function App(): ReactElement {
     setTraceIndex(snapshot.traceIndex)
     setEpoch(snapshot.epoch)
     setCurrentLoss(snapshot.currentLoss)
-    setCurrentLesson(snapshot.currentLesson)
-    setCompletedActions([...snapshot.completedActions])
     setPendingNodeType(undefined)
     setIsPlaying(false)
   }, [])
@@ -257,7 +246,7 @@ function App(): ReactElement {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [copySelectionToClipboard, pasteClipboard, undoLastAction, undoStack.length])
 
-  const loadGraph = useCallback((nextGraph: GraphModel, lesson?: LessonDefinition) => {
+  const loadGraph = useCallback((nextGraph: GraphModel) => {
     pushHistory()
     const evaluated = safeForward(nextGraph)
     setGraph(evaluated.graph)
@@ -269,8 +258,6 @@ function App(): ReactElement {
     setTraceIndex(0)
     setEpoch(0)
     setCurrentLoss(evaluated.loss ?? null)
-    setCurrentLesson(lesson)
-    setCompletedActions(lesson ? [`Started ${lesson.name}`] : [])
     setPendingNodeType(undefined)
   }, [pushHistory, selectSingleNode])
 
@@ -301,7 +288,6 @@ function App(): ReactElement {
       if (forward.steps.length === 0) {
         setVisualizationGraph(forward.graph)
       }
-      appendAction('Started forward pass')
       return
     }
 
@@ -313,7 +299,6 @@ function App(): ReactElement {
       setTraceIndex(0)
       setPhase('backward')
       selectSingleNode(backward.steps[0]?.nodeId)
-      appendAction('Started backward pass')
       return
     }
 
@@ -335,9 +320,8 @@ function App(): ReactElement {
       setEpoch((value) => value + 1)
       setCurrentLoss(refreshed.loss ?? null)
       selectSingleNode(updated.steps[0]?.nodeId)
-      appendAction('Updated parameters')
     }
-  }, [appendAction, blockingIssues.length, graph, phase, pushHistory, selectSingleNode, traceIndex, traceSteps])
+  }, [blockingIssues.length, graph, phase, pushHistory, selectSingleNode, traceIndex, traceSteps])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -358,8 +342,7 @@ function App(): ReactElement {
     setEpoch((value) => value + 1)
     setCurrentLoss(result.loss ?? null)
     selectSingleNode(updateSteps[0]?.nodeId)
-    appendAction('Ran one full training step')
-  }, [appendAction, blockingIssues.length, graph, pushHistory, selectSingleNode])
+  }, [blockingIssues.length, graph, pushHistory, selectSingleNode])
 
   const runTenTrainingSteps = useCallback(() => {
     if (blockingIssues.length > 0) return
@@ -391,8 +374,7 @@ function App(): ReactElement {
     setEpoch((value) => value + 10)
     setCurrentLoss(loss)
     selectSingleNode(summaryStep.nodeId)
-    appendAction('Ran 10 training steps')
-  }, [appendAction, blockingIssues.length, currentLoss, graph, pushHistory, selectSingleNode])
+  }, [blockingIssues.length, currentLoss, graph, pushHistory, selectSingleNode])
 
   const selectPaletteNode = (type: NodeType) => {
     setPendingNodeType(type)
@@ -497,7 +479,6 @@ function App(): ReactElement {
       setVisualizationGraph(evaluated.graph)
       return evaluated.graph
     })
-    appendAction('Randomized parameters')
   }
 
   const applyGraphChange = useCallback(
@@ -548,17 +529,65 @@ function App(): ReactElement {
     [pushHistory],
   )
 
-  const exportSummary = () => {
-    downloadSessionSummary(
-      createSessionSummary({
-        lessonName: currentLesson?.name ?? 'Free exploration',
+  const saveProjectState = () => {
+    setImportError(undefined)
+    downloadProjectStateFile(
+      createProjectStateFile({
         graph,
+        visualizationGraph,
         initialParameterValues: initialParams,
-        trainingSteps: epoch,
-        finalLoss: currentLoss,
-        completedLessonActions: completedActions,
+        selectedNodeIds,
+        selectedGroupId,
+        phase,
+        traceSteps,
+        traceIndex,
+        epoch,
+        currentLoss,
+        display: {
+          showMath,
+          showGradient,
+          showCode,
+          showVisualization,
+        },
       }),
     )
+  }
+
+  const chooseProjectStateFile = () => {
+    setImportError(undefined)
+    importInputRef.current?.click()
+  }
+
+  const importProjectState = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+
+    const result = parseProjectStateFile(await file.text())
+    if (!result.ok) {
+      setImportError(result.error)
+      return
+    }
+
+    const nextState = result.file.state
+    pushHistory()
+    setGraph(cloneGraph(nextState.graph))
+    setVisualizationGraph(cloneGraph(nextState.visualizationGraph))
+    setInitialParams(cloneParameterValueMap(nextState.initialParameterValues))
+    setSelectedNodeIds([...nextState.selectedNodeIds])
+    setSelectedGroupId(nextState.selectedGroupId)
+    setPhase(nextState.phase)
+    setTraceSteps(cloneTraceSteps(nextState.traceSteps))
+    setTraceIndex(nextState.traceIndex)
+    setEpoch(nextState.epoch)
+    setCurrentLoss(nextState.currentLoss)
+    setShowMath(nextState.display.showMath)
+    setShowGradient(nextState.display.showGradient)
+    setShowCode(nextState.display.showCode)
+    setShowVisualization(nextState.display.showVisualization)
+    setPendingNodeType(undefined)
+    setIsPlaying(false)
+    setImportError(undefined)
   }
 
   return (
@@ -594,7 +623,7 @@ function App(): ReactElement {
         </section>
 
         <section className="panel-section action-stack">
-          <button type="button" className="primary-button" onClick={() => loadGraph(createStarterGraph(), lessons[0])}>
+          <button type="button" className="primary-button" onClick={() => loadGraph(createStarterGraph())}>
             <BookOpen size={16} />
             Load starter example
           </button>
@@ -606,6 +635,23 @@ function App(): ReactElement {
             <Shuffle size={16} />
             Randomize parameters
           </button>
+          <button type="button" onClick={saveProjectState}>
+            <Download size={16} />
+            Save state
+          </button>
+          <button type="button" onClick={chooseProjectStateFile}>
+            <Upload size={16} />
+            Import state
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            aria-label="Import state file"
+            style={{ display: 'none' }}
+            onChange={importProjectState}
+          />
+          {importError ? <p className="import-error" role="alert">{importError}</p> : null}
           <button
             type="button"
             className={showVisualization ? 'panel-toggle-button is-active' : 'panel-toggle-button'}
@@ -632,26 +678,6 @@ function App(): ReactElement {
           </label>
         </section>
 
-        <section className="panel-section">
-          <button type="button" className="lesson-toggle" onClick={() => setLessonOpen((open) => !open)}>
-            <GraduationCap size={16} />
-            Lesson drawer
-          </button>
-          {lessonOpen ? (
-            <div className="lesson-list">
-              {lessons.map((lesson, index) => (
-                <article key={lesson.id} className={lesson.id === currentLesson?.id ? 'lesson-card is-current' : 'lesson-card'}>
-                  <h3>{lesson.name}</h3>
-                  <p>{lesson.prompt}</p>
-                  <p className="lesson-task">{lesson.task}</p>
-                  <button type="button" onClick={() => loadGraph(lesson.createGraph(), lesson)}>
-                    Start Lesson {index + 1}
-                  </button>
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </section>
       </aside>
 
       <GraphCanvas
@@ -683,7 +709,7 @@ function App(): ReactElement {
         <section className="inspector-card">
           <p className="eyebrow">Inspector</p>
           <h2>Current phase: {phaseLabel(phase)}</h2>
-          <p>{activeStep?.explanation ?? 'Edit the graph, load a lesson, or step through the tensor computation.'}</p>
+          <p>{activeStep?.explanation ?? 'Edit the graph, load an example, or step through the tensor computation.'}</p>
           <div className={`phase-badge phase-${phase}`}>{phaseLabel(phase)}</div>
         </section>
 
@@ -718,16 +744,6 @@ function App(): ReactElement {
           )}
         </section>
 
-        <section className="inspector-card">
-          <p className="eyebrow">Lesson progress</p>
-          <h3>{currentLesson?.name ?? 'Free exploration'}</h3>
-          <p>{currentLesson?.completionCondition ?? 'Build and inspect a graph at your own pace.'}</p>
-          {completedActions.length > 0 ? <p className="success-message">{currentLesson?.successMessage}</p> : null}
-          <button type="button" onClick={exportSummary}>
-            <Download size={16} />
-            Download session summary
-          </button>
-        </section>
       </aside>
 
       <footer className="control-bar">

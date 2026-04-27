@@ -1,6 +1,6 @@
 # Backprop Builder
 
-Backprop Builder is a browser-based teaching app for small tensor backpropagation. Students build a tiny feed-forward computation graph, step through the forward pass, inspect squared-error loss, watch gradients flow backward, and apply gradient descent updates to trainable weights and biases. Scalar values are represented as tensors with shape `[]`, so the starter lesson still looks and behaves like the original scalar graph.
+Backprop Builder is a browser-based teaching app for small tensor backpropagation. Students build a tiny feed-forward computation graph, step through the forward pass, inspect squared-error loss, watch gradients flow backward, and apply gradient descent updates to trainable weights and biases. Scalar values are represented as tensors with shape `[]`, so the starter graph stays compact while using the tensor engine.
 
 ## Run Locally
 
@@ -29,20 +29,18 @@ npm run build
 - Add, multiply, and activation nodes apply elementwise tensor operations with scalar broadcasting.
 - Squared-error loss reduces tensor prediction errors to one scalar objective for gradient descent.
 - Step controls for forward pass, loss, backward pass, and parameter updates.
-- Lesson drawer with three initial lessons.
 - Math, gradient, and pseudocode overlay toggles.
-- JSON session summary export for later LMS or Gradescope-style upload.
+- JSON project state save/import for continuing a workspace later.
 
 ## Project Structure
 
 ```text
 src/domain/
   engine.ts       Tensor autodiff, validation, topological sort, updates
-  examples.ts     Starter graph and lesson graph factories
-  lessons.ts      Built-in lesson metadata
-  session.ts      JSON summary creation/download
+  examples.ts     Starter graph factories
+  session.ts      JSON project state creation, download, and import parsing
   tensor.ts       Tensor representation, formatting, parsing, broadcasting
-  types.ts        Shared graph and training-session types
+  types.ts        Shared graph and project-state types
 
 src/components/
   GraphCanvas.tsx React Flow workspace

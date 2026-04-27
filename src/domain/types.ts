@@ -138,24 +138,34 @@ export interface UpdateResult {
   updates: ParameterUpdate[]
 }
 
-export interface LessonDefinition {
-  id: string
-  name: string
-  prompt: string
-  task: string
-  completionCondition: string
-  successMessage: string
-  createGraph: () => GraphModel
+export interface ProjectDisplayState {
+  showMath: boolean
+  showGradient: boolean
+  showCode: boolean
+  showVisualization: boolean
 }
 
-export interface TrainingSessionSummary {
-  timestamp: string
-  lessonName: string
-  graph: Pick<GraphModel, 'nodes' | 'edges'>
+export interface ProjectStateSnapshot {
+  graph: GraphModel
+  visualizationGraph: GraphModel
   initialParameterValues: Record<string, TensorValue>
-  finalParameterValues: Record<string, TensorValue>
-  learningRate: number
-  trainingSteps: number
-  finalLoss: number | null
-  completedLessonActions: string[]
+  selectedNodeIds: string[]
+  selectedGroupId?: string
+  phase: GraphPhase
+  traceSteps: EvaluationTraceStep[]
+  traceIndex: number
+  epoch: number
+  currentLoss: number | null
+  display: ProjectDisplayState
 }
+
+export interface ProjectStateFile {
+  kind: 'backprop-builder-state'
+  version: 1
+  savedAt: string
+  state: ProjectStateSnapshot
+}
+
+export type ProjectStateParseResult =
+  | { ok: true; file: ProjectStateFile }
+  | { ok: false; error: string }

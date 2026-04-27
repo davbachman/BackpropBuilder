@@ -132,39 +132,10 @@
   color: var(--accent);
 }
 
-.lesson-toggle {
-  width: 100%;
-}
-
-.lesson-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.lesson-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--panel-soft);
-  display: grid;
-  gap: 8px;
-}
-
-.lesson-card.is-current {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.lesson-card p,
 .right-panel p {
   color: var(--muted-strong);
   font-size: 13px;
   line-height: 1.45;
-}
-
-.lesson-task {
-  font-weight: 700;
 }
 
 .canvas-panel {
