@@ -106,6 +106,19 @@ function parabolaSeparationAccuracy(dataset: (typeof DATASET_OPTIONS)[number]): 
   return correct / dataset.targetValue.data.length
 }
 
+function quadrantCounts(dataset: (typeof DATASET_OPTIONS)[number]): number[] {
+  const [xValues, yValues] = dataset.featureValues
+  const counts = [0, 0, 0, 0]
+  xValues.data.forEach((x, index) => {
+    const y = yValues.data[index]
+    if (x < 0 && y < 0) counts[0] += 1
+    if (x < 0 && y >= 0) counts[1] += 1
+    if (x > 0 && y < 0) counts[2] += 1
+    if (x > 0 && y >= 0) counts[3] += 1
+  })
+  return counts
+}
+
 describe('scalar autodiff engine', () => {
   it('lays out the starter graph with enough vertical room for full node cards', () => {
     const graph = createStarterGraph()
@@ -181,6 +194,14 @@ describe('scalar autodiff engine', () => {
     expect(parabola?.task).toBe('binary-classification')
     expect(parabola?.featureValues).toHaveLength(2)
     expect(parabolaSeparationAccuracy(parabola!)).toBeGreaterThanOrEqual(0.95)
+  })
+
+  it('spreads the parabola boundary dataset across the two-input visualization domain', () => {
+    const parabola = DATASET_OPTIONS.find((dataset) => dataset.kind === 'parabola-boundary')
+
+    expect(parabola).toBeDefined()
+    expect(Math.min(...quadrantCounts(parabola!))).toBeGreaterThanOrEqual(4)
+    expect(parabolaSeparationAccuracy(parabola!)).toBe(1)
   })
 
   it('routes dataset feature and target outputs by source slot', () => {
