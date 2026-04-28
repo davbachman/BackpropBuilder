@@ -2,7 +2,7 @@
 
 [Open the app](https://davbachman.github.io/BackpropBuilder/)
 
-Created by David Bachman with GPT 5.4. To learn more about David see https://pzacad.pitzer.edu/~dbachman/, and subscribe to his AI podcast *Entropy Bonus* at https://profbachman.substack.com/.
+Created by David Bachman with GPT 5.5. To learn more about David see https://pzacad.pitzer.edu/~dbachman/, and subscribe to his AI podcast *Entropy Bonus* at https://profbachman.substack.com/.
 
 ## Brief description
 Backprop Builder is a browser-based teaching app for small tensor backpropagation, with an editable computation graph, forward and backward pass controls, loss inspection, gradient visualization, and parameter updates.
