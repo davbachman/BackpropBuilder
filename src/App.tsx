@@ -36,7 +36,7 @@ import {
   validateGraph,
 } from './domain/engine'
 import { createEmptyGraph, createNode, createStarterGraph } from './domain/examples'
-import { explodeVisualGroup, mergeNodesIntoVisualGroup, moveVisualGroup } from './domain/grouping'
+import { collapsedGroupForNode, explodeVisualGroup, mergeNodesIntoVisualGroup, moveVisualGroup, setVisualGroupExpanded } from './domain/grouping'
 import {
   createProjectStateFile,
   downloadProjectStateFile,
@@ -50,6 +50,7 @@ import type {
   EvaluationTraceStep,
   GraphModel,
   GraphPhase,
+  GraphViewState,
   LossKind,
   NodeType,
   TensorValue,
@@ -61,6 +62,7 @@ const palette: Array<{ type: NodeType; label: string }> = [
   { type: 'weight', label: 'Weight' },
   { type: 'bias', label: 'Bias' },
   { type: 'multiply', label: 'Multiply' },
+  { type: 'matmul', label: 'Matrix product' },
   { type: 'add', label: 'Add' },
   { type: 'activation', label: 'Activation' },
   { type: 'target', label: 'Target' },
@@ -94,10 +96,12 @@ function speedSliderValueToDelay(value: number): number {
   return MIN_PLAY_DELAY_MS + MAX_PLAY_DELAY_MS - value
 }
 
-function App(): ReactElement {
-  const [graph, setGraph] = useState<GraphModel>(() => createEmptyGraph())
-  const [visualizationGraph, setVisualizationGraph] = useState<GraphModel>(() => createEmptyGraph())
-  const [initialParams, setInitialParams] = useState<Record<string, TensorValue>>({})
+interface AppProps { initialGraph?: GraphModel; onGallery?: () => void }
+
+function App({ initialGraph, onGallery }: AppProps = {}): ReactElement {
+  const [graph, setGraph] = useState<GraphModel>(() => safeForward(initialGraph ?? createEmptyGraph()).graph)
+  const [visualizationGraph, setVisualizationGraph] = useState<GraphModel>(() => safeForward(initialGraph ?? createEmptyGraph()).graph)
+  const [initialParams, setInitialParams] = useState<Record<string, TensorValue>>(() => parameterValues(initialGraph ?? createEmptyGraph()))
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>()
   const [phase, setPhase] = useState<GraphPhase>('edit')
@@ -118,6 +122,7 @@ function App(): ReactElement {
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = validationIssues.filter((issue) => issue.code !== 'disconnected')
+  const hasLoss = graph.nodes.some((node) => node.type === 'loss')
   const activeStep = traceSteps[traceIndex]
   const selectedNodeId = !selectedGroupId && selectedNodeIds.length === 1 ? selectedNodeIds[0] : undefined
   const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId)
@@ -268,7 +273,7 @@ function App(): ReactElement {
 
     if (traceSteps.length > 0 && traceIndex < traceSteps.length - 1) {
       pushHistory()
-      const nextIndex = traceIndex + 1
+      const nextIndex = nextVisibleStepEnd(graph, traceSteps, traceIndex + 1)
       setTraceIndex(nextIndex)
       setPhase(traceSteps[nextIndex].phase)
       selectSingleNode(traceSteps[nextIndex].nodeId)
@@ -282,10 +287,11 @@ function App(): ReactElement {
       pushHistory()
       const forward = forwardPass(graph)
       setGraph(forward.graph)
+      const nextIndex = nextVisibleStepEnd(graph, forward.steps, 0)
       setTraceSteps(forward.steps)
-      setTraceIndex(0)
-      setPhase(forward.steps[0]?.phase ?? 'forward')
-      selectSingleNode(forward.steps[0]?.nodeId)
+      setTraceIndex(nextIndex)
+      setPhase(forward.steps[nextIndex]?.phase ?? 'forward')
+      selectSingleNode(forward.steps[nextIndex]?.nodeId)
       setCurrentLoss(forward.loss ?? null)
       if (forward.steps.length === 0) {
         setVisualizationGraph(forward.graph)
@@ -294,13 +300,15 @@ function App(): ReactElement {
     }
 
     if (phase === 'forward' || phase === 'loss') {
+      if (!hasLoss) { setIsPlaying(false); setVisualizationGraph(graph); return }
       pushHistory()
       const backward = backwardPass(graph)
       setGraph(backward.graph)
+      const nextIndex = nextVisibleStepEnd(graph, backward.steps, 0)
       setTraceSteps(backward.steps)
-      setTraceIndex(0)
+      setTraceIndex(nextIndex)
       setPhase('backward')
-      selectSingleNode(backward.steps[0]?.nodeId)
+      selectSingleNode(backward.steps[nextIndex]?.nodeId)
       return
     }
 
@@ -323,7 +331,7 @@ function App(): ReactElement {
       setCurrentLoss(refreshed.loss ?? null)
       selectSingleNode(updated.steps[0]?.nodeId)
     }
-  }, [blockingIssues.length, graph, phase, pushHistory, selectSingleNode, traceIndex, traceSteps])
+  }, [blockingIssues.length, graph, hasLoss, phase, pushHistory, selectSingleNode, traceIndex, traceSteps])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -332,7 +340,7 @@ function App(): ReactElement {
   }, [isPlaying, speedSliderValue, stepForward])
 
   const runOneTrainingStep = useCallback(() => {
-    if (blockingIssues.length > 0) return
+    if (blockingIssues.length > 0 || !hasLoss) return
     pushHistory()
     const result = runTrainingStep(graph, graph.learningRate)
     const updateSteps = result.steps.filter((step) => step.phase === 'update')
@@ -344,10 +352,10 @@ function App(): ReactElement {
     setEpoch((value) => value + 1)
     setCurrentLoss(result.loss ?? null)
     selectSingleNode(updateSteps[0]?.nodeId)
-  }, [blockingIssues.length, graph, pushHistory, selectSingleNode])
+  }, [blockingIssues.length, graph, hasLoss, pushHistory, selectSingleNode])
 
   const runTenTrainingSteps = useCallback(() => {
-    if (blockingIssues.length > 0) return
+    if (blockingIssues.length > 0 || !hasLoss) return
     pushHistory()
     let nextGraph = graph
     const startingLoss = currentLoss
@@ -376,7 +384,7 @@ function App(): ReactElement {
     setEpoch((value) => value + 10)
     setCurrentLoss(loss)
     selectSingleNode(summaryStep.nodeId)
-  }, [blockingIssues.length, currentLoss, graph, pushHistory, selectSingleNode])
+  }, [blockingIssues.length, currentLoss, graph, hasLoss, pushHistory, selectSingleNode])
 
   const selectPaletteNode = (type: NodeType) => {
     setPendingNodeType(type)
@@ -400,7 +408,7 @@ function App(): ReactElement {
 
   const updateNodeValue = useCallback((nodeId: string, value: TensorValue) => {
     pushHistory()
-    setGraph((existing) => ({
+    setGraph((existing) => invalidateGraphResults({
       ...existing,
       nodes: existing.nodes.map((node) =>
         node.id === nodeId ? { ...node, params: { ...node.params, value }, value } : node,
@@ -415,28 +423,40 @@ function App(): ReactElement {
       ),
     }))
     setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setIsPlaying(false)
   }, [pushHistory])
 
   const updateActivation = useCallback((nodeId: string, activation: ActivationKind) => {
     pushHistory()
-    setGraph((existing) => ({
+    setGraph((existing) => invalidateGraphResults({
       ...existing,
       nodes: existing.nodes.map((node) =>
         node.id === nodeId ? { ...node, params: { ...node.params, activation } } : node,
       ),
     }))
     setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setIsPlaying(false)
   }, [pushHistory])
 
   const updateLoss = useCallback((nodeId: string, loss: LossKind) => {
     pushHistory()
-    setGraph((existing) => ({
+    setGraph((existing) => invalidateGraphResults({
       ...existing,
       nodes: existing.nodes.map((node) =>
         node.id === nodeId ? { ...node, params: { ...node.params, loss } } : node,
       ),
     }))
     setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setIsPlaying(false)
   }, [pushHistory])
 
   const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
@@ -447,7 +467,7 @@ function App(): ReactElement {
       const value = datasetOutputValueForSlot(updated, 0)
       return { ...updated, value, grad: zeroLike(value) }
     }
-    setGraph((existing) => ({
+    setGraph((existing) => invalidateGraphResults({
       ...existing,
       nodes: existing.nodes.map(updateNode),
       edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
@@ -458,6 +478,10 @@ function App(): ReactElement {
       edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
     }))
     setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setIsPlaying(false)
   }, [pushHistory])
 
   const updateLearningRate = (learningRate: number) => {
@@ -483,12 +507,22 @@ function App(): ReactElement {
     })
   }
 
+  const clearRecordedExecution = useCallback(() => {
+    setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setIsPlaying(false)
+  }, [])
+
   const applyGraphChange = useCallback(
     (nextGraph: GraphModel) => {
       pushHistory()
-      setGraph(nextGraph)
+      const changed = computationSignature(graph) !== computationSignature(nextGraph)
+      setGraph(changed ? invalidateGraphResults(nextGraph) : nextGraph)
+      if (changed) { clearRecordedExecution(); setVisualizationGraph(invalidateGraphResults(nextGraph)) }
     },
-    [pushHistory],
+    [graph, pushHistory, clearRecordedExecution],
   )
 
   const mergeSelectedNodes = useCallback(() => {
@@ -499,9 +533,6 @@ function App(): ReactElement {
     setGraph(result.graph)
     setSelectedNodeIds([])
     setSelectedGroupId(result.group.id)
-    setPhase('edit')
-    setTraceSteps([])
-    setTraceIndex(0)
     setPendingNodeType(undefined)
   }, [graph, pushHistory, selectedNodeIds])
 
@@ -514,9 +545,6 @@ function App(): ReactElement {
       setGraph(explodeVisualGroup(graph, groupId))
       setSelectedNodeIds(group.nodeIds)
       setSelectedGroupId(undefined)
-      setPhase('edit')
-      setTraceSteps([])
-      setTraceIndex(0)
       setPendingNodeType(undefined)
     },
     [graph, pushHistory],
@@ -526,7 +554,6 @@ function App(): ReactElement {
     (groupId: string, position: { x: number; y: number }) => {
       pushHistory()
       setGraph((existing) => moveVisualGroup(existing, groupId, position))
-      setPhase('edit')
     },
     [pushHistory],
   )
@@ -603,6 +630,7 @@ function App(): ReactElement {
         </div>
 
         <div className="top-actions">
+          {onGallery ? <button type="button" className="topbar-button" onClick={onGallery}><BookOpen size={16} /> Preset gallery</button> : null}
           <div className="file-menu">
             <button
               type="button"
@@ -694,6 +722,10 @@ function App(): ReactElement {
         phase={phase}
         pendingNodeType={pendingNodeType}
         onGraphChange={applyGraphChange}
+        onViewChange={(view: GraphViewState) => {
+          if (JSON.stringify(graph.view?.expandedGroupIds ?? []) !== JSON.stringify(view.expandedGroupIds) || graph.view?.focusedGroupId !== view.focusedGroupId) pushHistory()
+          setGraph((existing) => ({ ...existing, view }))
+        }}
         onSelectionChange={selectCanvasSelection}
         onCreateNode={placePaletteNode}
         onCancelPendingPlacement={clearPendingPlacement}
@@ -729,6 +761,16 @@ function App(): ReactElement {
           <StepForward size={16} />
           Step
         </button>
+        <button type="button" disabled={!activeStep || !collapsedGroupForNode(graph, activeStep.nodeId ?? '')} onClick={() => {
+          const group = collapsedGroupForNode(graph, activeStep?.nodeId ?? '')
+          if (group) setGraph(setVisualGroupExpanded(graph, group.id, true))
+        }}>Step inside</button>
+        <button type="button" disabled={!activeStep} onClick={() => {
+          let end = traceIndex
+          while (end + 1 < traceSteps.length && traceSteps[end + 1].phase === phase) end += 1
+          setTraceIndex(end)
+          selectSingleNode(traceSteps[end]?.nodeId)
+        }}>Finish phase</button>
         <button type="button" onClick={() => setIsPlaying((playing) => !playing)} disabled={blockingIssues.length > 0}>
           {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           {isPlaying ? 'Pause' : 'Play'}
@@ -744,11 +786,11 @@ function App(): ReactElement {
             onChange={(event) => setSpeedSliderValue(Number(event.target.value))}
           />
         </label>
-        <button type="button" onClick={runOneTrainingStep} disabled={blockingIssues.length > 0}>
+        <button type="button" onClick={runOneTrainingStep} disabled={blockingIssues.length > 0 || !hasLoss}>
           <FastForward size={16} />
           Run one full training step
         </button>
-        <button type="button" onClick={runTenTrainingSteps} disabled={blockingIssues.length > 0}>
+        <button type="button" onClick={runTenTrainingSteps} disabled={blockingIssues.length > 0 || !hasLoss}>
           Run 10 training steps
         </button>
         <label className="slider-control">
@@ -812,6 +854,26 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   const tagName = target.tagName.toLowerCase()
   return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'
+}
+
+function nextVisibleStepEnd(graph: GraphModel, steps: EvaluationTraceStep[], start: number): number {
+  let index = start
+  const module = collapsedGroupForNode(graph, steps[index]?.nodeId ?? '')
+  if (module) {
+    while (index + 1 < steps.length && steps[index + 1].phase === steps[index].phase && module.nodeIds.includes(steps[index + 1].nodeId ?? '')) index += 1
+  }
+  return index
+}
+
+function computationSignature(graph: GraphModel): string {
+  return JSON.stringify({ nodes: graph.nodes.map(({ id, type, params }) => ({ id, type, params })), edges: graph.edges.map(({ id, source, sourceSlot, target, inputSlot }) => ({ id, source, sourceSlot, target, inputSlot })) })
+}
+
+function invalidateGraphResults(graph: GraphModel): GraphModel {
+  return { ...graph, nodes: graph.nodes.map((node) => ({ ...node,
+    value: ['input', 'target', 'weight', 'bias', 'dataset'].includes(node.type) ? node.value : undefined,
+    grad: undefined, localDerivative: undefined, cache: undefined,
+  })), edges: graph.edges.map((edge) => ({ ...edge, value: undefined, grad: undefined })) }
 }
 
 function safeForward(graph: GraphModel): { graph: GraphModel; loss?: number } {

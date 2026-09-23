@@ -78,6 +78,7 @@ export const inputArityByType: Record<NodeType, number> = {
   weight: 0,
   bias: 0,
   multiply: 2,
+  matmul: 2,
   add: 2,
   activation: 1,
   target: 1,
@@ -145,6 +146,8 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
       return `${node.label} = ${valueFormatter(node.params.value)}`
     case 'target':
       return `${node.label} = ${inputLabels[0] ?? valueFormatter(node.params.value)}`
+    case 'matmul':
+      return `${outputLabel} = ${inputLabels.join(' @ ')}`
     case 'multiply':
       return `${outputLabel} = ${inputLabels.join(' * ')}`
     case 'add':
@@ -317,6 +320,7 @@ function computedOutputLabels(graph: GraphModel): Map<string, string> {
 export function cloneGraph(graph: GraphModel): GraphModel {
   return {
     learningRate: graph.learningRate,
+    view: graph.view ? { ...graph.view, expandedGroupIds: [...graph.view.expandedGroupIds], viewport: graph.view.viewport ? { ...graph.view.viewport } : undefined } : undefined,
     groups: graph.groups?.map((group) => ({
       ...group,
       nodeIds: [...group.nodeIds],
@@ -360,12 +364,12 @@ export function parameterValues(graph: GraphModel): Record<string, TensorValue> 
   )
 }
 
-export function validateGraph(graph: GraphModel): ValidationIssue[] {
+export function validateGraph(graph: GraphModel, options: { requireLoss?: boolean } = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const nodeIds = new Set(graph.nodes.map((node) => node.id))
   const lossNodes = graph.nodes.filter((node) => node.type === 'loss')
 
-  if (lossNodes.length === 0) {
+  if (lossNodes.length === 0 && options.requireLoss) {
     issues.push({
       code: 'missing-loss',
       message: 'Add exactly one loss node so the app knows what to optimize.',
@@ -503,6 +507,10 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
 }
 
 function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] | undefined {
+  if (node.type === 'matmul') {
+    const [a, b] = inputShapes
+    return a.length === 2 && b.length === 2 && a[1] === b[0] ? [a[0], b[1]] : undefined
+  }
   if (node.type === 'activation') return [...inputShapes[0]]
   if (node.type === 'add' || node.type === 'multiply') return broadcastShapeForShapes(inputShapes)
   if (node.type === 'loss') return broadcastShapeForShapes(inputShapes) ? [] : undefined
@@ -576,7 +584,7 @@ export function forwardPass(graph: GraphModel): EvaluationResult {
 }
 
 export function backwardPass(graph: GraphModel): EvaluationResult {
-  assertValid(graph)
+  assertValid(graph, true)
   const next = cloneGraph(graph)
   const order = topologicalSort(next).reverse()
   const steps: EvaluationTraceStep[] = []
@@ -664,6 +672,10 @@ function computeForward(
 ): { value: TensorValue; localDerivative?: TensorValue; localDerivatives: TensorValue[]; error?: TensorValue } {
   if (SOURCE_TYPES.has(node.type)) {
     return { value: sourceForwardValue(node, inputs), localDerivatives: [] }
+  }
+
+  if (node.type === 'matmul') {
+    return { value: matrixProduct(inputs[0], inputs[1]), localDerivatives: [] }
   }
 
   if (node.type === 'multiply') {
@@ -769,6 +781,11 @@ function computeBackward(
   if (SOURCE_TYPES.has(node.type)) return []
   const values = incoming.map((edge) => valueForSourceEdge(graph, edge))
 
+  if (node.type === 'matmul') {
+    const gradients = [matrixProduct(downstreamGrad, transposeMatrix(values[1])), matrixProduct(transposeMatrix(values[0]), downstreamGrad)]
+    return incoming.map((edge, index) => ({ edgeId: edge.id, sourceId: edge.source, gradient: gradients[index] }))
+  }
+
   if (node.type === 'multiply') {
     return incoming.map((edge, index) => ({
       edgeId: edge.id,
@@ -807,6 +824,28 @@ function computeBackward(
     },
     { edgeId: incoming[1].id, sourceId: incoming[1].source, gradient: zeroLike(target) },
   ]
+}
+
+/** Explicit rank-two matrix product; multiply remains elementwise broadcasting. */
+export function matrixProduct(a: TensorValue, b: TensorValue): TensorValue {
+  if (a.shape.length !== 2 || b.shape.length !== 2 || a.shape[1] !== b.shape[0]) {
+    throw new Error('Matrix multiplication needs shapes [rows, inner] and [inner, columns].')
+  }
+  const [rows, inner] = a.shape
+  const columns = b.shape[1]
+  const data = Array.from({ length: rows * columns }, (_, index) => {
+    const row = Math.floor(index / columns)
+    const column = index % columns
+    let sum = 0
+    for (let k = 0; k < inner; k += 1) sum += a.data[row * inner + k] * b.data[k * columns + column]
+    return sum
+  })
+  return tensorValue([rows, columns], data)
+}
+
+function transposeMatrix(value: TensorValue): TensorValue {
+  const [rows, columns] = value.shape
+  return tensorValue([columns, rows], Array.from({ length: rows * columns }, (_, i) => value.data[(i % rows) * columns + Math.floor(i / rows)]))
 }
 
 function productExceptIndex(values: TensorValue[], excludedIndex: number): TensorValue {
@@ -930,8 +969,8 @@ function outputShapeForSourceEdge(
   return shapeByNode.get(source.id)
 }
 
-function assertValid(graph: GraphModel): void {
-  const blockingIssues = validateGraph(graph).filter(
+function assertValid(graph: GraphModel, requireLoss = false): void {
+  const blockingIssues = validateGraph(graph, { requireLoss }).filter(
     (issue) => issue.code !== 'disconnected',
   )
   if (blockingIssues.length > 0) {
@@ -1007,6 +1046,7 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   if (SOURCE_TYPES.has(node.type)) {
     return `${node.label} stores ${formatNumber(node.value)}.`
   }
+  if (node.type === 'matmul') return `${formatNumber(inputs[0])} @ ${formatNumber(inputs[1])} = ${formatNumber(node.value)} (row × column sums)`
   if (node.type === 'multiply') {
     return `${inputs.map((input) => formatNumber(input)).join(' * ')} = ${formatNumber(node.value)}`
   }
@@ -1037,6 +1077,7 @@ function lossCalculationForForward(node: GraphNode, inputs: TensorValue[]): stri
 
 function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
   const inputLabels = inputLabelsForFormula(node, graph)
+  if (node.type === 'matmul') return 'dA = gradient @ B.T; dB = A.T @ gradient'
   if (node.type === 'multiply') {
     return inputLabels
       .map((label, index) => `dz/d${label} = ${inputLabels.filter((_, otherIndex) => otherIndex !== index).join(' * ')}`)
@@ -1072,6 +1113,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'input') return [`${node.label} = ${formatNumber(node.params.value)}`]
   if (node.type === 'weight' || node.type === 'bias') return [`${node.label} = Parameter(${formatNumber(node.params.value)})`]
   if (node.type === 'target') return [`${node.label} = ${formatNumber(node.params.value)}`]
+  if (node.type === 'matmul') return ['z = a @ b']
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
@@ -1085,6 +1127,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
 }
 
 function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
+  if (node.type === 'matmul') return ['a.grad += g @ b.T', 'b.grad += a.T @ g']
   if (node.type === 'multiply') return ['for each input i:', '  input_i.grad += g * product(other inputs)']
   if (node.type === 'add') return ['for each input:', '  input.grad += g']
   if (node.type === 'activation') return ['u.grad += g * local_derivative']

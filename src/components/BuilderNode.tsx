@@ -46,6 +46,7 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   weight: Sigma,
   bias: Sigma,
   multiply: Crosshair,
+  matmul: Crosshair,
   add: Crosshair,
   activation: Box,
   target: CircleDot,

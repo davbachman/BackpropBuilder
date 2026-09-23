@@ -513,7 +513,8 @@ describe('scalar autodiff engine', () => {
       nodes: starter.nodes.filter((node) => node.type !== 'loss'),
       edges: starter.edges.filter((edge) => edge.target !== 'loss'),
     }
-    expect(validateGraph(noLoss).some((issue) => issue.code === 'missing-loss')).toBe(true)
+    expect(validateGraph(noLoss).some((issue) => issue.code === 'missing-loss')).toBe(false)
+    expect(validateGraph(noLoss, { requireLoss: true }).some((issue) => issue.code === 'missing-loss')).toBe(true)
 
     const multipleLosses: GraphModel = {
       ...starter,

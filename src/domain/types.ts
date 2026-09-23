@@ -4,6 +4,7 @@ export type NodeType =
   | 'weight'
   | 'bias'
   | 'multiply'
+  | 'matmul'
   | 'add'
   | 'activation'
   | 'target'
@@ -71,6 +72,8 @@ export interface GraphEdge {
 }
 
 export interface GraphGroup {
+  /** Parent module; nodeIds includes all descendant computation nodes. */
+  parentId?: string
   id: string
   label: string
   nodeIds: string[]
@@ -78,10 +81,17 @@ export interface GraphGroup {
   dimensions: NodeDimensions
 }
 
+export interface GraphViewState {
+  expandedGroupIds: string[]
+  focusedGroupId?: string
+  viewport?: { x: number; y: number; zoom: number }
+}
+
 export interface GraphModel {
   nodes: GraphNode[]
   edges: GraphEdge[]
   groups?: GraphGroup[]
+  view?: GraphViewState
   learningRate: number
 }
 

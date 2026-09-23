@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "train:decoder": "node --experimental-strip-types scripts/train-decoder.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.2",

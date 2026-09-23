@@ -15,7 +15,7 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
-import { Combine, Ungroup } from 'lucide-react'
+import { ArrowUp, Combine, Maximize, Ungroup } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
@@ -32,8 +32,11 @@ import {
 import { canConnectGraphNodes, connectGraphNodes, type GraphConnection } from '../domain/graphEditing'
 import {
   deleteVisualGroup,
-  groupForNode,
-  nodeIdsInGroups,
+  collapsedGroupForNode,
+  expandedGroupRect,
+  groupAncestors,
+  setVisualGroupExpanded,
+  visibleGroups,
   removeNodesFromVisualGroups,
   resolveVisualGroupInputHandle,
   resolveVisualGroupOutputHandle,
@@ -46,6 +49,7 @@ import type {
   EvaluationTraceStep,
   GraphModel,
   GraphNode,
+  GraphViewState,
   LossKind,
   NodeType,
   Position as GraphPosition,
@@ -54,6 +58,7 @@ import type {
 import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { BuilderNode, type BuilderNodeData } from './BuilderNode'
 import { GroupNode, type GroupNodeData } from './GroupNode'
+import './modules.css'
 
 const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode }
 const edgeTypes = { builderEdge: BuilderEdge }
@@ -79,6 +84,7 @@ interface GraphCanvasProps {
   phase: string
   pendingNodeType?: NodeType
   onGraphChange: (graph: GraphModel) => void
+  onViewChange?: (view: GraphViewState) => void
   onSelectionChange: (selection: CanvasSelection) => void
   onCreateNode: (type: NodeType, position: GraphPosition) => void
   onCancelPendingPlacement: () => void
@@ -110,6 +116,7 @@ function GraphCanvasInner({
   phase,
   pendingNodeType,
   onGraphChange,
+  onViewChange,
   onSelectionChange,
   onCreateNode,
   onCancelPendingPlacement,
@@ -121,9 +128,26 @@ function GraphCanvasInner({
   onGroupExplode,
   onGroupMove,
 }: GraphCanvasProps): ReactElement {
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView, setViewport } = useReactFlow()
   const renderedGraph = displayGraph ?? graph
-  const groupedNodeIds = useMemo(() => nodeIdsInGroups(renderedGraph), [renderedGraph])
+  const groupedNodeIds = useMemo(() => new Set(renderedGraph.nodes.filter((node) => collapsedGroupForNode(renderedGraph, node.id)).map((node) => node.id)), [renderedGraph])
+  const changeView = useCallback((view: GraphViewState) => {
+    if (onViewChange) onViewChange(view)
+    else onGraphChange({ ...graph, view })
+  }, [graph, onGraphChange, onViewChange])
+  const toggleGroup = useCallback((groupId: string) => {
+    const next = setVisualGroupExpanded(graph, groupId, !graph.view?.expandedGroupIds.includes(groupId))
+    if (next.view) changeView(next.view)
+  }, [graph, changeView])
+  const focusGroup = useCallback((groupId?: string) => {
+    changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], focusedGroupId: groupId })
+    const group = graph.groups?.find((candidate) => candidate.id === groupId)
+    void fitView({ nodes: group ? group.nodeIds.map((id) => ({ id })) : undefined, padding: 0.18 })
+  }, [graph, changeView, fitView])
+  const savedViewport = graph.view?.viewport
+  useEffect(() => {
+    if (savedViewport) void setViewport(savedViewport)
+  }, [savedViewport, setViewport])
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds])
   const groupInterfaces = useMemo(
     () => new Map((renderedGraph.groups ?? []).map((group) => [group.id, visualGroupInterface(renderedGraph, group)])),
@@ -157,28 +181,35 @@ function GraphCanvasInner({
 
   const reactNodes = useMemo(
     () => {
-      const groupNodes = (renderedGraph.groups ?? []).map<CanvasNode>((group) => {
+      const groupNodes = visibleGroups(renderedGraph).map<CanvasNode>((group) => {
         const groupInterface = groupInterfaces.get(group.id)
+        const expanded = renderedGraph.view?.expandedGroupIds.includes(group.id) ?? false
+        const rect = expanded ? expandedGroupRect(renderedGraph, group) : undefined
 
         return {
           id: groupNodeId(group.id),
           type: 'groupNode',
-          position: group.position,
-          width: group.dimensions.width,
-          height: group.dimensions.height,
+          position: rect ? { x: rect.x, y: rect.y } : group.position,
+          width: rect?.width ?? group.dimensions.width,
+          height: rect?.height ?? group.dimensions.height,
+          draggable: !expanded,
+          zIndex: expanded ? -1 : 0,
+          className: expanded ? 'expanded-module-frame' : undefined,
           selected: group.id === selectedGroupId,
           data: {
-            group,
+            group: rect ? { ...group, dimensions: { width: rect.width, height: rect.height } } : group,
+            expanded,
             inputCount: groupInterface?.inputs.length ?? 0,
             outputCount: groupInterface?.outputs.length ?? 0,
             outputMetrics: (groupInterface?.outputs ?? []).map((output) => {
               const edgeIds = edgeIdsForVisualGroupHandle(output)
               const edge = renderedGraph.edges.find((candidate) => edgeIds.includes(candidate.id))
-              return { forward: edge?.value, gradient: edge?.grad }
+              const source = renderedGraph.nodes.find((node) => node.id === output.source)
+              return { forward: edge?.value ?? source?.value, gradient: edge?.grad ?? source?.grad }
             }),
             showGradient,
             active: group.nodeIds.includes(activeStep?.nodeId ?? ''),
-            onExplode: onGroupExplode,
+            onToggle: toggleGroup,
           },
         }
       })
@@ -221,7 +252,7 @@ function GraphCanvasInner({
       onDatasetChange,
       addFlexibleInput,
       onNodeValueChange,
-      onGroupExplode,
+      toggleGroup,
       groupInterfaces,
       groupedNodeIds,
       renderedGraph,
@@ -235,8 +266,8 @@ function GraphCanvasInner({
   const reactEdges = useMemo(
     () =>
       renderedGraph.edges.flatMap<CanvasEdge>((edge) => {
-        const sourceGroup = groupForNode(renderedGraph, edge.source)
-        const targetGroup = groupForNode(renderedGraph, edge.target)
+        const sourceGroup = collapsedGroupForNode(renderedGraph, edge.source)
+        const targetGroup = collapsedGroupForNode(renderedGraph, edge.target)
         if (sourceGroup?.id && sourceGroup.id === targetGroup?.id) return []
         const sourceHandle = sourceGroup
           ? groupInterfaces.get(sourceGroup.id)?.outputs.find((handle) => visualGroupHandleHasEdge(handle, edge.id))?.handleId
@@ -276,6 +307,7 @@ function GraphCanvasInner({
         edges: renderedGraph.edges,
         groups: renderedGraph.groups ?? [],
         nodes: renderedGraph.nodes,
+        view: renderedGraph.view,
         selectedGroupId,
         selectedNodeIds,
         showGradient,
@@ -286,6 +318,7 @@ function GraphCanvasInner({
       renderedGraph.edges,
       renderedGraph.groups,
       renderedGraph.nodes,
+      renderedGraph.view,
       selectedGroupId,
       selectedNodeIds,
       showGradient,
@@ -299,9 +332,10 @@ function GraphCanvasInner({
         edges: renderedGraph.edges,
         groups: renderedGraph.groups ?? [],
         phase,
+        view: renderedGraph.view,
         showGradient,
       }),
-    [activeStep?.edgeIds, phase, renderedGraph.edges, renderedGraph.groups, showGradient],
+    [activeStep?.edgeIds, phase, renderedGraph.edges, renderedGraph.groups, renderedGraph.view, showGradient],
   )
   const previousNodeSyncKey = useRef(nodeSyncKey)
   const previousEdgeSyncKey = useRef(edgeSyncKey)
@@ -337,6 +371,9 @@ function GraphCanvasInner({
           .map((node) => groupIdFromNodeId(node.id))
           .filter((groupId): groupId is string => Boolean(groupId))
         const nodeIds = nextSelectedNodes.filter((node) => !isGroupNodeId(node.id)).map((node) => node.id)
+        if (selectedGroupIds.length > 1 || nodeIds.length > 0) {
+          for (const id of selectedGroupIds) nodeIds.push(...(graph.groups?.find((group) => group.id === id)?.nodeIds ?? []))
+        }
 
         onSelectionChange({
           nodeIds,
@@ -474,13 +511,14 @@ function GraphCanvasInner({
   const handleNodeDoubleClick = useCallback(
     (_: ReactMouseEvent, node: CanvasNode) => {
       const groupId = groupIdFromNodeId(node.id)
-      if (groupId) onGroupExplode(groupId)
+      if (groupId) toggleGroup(groupId)
     },
-    [onGroupExplode],
+    [toggleGroup],
   )
 
   const selectedGroup = selectedGroupId ? graph.groups?.find((group) => group.id === selectedGroupId) : undefined
   const groupCount = graph.groups?.length ?? 0
+  const breadcrumb = graph.view?.focusedGroupId ? groupAncestors(graph, graph.view.focusedGroupId) : []
 
   return (
     <section className="canvas-panel" aria-label="Graph canvas">
@@ -502,18 +540,34 @@ function GraphCanvasInner({
           {selectedGroup ? (
             <button type="button" className="canvas-action-button" onClick={() => onGroupExplode(selectedGroup.id)}>
               <Ungroup size={15} />
-              Explode group
+              Ungroup module
             </button>
           ) : null}
         </div>
       </div>
+      {groupCount > 0 ? <nav className="module-navigation" aria-label="Module navigation">
+        <button type="button" onClick={() => focusGroup(undefined)}>Model</button>
+        {breadcrumb.map((group) => <span key={group.id}><span aria-hidden="true"> / </span><button type="button" onClick={() => focusGroup(group.id)}>{group.label}</button></span>)}
+        <button type="button" disabled={breadcrumb.length === 0} onClick={() => {
+          const current = breadcrumb[breadcrumb.length - 1]
+          if (current) { const next = setVisualGroupExpanded(graph, current.id, false); if (next.view) changeView(next.view) }
+        }}><ArrowUp size={14} /> Up one level</button>
+        <button type="button" onClick={() => void fitView({ padding: 0.18 })}><Maximize size={14} /> Fit view</button>
+      </nav> : null}
       <div className="flow-shell" onPointerDownCapture={handleFlowPointerDownCapture}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          fitView
+          fitView={!graph.view?.viewport}
+          defaultViewport={graph.view?.viewport}
+          onMoveEnd={(_, viewport) => {
+            const previous = graph.view?.viewport
+            if (!previous || previous.x !== viewport.x || previous.y !== viewport.y || previous.zoom !== viewport.zoom) {
+              changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], viewport })
+            }
+          }}
           minZoom={0.35}
           maxZoom={1.4}
           onConnect={onConnect}

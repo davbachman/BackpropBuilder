@@ -1,4 +1,5 @@
 import { cloneGraph } from './engine'
+import { groupAncestors } from './grouping'
 import type { GraphEdge, GraphGroup, GraphModel, GraphNode, NodeType, Position } from './types'
 
 export interface GraphClipboardSelection {
@@ -10,6 +11,7 @@ export interface GraphClipboardFragment {
   nodes: GraphNode[]
   edges: GraphEdge[]
   group?: GraphGroup
+  groups?: GraphGroup[]
 }
 
 export interface GraphClipboardPasteResult {
@@ -77,14 +79,18 @@ export function pasteGraphClipboard(
     ]
   })
 
-  const pastedGroup = source.group ? createPastedGroup(source.group, usedGroupIds, nodeIdMap, offset) : undefined
+  const originalGroups = source.group ? [source.group, ...(source.groups ?? [])] : []
+  const pastedGroups = originalGroups.map((group) => createPastedGroup(group, usedGroupIds, nodeIdMap, offset))
+  const groupIdMap = new Map(originalGroups.map((group, index) => [group.id, pastedGroups[index].id]))
+  pastedGroups.forEach((group, index) => { group.parentId = groupIdMap.get(originalGroups[index].parentId ?? '') })
+  const pastedGroup = pastedGroups[0]
 
   return {
     graph: {
       ...graph,
       nodes: [...graph.nodes, ...pastedNodes],
       edges: [...graph.edges, ...pastedEdges],
-      groups: pastedGroup ? [...(graph.groups ?? []), pastedGroup] : graph.groups,
+      groups: pastedGroup ? [...(graph.groups ?? []), ...pastedGroups] : graph.groups,
     },
     selection: pastedGroup
       ? { nodeIds: [], groupId: pastedGroup.id }
@@ -106,6 +112,7 @@ function copyGroupSelection(graph: GraphModel, groupId: string): GraphClipboardF
     nodes,
     edges: boundaryAndInternalEdgesForNodeIds(graph, selectedNodeIdSet),
     group,
+    groups: (graph.groups ?? []).filter((candidate) => candidate.id !== group.id && groupAncestors(graph, candidate.id).some((ancestor) => ancestor.id === group.id)),
   })
 }
 
@@ -122,13 +129,14 @@ function cloneClipboardFragment(fragment: GraphClipboardFragment): GraphClipboar
     learningRate: 0,
     nodes: fragment.nodes,
     edges: fragment.edges,
-    groups: fragment.group ? [fragment.group] : undefined,
+    groups: fragment.group ? [fragment.group, ...(fragment.groups ?? [])] : undefined,
   })
 
   return {
     nodes: clonedGraph.nodes,
     edges: clonedGraph.edges,
     group: clonedGraph.groups?.[0],
+    groups: clonedGraph.groups?.slice(1),
   }
 }
 

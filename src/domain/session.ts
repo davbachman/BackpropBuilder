@@ -28,6 +28,7 @@ const NODE_TYPES = new Set([
   'weight',
   'bias',
   'multiply',
+  'matmul',
   'add',
   'activation',
   'target',
@@ -143,7 +144,8 @@ function isGraphModel(value: unknown): value is GraphModel {
     Array.isArray(value.edges) &&
     value.edges.every(isGraphEdge) &&
     (value.groups === undefined || (Array.isArray(value.groups) && value.groups.every(isGraphGroup))) &&
-    isFiniteNumber(value.learningRate)
+    isFiniteNumber(value.learningRate) &&
+    (value.view === undefined || isGraphView(value.view))
   )
 }
 
@@ -176,11 +178,19 @@ function isGraphEdge(value: unknown): value is GraphEdge {
   )
 }
 
+function isGraphView(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  return Array.isArray(value.expandedGroupIds) && value.expandedGroupIds.every((id) => typeof id === 'string') &&
+    (value.focusedGroupId === undefined || typeof value.focusedGroupId === 'string') &&
+    (value.viewport === undefined || (isRecord(value.viewport) && isPosition(value.viewport) && isFiniteNumber(value.viewport.zoom) && value.viewport.zoom > 0))
+}
+
 function isGraphGroup(value: unknown): boolean {
   if (!isRecord(value)) return false
   return (
     typeof value.id === 'string' &&
     typeof value.label === 'string' &&
+    (value.parentId === undefined || typeof value.parentId === 'string') &&
     Array.isArray(value.nodeIds) &&
     value.nodeIds.every((id) => typeof id === 'string') &&
     isPosition(value.position) &&

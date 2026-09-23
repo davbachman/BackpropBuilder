@@ -866,7 +866,7 @@ describe('Backprop Builder app', () => {
     expect(onGroupCreate).toHaveBeenCalledOnce()
   })
 
-  it('renders a merged visual group as one selectable node with an explode action', async () => {
+  it('renders a merged visual group as one selectable node with a separate ungroup action', async () => {
     const user = userEvent.setup()
     const onGroupExplode = vi.fn()
     const graph: GraphModel = {
@@ -926,7 +926,7 @@ describe('Backprop Builder app', () => {
     })
     expect(container.querySelectorAll('.visual-group-node .source-handle.group-handle')).toHaveLength(2)
 
-    await user.click(screen.getByRole('button', { name: /Explode group/i }))
+    await user.click(screen.getByRole('button', { name: /Ungroup module/i }))
 
     expect(onGroupExplode).toHaveBeenCalledWith('group-1')
   })

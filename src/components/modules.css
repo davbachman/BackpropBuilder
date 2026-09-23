@@ -1,0 +1,59 @@
+.module-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 14px; border-bottom:1px solid var(--border, #dadde3); font-size:12px; background:var(--panel-bg, #f8fafc); }
+.module-navigation button { display:inline-flex; align-items:center; gap:4px; border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; background:#fff; color:#334155; cursor:pointer; }
+.module-navigation button:disabled { opacity:.45; cursor:default; }
+.visual-group-node.is-expanded { background:rgba(82,114,177,.035); border:2px dashed #91a5c7; border-radius:14px; pointer-events:none; }
+.visual-group-node.is-expanded .visual-group-title-row { pointer-events:auto; justify-content:flex-start; width:max-content; max-width:100%; background:#f4f7fc; padding:8px; border-radius:8px; }
+.visual-group-node.is-expanded .node-metrics { display:none; }
+.expanded-module-frame { pointer-events:none !important; }
+.expanded-module-frame .visual-group-title-row { pointer-events:auto; }
+.module-navigation button:focus-visible, .group-explode-button:focus-visible { outline:3px solid #436bea; outline-offset:2px; }
+
+.canvas-panel:has(.module-navigation) { grid-template-rows:auto auto minmax(0, 1fr); }
+.control-bar { overflow-x:auto; }
+.control-bar > button { flex-shrink:0; }
+
+/* Keep the free builder usable beside the responsive lesson workspace. */
+body:has(.app-shell) { min-width: 360px; }
+@media (max-width: 1250px) {
+  .app-shell { grid-template-columns: 170px minmax(0, 1fr) 270px; }
+  .app-shell .left-panel, .app-shell .right-panel { padding: 12px; }
+  .app-shell .control-bar { flex-wrap: nowrap; padding: 10px 12px; }
+  .app-shell .control-bar .slider-control { flex: 0 0 135px; min-width: 135px; }
+  .app-shell .top-brand h1 { font-size: 17px; }
+  .app-shell .topbar-button { font-size: 11px; padding-inline: 8px; }
+  .app-shell .canvas-header { padding: 12px; }
+  .app-shell .canvas-header h2 { font-size: 17px; }
+}
+@media (max-width: 1050px) {
+  .app-shell { height: 100dvh; grid-template-columns: 150px minmax(0, 1fr); grid-template-rows: auto minmax(440px, 1fr) auto auto; overflow-y: auto; }
+  .app-shell .top-bar { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .app-shell .top-actions { flex-wrap: wrap; justify-content: flex-start; }
+  .app-shell .right-panel { grid-column: 1 / -1; border-width: 1px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; overflow: visible; }
+  .app-shell .right-panel > * { min-width: 0; }
+  .app-shell .right-panel .inspector-card { margin: 0; }
+  .app-shell .control-bar { grid-row: 4; position: sticky; bottom: 0; z-index: 12; }
+  .app-shell .canvas-header { align-items: flex-start; gap: 8px; }
+  .app-shell .canvas-header-actions { flex-wrap: wrap; gap: 5px; }
+  .app-shell .canvas-header-actions p { font-size: 11px; }
+}
+@media (max-width: 700px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(460px, 65dvh) auto auto; }
+  .app-shell .left-panel { grid-row: 2; border-width: 0 0 1px; padding: 8px 12px; overflow: visible; }
+  .app-shell .left-panel .panel-section { padding: 8px; }
+  .app-shell .left-panel .palette-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .app-shell .palette-button { flex: 0 0 auto; width: auto; padding: 8px 10px; }
+  .app-shell .canvas-panel { grid-row: 3; }
+  .app-shell .right-panel { grid-row: 4; grid-template-columns: minmax(0, 1fr); }
+  .app-shell .control-bar { grid-row: 5; }
+  .app-shell .brand-mark { width: 34px; height: 34px; }
+  .app-shell .react-flow__minimap { display: none; }
+  .app-shell .module-navigation { padding: 8px; font-size: 11px; }
+}
+@media (pointer: coarse) {
+  .app-shell button { min-height: 40px; }
+  .app-shell input, .app-shell select { min-height: 36px; }
+  .app-shell .group-explode-button { min-width: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *, .app-shell *::before, .app-shell *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

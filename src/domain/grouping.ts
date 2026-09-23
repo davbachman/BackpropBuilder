@@ -36,38 +36,86 @@ interface NodeRect {
 }
 
 export function mergeNodesIntoVisualGroup(graph: GraphModel, nodeIds: string[]): MergeResult {
-  const ids = unique(nodeIds)
-  const groupedNodeIds = nodeIdsInGroups(graph)
-  const nodes = ids
-    .filter((id) => !groupedNodeIds.has(id))
-    .map((id) => graph.nodes.find((node) => node.id === id))
-    .filter((node): node is GraphNode => Boolean(node))
-
-  if (nodes.length < 2) return { graph }
-
+  const ids = unique(nodeIds).filter((id) => graph.nodes.some((node) => node.id === id))
+  if (ids.length < 2) return { graph }
+  const selected = new Set(ids)
+  const groups = graph.groups ?? []
+  // A selection can contain complete modules or sit inside a module, but cannot
+  // cut across a module boundary. This keeps the hierarchy a genuine tree.
+  if (groups.some((group) => {
+    const overlap = group.nodeIds.filter((id) => selected.has(id)).length
+    return overlap > 0 && overlap < group.nodeIds.length && overlap < selected.size
+  })) return { graph }
+  const parent = groups.filter((group) => ids.every((id) => group.nodeIds.includes(id)) && group.nodeIds.length > ids.length)
+    .sort((a, b) => a.nodeIds.length - b.nodeIds.length)[0]
+  const nodes = ids.map((id) => graph.nodes.find((node) => node.id === id)!)
   const id = nextGroupId(graph)
   const group: GraphGroup = {
     id,
     label: `Group ${groupIndexFromId(id)}`,
-    nodeIds: nodes.map((node) => node.id),
+    ...(parent ? { parentId: parent.id } : {}),
+    nodeIds: ids,
     position: collapsedPositionForNodes(nodes),
     dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
   }
-
   return {
-    graph: {
-      ...graph,
-      groups: [...(graph.groups ?? []), group],
-    },
+    graph: { ...graph, groups: [...groups.map((candidate) =>
+      candidate.parentId === parent?.id && candidate.nodeIds.every((nodeId) => selected.has(nodeId))
+        ? { ...candidate, parentId: id } : candidate), group] },
     group,
   }
 }
 
+/** Ungroup is an explicit structure edit. Opening a module uses setVisualGroupExpanded. */
 export function explodeVisualGroup(graph: GraphModel, groupId: string): GraphModel {
+  const group = graph.groups?.find((candidate) => candidate.id === groupId)
   return {
     ...graph,
-    groups: (graph.groups ?? []).filter((group) => group.id !== groupId),
+    groups: (graph.groups ?? []).filter((candidate) => candidate.id !== groupId)
+      .map((candidate) => candidate.parentId === groupId ? { ...candidate, parentId: group?.parentId } : candidate),
+    view: graph.view ? { ...graph.view, expandedGroupIds: graph.view.expandedGroupIds.filter((id) => id !== groupId),
+      focusedGroupId: graph.view.focusedGroupId === groupId ? group?.parentId : graph.view.focusedGroupId } : undefined,
   }
+}
+
+export function groupAncestors(graph: GraphModel, groupId: string): GraphGroup[] {
+  const ancestors: GraphGroup[] = []
+  const seen = new Set<string>()
+  let group = graph.groups?.find((candidate) => candidate.id === groupId)
+  while (group && !seen.has(group.id)) {
+    seen.add(group.id)
+    ancestors.unshift(group)
+    group = graph.groups?.find((candidate) => candidate.id === group?.parentId)
+  }
+  return ancestors
+}
+
+export function setVisualGroupExpanded(graph: GraphModel, groupId: string, expanded: boolean): GraphModel {
+  const path = groupAncestors(graph, groupId)
+  if (path.length === 0) return graph
+  const expandedIds = new Set(graph.view?.expandedGroupIds ?? [])
+  if (expanded) path.forEach((group) => expandedIds.add(group.id))
+  else expandedIds.delete(groupId)
+  return { ...graph, view: { ...graph.view, expandedGroupIds: [...expandedIds],
+    focusedGroupId: expanded ? groupId : path[path.length - 1].parentId } }
+}
+
+export function visibleGroups(graph: GraphModel): GraphGroup[] {
+  const expanded = new Set(graph.view?.expandedGroupIds ?? [])
+  return (graph.groups ?? []).filter((group) => groupAncestors(graph, group.id).slice(0, -1).every((parent) => expanded.has(parent.id)))
+}
+
+export function collapsedGroupForNode(graph: GraphModel, nodeId: string): GraphGroup | undefined {
+  const expanded = new Set(graph.view?.expandedGroupIds ?? [])
+  return visibleGroups(graph).find((group) => !expanded.has(group.id) && group.nodeIds.includes(nodeId))
+}
+
+export function expandedGroupRect(graph: GraphModel, group: GraphGroup): NodeRect {
+  const members = graph.nodes.filter((node) => group.nodeIds.includes(node.id)).map(nodeRect)
+  const minX = Math.min(...members.map((rect) => rect.x)) - 28
+  const minY = Math.min(...members.map((rect) => rect.y)) - 64
+  return { x: minX, y: minY, width: Math.max(...members.map((rect) => rect.x + rect.width)) - minX + 28,
+    height: Math.max(...members.map((rect) => rect.y + rect.height)) - minY + 28 }
 }
 
 export function deleteVisualGroup(graph: GraphModel, groupId: string): GraphModel {
@@ -103,7 +151,8 @@ export function moveVisualGroup(graph: GraphModel, groupId: string, position: Po
   return {
     ...graph,
     groups: (graph.groups ?? []).map((candidate) =>
-      candidate.id === groupId ? { ...candidate, position: { ...position } } : candidate,
+      candidate.id === groupId || groupAncestors(graph, candidate.id).some((parent) => parent.id === groupId)
+        ? { ...candidate, position: { x: candidate.position.x + delta.x, y: candidate.position.y + delta.y } } : candidate,
     ),
     nodes: graph.nodes.map((node) =>
       groupNodeIds.has(node.id)

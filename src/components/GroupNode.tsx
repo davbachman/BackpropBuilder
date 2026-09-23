@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Boxes, Ungroup } from 'lucide-react'
+import { Boxes, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type { GraphGroup, TensorValue } from '../domain/types'
@@ -16,7 +16,8 @@ export interface GroupNodeData extends Record<string, unknown> {
   outputMetrics: GroupOutputMetric[]
   showGradient: boolean
   active: boolean
-  onExplode: (groupId: string) => void
+  expanded: boolean
+  onToggle: (groupId: string) => void
 }
 
 export function GroupNode(props: NodeProps): ReactElement {
@@ -25,13 +26,13 @@ export function GroupNode(props: NodeProps): ReactElement {
 
   return (
     <div
-      className={`visual-group-node ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
+      className={`visual-group-node ${data.expanded ? 'is-expanded' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
       style={{
         width: group.dimensions.width,
         height: group.dimensions.height,
       }}
     >
-      {Array.from({ length: data.inputCount }).map((_, index) => (
+      {Array.from({ length: data.expanded ? 0 : data.inputCount }).map((_, index) => (
         <Handle
           key={`in-${index}`}
           id={`in-${index}`}
@@ -47,25 +48,26 @@ export function GroupNode(props: NodeProps): ReactElement {
         </span>
         <div>
           <strong>{group.label}</strong>
-          <span>{data.inputCount} in / {data.outputCount} out</span>
+          <span>{group.nodeIds.length} calculations · {data.inputCount} in / {data.outputCount} out</span>
         </div>
         <button
           type="button"
           className="group-explode-button nodrag nopan"
-          aria-label={`Explode merged node ${group.label}`}
+          aria-label={`${data.expanded ? 'Close' : 'Open'} module ${group.label}`}
+          aria-expanded={data.expanded}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation()
-            data.onExplode(group.id)
+            data.onToggle(group.id)
           }}
         >
-          <Ungroup size={15} />
+          {data.expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       </div>
-      <div className="node-metrics">
+      <div className="node-metrics" hidden={data.expanded}>
         <GroupMetrics outputs={data.outputMetrics} showGradient={data.showGradient} />
       </div>
-      {Array.from({ length: data.outputCount }).map((_, index) => (
+      {Array.from({ length: data.expanded ? 0 : data.outputCount }).map((_, index) => (
         <Handle
           key={`out-${index}`}
           id={`out-${index}`}
