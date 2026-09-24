@@ -38,14 +38,15 @@ function mountCanvas(graph: GraphModel, displayGraph?: GraphModel) {
   const onGraphChange = vi.fn()
   const onViewChange = vi.fn()
   const onSelectionChange = vi.fn()
+  const onCreateNode = vi.fn()
   const canvas = (current: GraphModel) => <GraphCanvas
     graph={current} displayGraph={displayGraph} showMath showGradient={false} phase="edit"
     onGraphChange={onGraphChange} onViewChange={onViewChange} onSelectionChange={onSelectionChange}
-    onCreateNode={vi.fn()} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()}
+    onCreateNode={onCreateNode} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()}
     onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()}
   />
   const result = render(canvas(graph))
-  return { ...result, rerenderGraph: (current: GraphModel) => result.rerender(canvas(current)), onGraphChange, onViewChange, onSelectionChange }
+  return { ...result, rerenderGraph: (current: GraphModel) => result.rerender(canvas(current)), onGraphChange, onViewChange, onSelectionChange, onCreateNode }
 }
 
 function nodeById(id: string): Node {
@@ -79,6 +80,28 @@ function dragStop(nodes: Node[]) {
 
 describe('canvas movement gestures', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('searches block types at a blank click and places the chosen block at that click’s flow coordinates', () => {
+    flow.screenToFlowPosition.mockImplementationOnce(() => ({ x: 417, y: -83 }))
+    const { getByRole, queryByRole, onCreateNode, onSelectionChange } = mountCanvas(createModelPreset('blank'))
+    act(() => flow.props!.onPaneClick!(new MouseEvent('click', { clientX: 523, clientY: 186 }) as unknown as ReactMouseEvent))
+    expect(getByRole('dialog', { name: 'Add a block' })).toBeInTheDocument()
+    expect(getByRole('searchbox', { name: 'Search blocks' })).toHaveFocus()
+    expect(onSelectionChange).toHaveBeenCalledWith({ nodeIds: [] })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'convol' } })
+    expect(getByRole('option', { name: /Convolution/ })).toBeInTheDocument()
+    fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
+    expect(onCreateNode).toHaveBeenCalledExactlyOnceWith('conv2d', { x: 417, y: -83 })
+    expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
+  })
+
+  it('dismisses the blank-canvas block picker with Escape', () => {
+    const { getByRole, queryByRole, onCreateNode } = mountCanvas(createModelPreset('blank'))
+    act(() => flow.props!.onPaneClick!(new MouseEvent('click', { clientX: 100, clientY: 100 }) as unknown as ReactMouseEvent))
+    fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Escape' })
+    expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
+    expect(onCreateNode).not.toHaveBeenCalled()
+  })
 
   it('keeps blocks and the camera still through connection edits until Compact layout is requested', () => {
     let graph = placeCanvasNode(createModelPreset('linear'), { ...createNode('dataset', 1), position: { x: -210, y: 300 } })

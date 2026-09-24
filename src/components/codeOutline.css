@@ -1,0 +1,24 @@
+.code-outline { min-width: 0; min-height: 100%; background: #fcfbfd; }
+.code-outline-intro { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid #eee9f3; color: #8057af; background: #fff; }
+.code-outline-intro > svg { flex: none; }
+.code-outline-intro strong { display: block; color: #443550; font: 600 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.code-outline-intro p { margin: 2px 0 0; color: #94879e; font-size: 10px; line-height: 1.45; }
+.code-outline-list { display: block; padding: 9px 6px 24px; }
+.code-outline-row { display: flex; align-items: flex-start; min-width: 0; min-height: 29px; border-radius: 6px; }
+.code-outline-row:hover { background: #f5f1f8; }
+.code-outline-row.is-selected { background: #eee5f8; box-shadow: inset 2px 0 #8057af; }
+.code-outline-number { flex: none; width: 31px; padding: 6px 6px 0 0; color: #b3a9bc; text-align: right; font: 10px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; user-select: none; }
+.code-outline-indent { flex: none; }
+.code-outline-disclosure { flex: none; display: grid; place-items: center; width: 17px; height: 28px; min-height: 0; padding: 0; border: 0; color: #8a69a9; background: transparent; }
+.code-outline-spacer { flex: none; width: 17px; }
+.code-outline-line { display: block; min-width: 0; width: 100%; min-height: 28px; padding: 5px 4px 6px 2px; border: 0; text-align: left; background: transparent; color: #4b4357; font: 10px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.code-outline-line:hover, .code-outline-disclosure:hover { background: transparent !important; border-color: transparent !important; }
+.code-outline-statement { font: inherit; white-space: pre-wrap; }
+.code-token-variable { color: #495a8f; }
+.code-token-function { color: #8651a1; }
+.code-token-number { color: #ad6657; }
+.code-token-string { color: #46827d; }
+.code-token-operator { color: #786887; }
+.code-outline-comment { color: #938e9b; white-space: pre-wrap; }
+.code-outline-row.is-selected .code-token-variable { color: #654196; }
+.code-outline-empty { padding: 16px; color: #8d8397; font-size: 11px; }

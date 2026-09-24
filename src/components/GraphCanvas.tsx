@@ -17,7 +17,7 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
-import { ArrowUp, Combine, Maximize, Ungroup, ScanSearch, LayoutGrid } from 'lucide-react'
+import { ArrowUp, Combine, Maximize, Ungroup, ScanSearch, LayoutGrid, Search } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -46,6 +46,8 @@ import {
   moveVisualGroup,
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
+import { blockPalette } from '../domain/blockPalette'
+import { codeForGroup } from '../domain/codeOutline'
 import type {
   ActivationKind,
   DatasetKind,
@@ -69,6 +71,7 @@ import { findWireCrossings } from '../domain/wireCrossings'
 import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds } from '../domain/continuousScene'
 import './modules.css'
 import './semanticCanvas.css'
+import './canvasAddMenu.css'
 
 const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode, semanticNode: SemanticNode }
 const edgeTypes = { builderEdge: BuilderEdge }
@@ -91,6 +94,7 @@ interface GraphCanvasProps {
   selectedNodeIds?: string[]
   selectedGroupId?: string
   selectedEdgeId?: string
+  focusRequest?: { kind: 'group' | 'node'; id: string; serial: number }
   showMath: boolean
   showGradient: boolean
   phase: string
@@ -126,6 +130,7 @@ function GraphCanvasInner({
   selectedNodeIds = EMPTY_SELECTED_NODE_IDS,
   selectedGroupId,
   selectedEdgeId,
+  focusRequest,
   showMath,
   showGradient,
   phase,
@@ -160,6 +165,10 @@ function GraphCanvasInner({
   const layout = useMemo(() => scene ?? (semantic ? layoutSemanticGraph(renderedGraph) : undefined), [renderedGraph, semantic, scene])
   const shell = useRef<HTMLDivElement>(null)
   const [camera, setCamera] = useState(graph.view?.viewport ?? { x: 0, y: 0, zoom: 1 })
+  const [addMenu, setAddMenu] = useState<{ x: number; y: number; position: GraphPosition }>()
+  const [addQuery, setAddQuery] = useState('')
+  const [activeSuggestion, setActiveSuggestion] = useState(0)
+  const addSearch = useRef<HTMLInputElement>(null)
   const emittedViewport = useRef<GraphViewState['viewport']>(undefined)
   const cameraZoom = camera.zoom
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: 600 })
@@ -185,6 +194,20 @@ function GraphCanvasInner({
     const bounds = { x, y, width: Math.max(...rects.map(rect => rect.x + rect.width)) - x, height: Math.max(...rects.map(rect => rect.y + rect.height)) - y }
     void setViewport(getViewportForBounds(bounds, canvasSize.width, canvasSize.height, .01, maxZoom, frame ? .08 : .2), { duration: 650 })
   }, [scene, geometryGraph, canvasSize, maxZoom, setViewport])
+  const lastCodeFocus = useRef(0)
+  useEffect(() => {
+    if (!focusRequest || lastCodeFocus.current === focusRequest.serial) return
+    lastCodeFocus.current = focusRequest.serial
+    if (focusRequest.kind === 'group') {
+      if (scene) zoomToGroup(focusRequest.id)
+      else void fitView({ nodes: [{ id: groupNodeId(focusRequest.id) }], padding: .18, duration: 650, maxZoom: 1.6 })
+      return
+    }
+    const rect = scene?.nodes.get(focusRequest.id) ?? layout?.nodes.get(focusRequest.id)
+    if (!rect) return
+    void setViewport(getViewportForBounds(rect, canvasSize.width, canvasSize.height, .01, maxZoom, .32), { duration: 650 })
+  }, [focusRequest, scene, layout, zoomToGroup, fitView, setViewport, canvasSize, maxZoom])
+  useEffect(() => { if (addMenu) addSearch.current?.focus() }, [addMenu])
   useEffect(() => {
     if (!shell.current || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(([entry]) => setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height }))
@@ -274,6 +297,10 @@ function GraphCanvasInner({
   const lastFocusRequest = useRef<string | undefined>(undefined)
   useEffect(() => {
     if (!semantic || !focusNodeId) { lastFocusRequest.current = undefined; return }
+    // A code-line navigation has already started this camera transition.
+    // Do not restart it when the matching focused group enters graph state.
+    if ((focusRequest?.kind === 'node' && focusRequest.id === selectedNodeIds[0])
+      || (focusRequest?.kind === 'group' && focusRequest.id === focusNodeId)) return
     const request = `${focusNodeId}:${expansionKey}`
     if (lastFocusRequest.current === request) return
     const timeout = window.setTimeout(() => {
@@ -282,7 +309,7 @@ function GraphCanvasInner({
       else void fitView({ nodes: [{ id: groupNodeId(focusNodeId) }], padding: .2, duration: 650, maxZoom: 1.6 })
     }, 120)
     return () => window.clearTimeout(timeout)
-  }, [focusNodeId, expansionKey, fitView, semantic, continuous, zoomToGroup])
+  }, [focusNodeId, expansionKey, fitView, semantic, continuous, zoomToGroup, focusRequest, selectedNodeIds])
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds])
   const groupInterfaces = useMemo(
     () => new Map((renderedGraph.groups ?? []).map((group) => [group.id, visualGroupInterface(renderedGraph, group)])),
@@ -339,6 +366,7 @@ function GraphCanvasInner({
           selected: group.id === selectedGroupId || group.nodeIds.length > 0 && group.nodeIds.every(id => selectedNodeIdSet.has(id)),
           data: {
             group: rect ? { ...group, dimensions: { width: rect.width, height: rect.height } } : group,
+            codeLine: codeForGroup(renderedGraph, group),
             expanded,
             continuous,
             sceneScale: scene?.scales.get(groupNodeId(group.id)),
@@ -765,9 +793,15 @@ function GraphCanvasInner({
             y: event.clientY,
           }),
         )
+        setAddMenu(undefined)
         return
       }
       onSelectionChange({ nodeIds: [] })
+      const frame = shell.current?.getBoundingClientRect()
+      if (!frame) return
+      setAddQuery('')
+      setActiveSuggestion(0)
+      setAddMenu({ x: Math.max(8, Math.min(event.clientX - frame.left, frame.width - 288)), y: Math.max(8, Math.min(event.clientY - frame.top, frame.height - 350)), position: screenToFlowPosition({ x: event.clientX, y: event.clientY }) })
     },
     [onCreateNode, onSelectionChange, pendingNodeType, screenToFlowPosition],
   )
@@ -775,6 +809,7 @@ function GraphCanvasInner({
   const handleFlowPointerDownCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button === 2) {
+        setAddMenu(undefined)
         event.preventDefault()
         event.stopPropagation()
         secondaryPan.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, viewport: getViewport() }
@@ -796,6 +831,7 @@ function GraphCanvasInner({
 
   const handleNodeClick = useCallback(
     (_: ReactMouseEvent, node: CanvasNode) => {
+      setAddMenu(undefined)
       const groupId = groupIdFromNodeId(node.id)
       const group = renderedGraph.groups?.find((candidate) => candidate.id === groupId)
       if (group?.detail?.virtual && typeof group.detail.layerId === 'string' && typeof group.detail.unitIndex === 'number') {
@@ -822,6 +858,12 @@ function GraphCanvasInner({
     .sort(([a], [b]) => semanticGroupDepth(renderedGraph, b) - semanticGroupDepth(renderedGraph, a))[0]?.[0]
   const navigationFocus = continuous ? cameraFocus : graph.view?.focusedGroupId
   const breadcrumb = navigationFocus ? groupAncestors(renderedGraph, navigationFocus) : []
+  const suggestions = blockPalette.filter(item => `${item.label} ${item.type}`.toLowerCase().includes(addQuery.trim().toLowerCase()))
+  const placeSuggestion = (type: NodeType) => {
+    if (!addMenu) return
+    onCreateNode(type, addMenu.position)
+    setAddMenu(undefined)
+  }
 
   return (
     <section className="canvas-panel" aria-label="Graph canvas">
@@ -924,6 +966,20 @@ function GraphCanvasInner({
           <MiniMap pannable zoomable nodeStrokeWidth={3} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        {addMenu ? <div className="canvas-add-menu" role="dialog" aria-label="Add a block" style={{ left: addMenu.x, top: addMenu.y }} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+          <label className="canvas-add-search"><Search size={15} /><input ref={addSearch} type="search" aria-label="Search blocks" autoComplete="off" placeholder="Type a block name…" value={addQuery}
+            onChange={event => { setAddQuery(event.target.value); setActiveSuggestion(0) }}
+            onKeyDown={event => {
+              if (event.key === 'Escape') { event.preventDefault(); setAddMenu(undefined) }
+              if (event.key === 'ArrowDown') { event.preventDefault(); setActiveSuggestion(index => Math.min(index + 1, suggestions.length - 1)) }
+              if (event.key === 'ArrowUp') { event.preventDefault(); setActiveSuggestion(index => Math.max(0, index - 1)) }
+              if (event.key === 'Enter' && suggestions.length) { event.preventDefault(); placeSuggestion(suggestions[activeSuggestion]?.type ?? suggestions[0].type) }
+            }} /></label>
+          <div className="canvas-add-results" role="listbox" aria-label="Block types">
+            {suggestions.length ? suggestions.map((item, index) => <button type="button" key={item.type} role="option" aria-selected={index === activeSuggestion} className={index === activeSuggestion ? 'is-active' : ''} onMouseEnter={() => setActiveSuggestion(index)} onClick={() => placeSuggestion(item.type)}><span>{item.label}</span><small>{item.type}</small></button>) : <p>No matching blocks</p>}
+          </div>
+          <div className="canvas-add-hint">↑ ↓ choose · Enter place · Esc close</div>
+        </div> : null}
         {semantic ? <div className="semantic-canvas-hint"><ScanSearch size={15}/><span>Drag to move or select · two-finger click-drag to pan · double-click to explore</span></div> : null}
       </div>
     </section>

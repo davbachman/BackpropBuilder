@@ -33,6 +33,9 @@
 .semantic-group .architecture-preview text { fill: var(--group-ink); font-size: 10px; font-family: inherit; }
 .semantic-group .attention-preview rect { stroke: none; fill: var(--group-ink); }
 .semantic-group .node-metrics { border-top: 1px solid #eef1f6; padding: 7px 0 0; margin: 8px 0 0; display: block; color: #728097; font-size: 9px; font-family: 'SFMono-Regular', Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.semantic-group .group-code-line { display: block; min-width: 0; margin-top: auto; color: #8b78a0; font: 8px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.semantic-group.group-kind-neuron .group-code-line { font-size: 7px; }
+.semantic-group.is-model-stage .group-code-line { max-width: 56%; }
 .semantic-group .node-metrics > span:not(:first-child) { display: none; }
 .semantic-group.is-expanded { background: transparent; border: 1.5px solid color-mix(in srgb, var(--group-ink) 30%, transparent); border-radius: 20px; padding: 14px 20px; box-shadow: none; }
 .semantic-group.is-expanded .visual-group-title-row { padding: 0; background: transparent; width: 100%; max-width: unset; gap: 8px; }
@@ -138,3 +141,8 @@
 .continuous-group-heading .layer-neuron-preview { left: 12px; top: auto; bottom: 8px; width: calc(100% - 24px); }
 .continuous-group-heading[aria-hidden=true] *, .continuous-card-cover[aria-hidden=true] * { pointer-events: none !important; }
 .continuous-group-outline { position: absolute; inset: 0; border: solid #c6d9df; border-radius: 16px; pointer-events: none; }
+.semantic-operation.is-selected { border-color: #8057af; box-shadow: 0 0 0 4px #8057af30, 0 8px 22px #3c27501f; }
+.continuous-card-cover .visual-group-node.semantic-group.is-selected,
+.visual-group-node.semantic-group.is-selected { border-color: #8057af; box-shadow: 0 0 0 4px #8057af30, 0 8px 22px #3c27501f; }
+.continuous-group-heading .visual-group-node.semantic-group.is-expanded.is-selected { border: 0; box-shadow: none; }
+.continuous-group-outline.is-selected { border-color: #8057af; background: #8057af05; }

@@ -11,6 +11,7 @@ export interface GroupOutputMetric {
 
 export interface GroupNodeData extends Record<string, unknown> {
   group: GraphGroup
+  codeLine?: string
   inputCount: number
   outputCount: number
   outputMetrics: GroupOutputMetric[]
@@ -46,7 +47,7 @@ export function GroupNode(props: NodeProps): ReactElement {
     const headingAvailable = Boolean(data.accessible && (data.frameHeaderVisible ?? 0) > .1)
     const coverAvailable = Boolean(data.accessible && reveal < .95)
     return <div className="continuous-group-surface" style={{ ...dimensions, transform: `scale(${scale})` }}>
-      <div className="continuous-group-outline" style={{ borderWidth: Math.min(1.5, 1 / (scale * (data.cameraZoom ?? 1))), opacity: reveal }} />
+      <div className={`continuous-group-outline ${props.selected ? 'is-selected' : ''}`} style={{ borderWidth: Math.min(props.selected ? 3 : 1.5, (props.selected ? 2.5 : 1) / Math.max(0.01, scale * (data.cameraZoom ?? 1) || 1)), opacity: reveal }} />
       <div className="continuous-group-heading" style={{ opacity: data.frameHeaderVisible, transform: `scale(${headingScale})`, transformOrigin: 'top left', pointerEvents: 'none' }} aria-hidden={!headingAvailable} inert={!headingAvailable}>
         <GroupNode {...props} data={{ ...nestedData, expanded: true, group: { ...group, dimensions: { width: dimensions.width / headingScale, height: dimensions.height / headingScale } } }} />
       </div>
@@ -97,6 +98,7 @@ export function GroupNode(props: NodeProps): ReactElement {
         </button>
       </div>
       {data.semantic && (!data.expanded || kind === 'layer' && data.onInspectNeuron && data.unitCount) ? <GroupPreview data={data} /> : null}
+      {!data.expanded && data.codeLine ? <code className="group-code-line" title={data.codeLine}>{data.codeLine}</code> : null}
       <div className="node-metrics" hidden={data.expanded}>
         <GroupMetrics outputs={data.outputMetrics} showGradient={data.showGradient} />
       </div>

@@ -1,0 +1,11 @@
+.flow-shell { position: relative; }
+.canvas-add-menu { position: absolute; z-index: 40; width: 280px; max-width: calc(100% - 16px); overflow: hidden; border: 1px solid #dacee7; border-radius: 12px; background: #fff; box-shadow: 0 16px 45px #30203d2b; }
+.canvas-add-search { display: flex; align-items: center; gap: 8px; padding: 11px 12px; color: #8665aa; border-bottom: 1px solid #eee8f3; }
+.canvas-add-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #382b46; font: 12px/1.5 inherit; }
+.canvas-add-search input::placeholder { color: #9b8ca9; }
+.canvas-add-results { display: grid; max-height: min(285px, 46vh); overflow-y: auto; padding: 5px; }
+.canvas-add-results button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 29px; padding: 6px 8px; border: 0; border-radius: 6px; text-align: left; background: transparent; color: #554664; font-size: 11px; }
+.canvas-add-results button.is-active, .canvas-add-results button:hover { background: #f0e9f8; color: #694596; }
+.canvas-add-results small { color: #9b8ca9; font-size: 9px; }
+.canvas-add-results p { margin: 0; padding: 12px; color: #9b8ca9; font-size: 11px; }
+.canvas-add-hint { padding: 8px 12px; border-top: 1px solid #eee8f3; color: #a197aa; font-size: 9px; }

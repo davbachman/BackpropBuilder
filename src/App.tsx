@@ -6,6 +6,10 @@ import {
   BookOpen,
   Calculator,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Download,
   FastForward,
   Eye,
@@ -23,10 +27,15 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from 'react'
 import './App.css'
 import './unifiedStudio.css'
+import './workspacePanels.css'
+import { CodeOutline, type CodeTarget } from './components/CodeOutline'
 import { ModelInspector } from './components/ModelInspector'
 import { DecoderControls } from './components/DecoderControls'
 import { DatasetControls } from './components/DatasetControls'
@@ -34,6 +43,8 @@ import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
 import { createModelPreset, type ModelPresetKind } from './domain/modelPresets'
 import { placeCanvasNode } from './domain/nodePlacement'
+import { blockPalette } from './domain/blockPalette'
+import { compactVisualHierarchy } from './domain/continuousScene'
 import {
   activeProjectionEdges,
   projectDenseNeurons,
@@ -100,31 +111,6 @@ import type {
   TensorValue,
 } from './domain/types'
 
-const palette: Array<{ type: NodeType; label: string }> = [
-  { type: 'dataset', label: 'Dataset' },
-  { type: 'input', label: 'Input' },
-  { type: 'weight', label: 'Weight' },
-  { type: 'bias', label: 'Bias' },
-  { type: 'multiply', label: 'Multiply' },
-  { type: 'matmul', label: 'Matrix product' },
-  { type: 'add', label: 'Add' },
-  { type: 'activation', label: 'Activation' },
-  { type: 'target', label: 'Target' },
-  { type: 'loss', label: 'Loss' },
-  { type: 'embedding', label: 'Embedding lookup' },
-  { type: 'transpose', label: 'Transpose' },
-  { type: 'slice', label: 'Slice tensor' },
-  { type: 'concat', label: 'Concatenate' },
-  { type: 'softmax', label: 'Softmax' },
-  { type: 'causal-mask', label: 'Causal mask' },
-  { type: 'layer-norm', label: 'Layer norm' },
-  { type: 'reshape', label: 'Reshape' },
-  { type: 'mean', label: 'Mean' },
-  { type: 'cross-entropy', label: 'Cross-entropy' },
-  { type: 'conv2d', label: 'Convolution' },
-  { type: 'avgpool2d', label: 'Average pooling' },
-]
-
 const MIN_PLAY_DELAY_MS = 50
 const MAX_PLAY_DELAY_MS = 1800
 const DEFAULT_PLAY_DELAY_MS = 900
@@ -178,6 +164,14 @@ function App({
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | undefined>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [leftOpen, setLeftOpen] = useState(true)
+  const [rightOpen, setRightOpen] = useState(true)
+  const [leftWidth, setLeftWidth] = useState(presetKind ? 164 : 220)
+  const [rightWidth, setRightWidth] = useState(presetKind ? 286 : 340)
+  const [rightTab, setRightTab] = useState<'details' | 'code'>('details')
+  const [codeFocus, setCodeFocus] = useState<{ kind: 'group' | 'node'; id: string; serial: number }>()
+  const nextCodeFocus = useRef(0)
+  const resizeDrag = useRef<{ side: 'left' | 'right'; x: number; width: number } | undefined>(undefined)
   const [executionError, setExecutionError] = useState<string>()
   const [phase, setPhase] = useState<GraphPhase>('edit')
   const [traceSteps, setTraceSteps] = useState<EvaluationTraceStep[]>([])
@@ -236,12 +230,23 @@ function App({
     [traceGraph],
   )
   const displayGraph = projection.graph
+  const codeGraph = useMemo(() => compactVisualHierarchy(displayGraph), [displayGraph])
   const inspectedNode = displayGraph.nodes.find(
     (node) => node.id === selectedNodeId,
   )
   const selectedGroup = graph.groups?.find(
     (group) => group.id === selectedGroupId,
   )
+  const inspectedNeuron = graph.view?.inspectedNeuron
+  const selectedCodeGroupId = selectedGroupId && (
+    (inspectedNeuron?.groupId === selectedGroupId
+      ? codeGraph.groups?.find(group => group.detail?.virtual && group.detail.layerId === selectedGroupId && group.detail.unitIndex === inspectedNeuron.unitIndex)?.id
+      : undefined)
+    ?? codeGraph.groups?.find(group => group.id === selectedGroupId)?.id
+    ?? codeGraph.groups?.find(group => group.nodeIds.length === selectedGroup?.nodeIds.length && group.nodeIds.every(id => selectedGroup?.nodeIds.includes(id)))?.id
+  )
+  const selectedCodeTarget: CodeTarget | undefined = selectedNodeId ? { kind: 'node', id: selectedNodeId }
+    : selectedCodeGroupId ? { kind: 'group', id: selectedCodeGroupId } : undefined
   const preset = LESSONS.find((item) => item.id === presetKind)
   const inspectedEdge = displayGraph.edges.find(
     (edge) => edge.id === selectedEdgeId,
@@ -315,12 +320,14 @@ function App({
   }, [restoreSnapshot, undoStack])
 
   const selectSingleNode = useCallback((nodeId?: string) => {
+    setCodeFocus(undefined)
     setSelectedNodeIds(nodeId ? [nodeId] : [])
     setSelectedGroupId(undefined)
   }, [])
 
   const selectCanvasSelection = useCallback(
     (selection: { nodeIds: string[]; groupId?: string }) => {
+      setCodeFocus(undefined)
       setSelectedEdgeId(undefined)
       setSelectedNodeIds((existing) =>
         stringArraysEqual(existing, selection.nodeIds)
@@ -843,6 +850,27 @@ function App({
     setSelectedNodeIds([])
   }
 
+  const navigateFromCode = (target: CodeTarget) => {
+    setSelectedEdgeId(undefined)
+    if (target.kind === 'group') {
+      const group = codeGraph.groups?.find(item => item.id === target.id)
+      if (group?.detail?.virtual && typeof group.detail.layerId === 'string' && typeof group.detail.unitIndex === 'number') {
+        inspectNeuron(group.detail.layerId, group.detail.unitIndex)
+      } else if (graph.groups?.some(item => item.id === target.id)) {
+        openGroup(target.id)
+      }
+    } else {
+      const ancestors = (codeGraph.groups ?? []).filter(group => group.nodeIds.includes(target.id))
+      const realAncestors = ancestors.map(group => group.id).filter(id => graph.groups?.some(group => group.id === id))
+      if (graph.view?.semanticZoom === false && realAncestors.some(id => !graph.view?.expandedGroupIds.includes(id))) {
+        setGraph(existing => ({ ...existing, view: { ...existing.view, expandedGroupIds: [...new Set([...(existing.view?.expandedGroupIds ?? []), ...realAncestors])] } }))
+      }
+      setSelectedNodeIds([target.id])
+      setSelectedGroupId(undefined)
+    }
+    setCodeFocus({ ...target, serial: ++nextCodeFocus.current })
+  }
+
   const updateNodeParams = (nodeId: string, params: NodeParams) =>
     applyGraphChange({
       ...graph,
@@ -939,9 +967,36 @@ function App({
     setImportError(undefined)
   }
 
+  const resizeLimit = (side: 'left' | 'right') => side === 'left' ? 430 : 620
+  const handleResizeStart = (side: 'left' | 'right', event: ReactPointerEvent<HTMLDivElement>) => {
+    resizeDrag.current = { side, x: event.clientX, width: side === 'left' ? leftWidth : rightWidth }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.preventDefault()
+  }
+  const handleResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = resizeDrag.current
+    if (!drag) return
+    const delta = (event.clientX - drag.x) * (drag.side === 'left' ? 1 : -1)
+    const width = Math.max(drag.side === 'left' ? 126 : 230, Math.min(resizeLimit(drag.side), drag.width + delta))
+    if (drag.side === 'left') setLeftWidth(width)
+    else setRightWidth(width)
+  }
+  const handleResizeKey = (side: 'left' | 'right', event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const minimum = side === 'left' ? 126 : 230
+    const current = side === 'left' ? leftWidth : rightWidth
+    const delta = event.key === 'Home' ? minimum - current : event.key === 'End' ? resizeLimit(side) - current
+      : (event.key === 'ArrowRight' ? 16 : -16) * (side === 'left' ? 1 : -1)
+    const value = Math.max(minimum, Math.min(resizeLimit(side), current + delta))
+    if (side === 'left') setLeftWidth(value)
+    else setRightWidth(value)
+  }
+
   return (
     <main
-      className={`app-shell ${presetKind ? 'unified-studio' : ''} ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''}`}
+      className={`app-shell workspace-split ${presetKind ? 'unified-studio' : ''} ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''} ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
+      style={{ '--left-size': leftOpen ? `${leftWidth}px` : '42px', '--right-size': rightOpen ? `${rightWidth}px` : '42px' } as CSSProperties}
     >
       <header className="top-bar">
         <div className="top-brand">
@@ -957,13 +1012,13 @@ function App({
         </div>
 
         <div className="top-actions">
-          {presetKind && (
             <>
               <button
                 type="button"
                 className="topbar-button compact-panel-toggle"
                 aria-pressed={paletteOpen}
                 onClick={() => {
+                  setLeftOpen(true)
                   setPaletteOpen(!paletteOpen)
                   setInspectorOpen(false)
                 }}
@@ -975,6 +1030,7 @@ function App({
                 className="topbar-button compact-panel-toggle"
                 aria-pressed={inspectorOpen}
                 onClick={() => {
+                  setRightOpen(true)
                   setInspectorOpen(!inspectorOpen)
                   setPaletteOpen(false)
                 }}
@@ -982,7 +1038,6 @@ function App({
                 Inspect
               </button>
             </>
-          )}
           {onGallery ? (
             <button type="button" className="topbar-button" onClick={onGallery}>
               <BookOpen size={16} /> Preset gallery
@@ -1077,14 +1132,20 @@ function App({
         </div>
       </header>
 
-      <aside className="left-panel">
+      <aside className="left-panel" aria-label="Build blocks">
+        <div className="sidebar-heading">
+          {leftOpen ? <span>Blocks</span> : null}
+          <button type="button" aria-label={leftOpen ? 'Collapse left sidebar' : 'Expand left sidebar'} title={leftOpen ? 'Collapse blocks' : 'Expand blocks'} onClick={() => { if (leftOpen) setPaletteOpen(false); setLeftOpen(value => !value) }}>
+            {leftOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+        </div>
         <section className="panel-section">
           <p className="eyebrow">Build the model</p>
           <p className="palette-intro">
             Pick an operation. Place it. Connect it.
           </p>
           <div className="palette-grid">
-            {palette.map((item) => (
+            {blockPalette.map((item) => (
               <button
                 key={item.type}
                 type="button"
@@ -1105,6 +1166,11 @@ function App({
         </section>
       </aside>
 
+      <div className={`sidebar-splitter sidebar-splitter-left ${leftOpen ? '' : 'is-collapsed'}`} role="separator" aria-label="Resize left sidebar" aria-orientation="vertical" aria-valuemin={126} aria-valuemax={430} aria-valuenow={leftWidth} tabIndex={leftOpen ? 0 : -1}
+        onPointerDown={event => { if (leftOpen) handleResizeStart('left', event) }} onPointerMove={handleResizeMove}
+        onPointerUp={event => { resizeDrag.current = undefined; event.currentTarget.releasePointerCapture?.(event.pointerId) }} onLostPointerCapture={() => { resizeDrag.current = undefined }}
+        onKeyDown={event => handleResizeKey('left', event)} onDoubleClick={() => setLeftWidth(presetKind ? 164 : 220)} />
+
       <GraphCanvas
         graph={graph}
         displayGraph={displayGraph}
@@ -1112,6 +1178,7 @@ function App({
         selectedNodeIds={selectedNodeIds}
         selectedGroupId={selectedGroupId}
         selectedEdgeId={selectedEdgeId}
+        focusRequest={codeFocus}
         onInspectEdge={(edgeId) => {
           setSelectedEdgeId(edgeId)
           setSelectedNodeIds([])
@@ -1163,7 +1230,22 @@ function App({
         onGroupMove={moveGroup}
       />
 
-      <aside className="right-panel">
+      <div className={`sidebar-splitter sidebar-splitter-right ${rightOpen ? '' : 'is-collapsed'}`} role="separator" aria-label="Resize right sidebar" aria-orientation="vertical" aria-valuemin={230} aria-valuemax={620} aria-valuenow={rightWidth} tabIndex={rightOpen ? 0 : -1}
+        onPointerDown={event => { if (rightOpen) handleResizeStart('right', event) }} onPointerMove={handleResizeMove}
+        onPointerUp={event => { resizeDrag.current = undefined; event.currentTarget.releasePointerCapture?.(event.pointerId) }} onLostPointerCapture={() => { resizeDrag.current = undefined }}
+        onKeyDown={event => handleResizeKey('right', event)} onDoubleClick={() => setRightWidth(presetKind ? 286 : 340)} />
+
+      <aside className="right-panel" aria-label="Model sidebar">
+        <div className="sidebar-heading right-sidebar-heading">
+          {rightOpen ? <div className="right-sidebar-tabs" role="tablist" aria-label="Right sidebar views">
+            <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
+            <button type="button" role="tab" aria-selected={rightTab === 'code'} onClick={() => { setRightTab('code'); setRightWidth(width => Math.max(width, 390)) }}>Code</button>
+          </div> : null}
+          <button type="button" aria-label={rightOpen ? 'Collapse right sidebar' : 'Expand right sidebar'} title={rightOpen ? 'Collapse sidebar' : 'Expand sidebar'} onClick={() => { if (rightOpen) setInspectorOpen(false); setRightOpen(value => !value) }}>
+            {rightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          </button>
+        </div>
+        <div className="right-panel-scroll" hidden={rightTab !== 'details'} role="tabpanel" aria-label="Model details">
         {executionError && (
           <div className="graph-issues" role="alert">
             {executionError}
@@ -1342,6 +1424,10 @@ function App({
             </span>
           </div>
         </section>
+        </div>
+        <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
+          {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}
+        </div>
       </aside>
 
       <footer className="control-bar">
@@ -1448,7 +1534,7 @@ function App({
 }
 
 function labelForType(type: NodeType): string {
-  return palette.find((item) => item.type === type)?.label ?? type
+  return blockPalette.find((item) => item.type === type)?.label ?? type
 }
 
 function nextNodeIndexForType(graph: GraphModel, type: NodeType): number {
