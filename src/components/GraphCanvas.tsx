@@ -65,6 +65,7 @@ import { SemanticNode } from './SemanticNode'
 import { layoutSemanticGraph, semanticGroupDepth } from '../domain/semanticLayout'
 import { preserveLayoutForWiring } from '../domain/layoutState'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint, type WireObstacle } from '../domain/wireRouting'
+import { findWireCrossings } from '../domain/wireCrossings'
 import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds } from '../domain/continuousScene'
 import './modules.css'
 import './semanticCanvas.css'
@@ -491,6 +492,7 @@ function GraphCanvasInner({
       ? { ...block, width: Math.min(block.width, 310), height: 46 }
       : block))
   }, [routingKey])
+  const wireCrossings = useMemo(() => findWireCrossings(wireRoutes), [wireRoutes])
   const scenePositionKey = JSON.stringify(scene ? nodes.map(node => [node.id, node.position]) : [])
   const sceneRoutes = useMemo(() => scene ? routeContinuousScene(geometryGraph, scene, new Map(JSON.parse(scenePositionKey))) : [], [geometryGraph, scene, scenePositionKey])
   const routedEdges = useMemo(() => {
@@ -498,11 +500,11 @@ function GraphCanvasInner({
       const byId = new Map(edges.map(edge => [edge.id, edge]))
       return sceneRoutes.flatMap(wire => {
         const edge = byId.get(wire.edgeId)
-        return edge ? [{ ...edge, id: wire.id, data: { ...edge.data!, route: wire.route, absoluteRoute: true, sceneScale: wire.scale, parentId: wire.parentId, canonicalEdgeId: wire.edgeId } }] : []
+        return edge ? [{ ...edge, id: wire.id, data: { ...edge.data!, route: wire.route, crossings: wire.crossings, absoluteRoute: true, sceneScale: wire.scale, parentId: wire.parentId, canonicalEdgeId: wire.edgeId } }] : []
       })
     }
-    return edges.map(edge => wireRoutes.has(edge.id) ? { ...edge, data: { ...edge.data!, route: wireRoutes.get(edge.id) } } : edge)
-  }, [edges, wireRoutes, scene, sceneRoutes])
+    return edges.map(edge => wireRoutes.has(edge.id) ? { ...edge, data: { ...edge.data!, route: wireRoutes.get(edge.id), crossings: wireCrossings.get(edge.id) } } : edge)
+  }, [edges, wireRoutes, wireCrossings, scene, sceneRoutes])
   const reveals = new Map(scene ? [...scene.groups].map(([id, rect]) => [id, cardReveal(rect, cameraZoom, canvasSize.width, canvasSize.height)]) : [])
   const accessible = (id?: string): boolean => !id || ((reveals.get(id) ?? 0) > .92 && accessible(scene?.parents.get(groupNodeId(id))))
   const presentedNodes = scene ? nodes.filter(node => scene.nodes.has(node.id) || scene.groups.has(groupIdFromNodeId(node.id) ?? '')).map(node => {

@@ -57,6 +57,22 @@ describe('clean directional connection flow', () => {
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('data-direction')).toBe('backward')
   })
 
+  it('masks the crossing gap on both the wire and its moving bands at deep zoom', () => {
+    const { container } = renderEdge({ absoluteRoute: true, sceneScale: .01, cameraZoom: 150,
+      route: [{ x: 12, y: 34 }, { x: 12, y: 35 }], crossings: { points: [{ x: 12, y: 34.5 }], gaps: [{ x: 12, y: 34.5 }] },
+      phase: 'backward', gradient: { shape: [], data: [-.25] },
+    })
+    const mask = container.querySelector('mask')!, circle = mask.querySelector('circle')!
+    expect(mask.getAttribute('maskUnits')).toBe('userSpaceOnUse')
+    expect(circle.getAttribute('cx')).toBe('0')
+    expect(circle.getAttribute('cy')).toBe('50')
+    expect(circle.getAttribute('r')).toBe('4')
+    const wire = container.querySelector('path.builder-edge')!, bands = container.querySelector('.builder-edge-bands')!
+    expect(wire.closest('g[mask]')?.getAttribute('mask')).toBe(`url(#${mask.id})`)
+    expect(bands.closest('g[mask]')).toBe(wire.closest('g[mask]'))
+    expect(bands.getAttribute('d')).toBe(wire.getAttribute('d'))
+  })
+
   it('encodes absolute magnitude consistently, excluding causal sentinels', () => {
     expect(edgeSignalIntensity({ shape: [], data: [-2] })).toBe(edgeSignalIntensity({ shape: [], data: [2] }))
     expect(edgeSignalIntensity({ shape: [], data: [2] })).toBeGreaterThan(edgeSignalIntensity({ shape: [], data: [0.2] }))

@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { roundedWirePath, routeDiagramWires, segmentCrossesRect, type DiagramWire, type WireObstacle } from './wireRouting'
+import { roundedWirePath, routeDiagramWires, segmentCrossesRect, WIRE_SPACING, type DiagramWire, type WireObstacle } from './wireRouting'
+import type { Position } from './types'
 
 const wire: DiagramWire = { id: 'signal', source: { x: 100, y: 60, side: 'right' }, target: { x: 600, y: 260, side: 'left' } }
+
+function expectSeparated(routes: Map<string, Position[]>) {
+  const paths = [...routes.values()]
+  for (let i = 0; i < paths.length; i++) for (let j = 0; j < i; j++) {
+    for (let a = 1; a < paths[i].length; a++) for (let b = 1; b < paths[j].length; b++) {
+      const [p, q, r, s] = [paths[i][a - 1], paths[i][a], paths[j][b - 1], paths[j][b]]
+      const horizontal = Math.abs(p.y - q.y) < .01
+      if (horizontal !== (Math.abs(r.y - s.y) < .01)) continue
+      const [along, across] = horizontal ? ['x', 'y'] as const : ['y', 'x'] as const
+      const overlap = Math.min(Math.max(p[along], q[along]), Math.max(r[along], s[along])) - Math.max(Math.min(p[along], q[along]), Math.min(r[along], s[along]))
+      // Prefer a full track of clearance, with room to compress slightly at
+      // fixed ports and obstacle corners without visually merging the wires.
+      if (overlap > .01) expect(Math.abs(p[across] - r[across])).toBeGreaterThanOrEqual(WIRE_SPACING * .75 - .01)
+    }
+  }
+}
 
 describe('clear connection routing', () => {
   it('keeps rounded corners clean when browser handle measurements have subpixel differences', () => {
@@ -57,5 +74,42 @@ describe('clear connection routing', () => {
       expect(point.y).toBeLessThanOrEqual(bounds.height)
       if (i) expect(segmentCrossesRect(route[i - 1], point, obstacle)).toBe(false)
     }
+  })
+
+  it.each(['one obstacle', 'staggered obstacles'])('allocates separate tracks for ten wires around %s without recycling lanes', kind => {
+    const wires: DiagramWire[] = Array.from({ length: 10 }, (_, i) => ({ id: `wire-${i}`, source: { x: 0, y: i * 24, side: 'right' }, target: { x: 700, y: i * 24 + 80, side: 'left' } }))
+    const obstacles = kind === 'one obstacle'
+      ? [{ id: 'box', x: 200, y: -30, width: 180, height: 340 }]
+      : [{ id: 'one', x: 140, y: -100, width: 100, height: 260 }, { id: 'two', x: 310, y: 80, width: 100, height: 260 }, { id: 'three', x: 480, y: -100, width: 100, height: 300 }]
+    const bounds = { x: -10, y: -400, width: 720, height: 1100 }
+    const routes = routeDiagramWires(wires, obstacles, bounds)
+    expectSeparated(routes)
+    for (const wire of wires) {
+      const path = routes.get(wire.id)!
+      expect(path[0]).toEqual(wire.source)
+      expect(path.at(-1)).toEqual(wire.target)
+      for (let i = 1; i < path.length; i++) {
+        for (const rect of obstacles) expect(segmentCrossesRect(path[i - 1], path[i], rect)).toBe(false)
+        expect(path[i].x).toBeGreaterThanOrEqual(bounds.x)
+        expect(path[i].x).toBeLessThanOrEqual(bounds.x + bounds.width)
+        expect(path[i].y).toBeGreaterThanOrEqual(bounds.y)
+        expect(path[i].y).toBeLessThanOrEqual(bounds.y + bounds.height)
+      }
+    }
+    expect(routeDiagramWires([...wires].reverse(), obstacles, bounds)).toEqual(routes)
+  })
+
+  it('crosses swapped parallel connections without sharing a vertical tangent', () => {
+    const routes = routeDiagramWires([
+      { id: 'upper', source: { x: 0, y: 0, side: 'right' }, target: { x: 700, y: 24, side: 'left' } },
+      { id: 'lower', source: { x: 0, y: 24, side: 'right' }, target: { x: 700, y: 0, side: 'left' } },
+    ], [])
+    expectSeparated(routes)
+  })
+
+  it('finishes rounded corners before a nearby crossing', () => {
+    const points = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]
+    const path = roundedWirePath(points, 12, [{ x: 100, y: 8 }])
+    expect(path).toContain('L96,0 Q100,0 100,4 L100,100')
   })
 })

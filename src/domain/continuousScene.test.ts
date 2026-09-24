@@ -155,6 +155,29 @@ describe('one continuous nested scene', () => {
     }
   })
 
+  it.each(LESSONS)('keeps separate signal runs distinguishable at every level of $id', ({ id }) => {
+    const graph = compactVisualHierarchy(createModelPreset(id))
+    const wires = routeContinuousScene(graph, layoutContinuousScene(graph))
+    const collisions: string[] = []
+    for (let i = 0; i < wires.length; i++) for (let j = 0; j < i; j++) {
+      const a = wires[i], b = wires[j]
+      if (a.parentId !== b.parentId) continue
+      const first = a.route.map(point => ({ x: point.x / a.scale, y: point.y / a.scale }))
+      const second = b.route.map(point => ({ x: point.x / b.scale, y: point.y / b.scale }))
+      for (let x = 1; x < first.length; x++) for (let y = 1; y < second.length; y++) {
+        // A real fan-out can share its short departure from the same port.
+        if (x === 1 && y === 1 && close(first[0], second[0])) continue
+        const [p, q, r, s] = [first[x - 1], first[x], second[y - 1], second[y]]
+        const horizontal = Math.abs(p.y - q.y) < .01
+        if (horizontal !== (Math.abs(r.y - s.y) < .01)) continue
+        const [along, across] = horizontal ? ['x', 'y'] as const : ['y', 'x'] as const
+        const overlap = Math.min(Math.max(p[along], q[along]), Math.max(r[along], s[along])) - Math.max(Math.min(p[along], q[along]), Math.min(r[along], s[along]))
+        if (overlap > 30 && Math.abs(p[across] - r[across]) < 8) collisions.push(`${a.id} / ${b.id}`)
+      }
+    }
+    expect(collisions).toEqual([])
+  })
+
   it('moves a group and all of its nested contents by the same world-space displacement', () => {
     const graph = createModelPreset('linear')
     const group = graph.groups!.find(group => !group.parentId)!

@@ -3,6 +3,7 @@ import { visualGroupInterface } from './grouping'
 import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint } from './wireRouting'
+import { findWireCrossings, type WireCrossings } from './wireCrossings'
 
 export const sceneGroupId = (id: string) => `visual-group:${id}`
 export interface SceneLevel { parentId?: string; ids: string[]; scale: number; x: number; y: number }
@@ -12,7 +13,7 @@ export interface ContinuousScene extends SemanticLayout {
   levels: SceneLevel[]
   repairedOffsetIds: Set<string>
 }
-export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[] }
+export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; crossings: WireCrossings }
 
 /** A container with exactly one child and no calculations of its own adds no
  * visual detail. Keep the most specific block and skip those empty levels.
@@ -188,7 +189,11 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const frame = boundary ? rectFor(boundary) : undefined
     const bounds = frame ? { ...localPoint(frame), width: frame.width / level.scale, height: frame.height / level.scale } : undefined
     const routes = routeDiagramWires(wires, obstacles, bounds)
-    for (const [edgeId, route] of routes) result.push({ id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale, route: route.map(point => ({ x: origin.x + point.x * level.scale, y: origin.y + point.y * level.scale })) })
+    const crossings = findWireCrossings(routes)
+    const worldPoint = (point: Position) => ({ x: origin.x + point.x * level.scale, y: origin.y + point.y * level.scale })
+    for (const [edgeId, route] of routes) result.push({ id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale, route: route.map(worldPoint),
+      crossings: { points: crossings.get(edgeId)!.points.map(worldPoint), gaps: crossings.get(edgeId)!.gaps.map(worldPoint) },
+    })
   }
   return result
 }
