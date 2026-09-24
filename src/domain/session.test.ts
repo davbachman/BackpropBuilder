@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { forwardPass } from './engine'
+import { cloneGraph, forwardPass } from './engine'
 import { createStarterGraph } from './examples'
+import { createModelPreset } from './modelPresets'
 import {
   createProjectStateFile,
   parseProjectStateFile,
@@ -87,6 +88,64 @@ describe('project state files', () => {
     expect(result.file.state.selectedGroupId).toBeUndefined()
   })
 
+  it('round-trips transformer tensor operations, exact masks and semantic inspection state', () => {
+    const snapshot = projectSnapshot()
+    snapshot.graph = forwardPass(createModelPreset('decoder')).graph
+    snapshot.graph.view = { expandedGroupIds: ['blocks.0', 'blocks.0.mlp'], semanticZoom: true, inspectedNeuron: { groupId: 'blocks.0.ff1.layer', unitIndex: 2, row: 1 } }
+    const file = createProjectStateFile(snapshot)
+    const result = parseProjectStateFile(JSON.stringify(file))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.file.state.graph).toEqual(file.state.graph)
+    expect(result.file.state.graph.nodes.find(node => node.type === 'causal-mask')!.value!.excluded).toContain(true)
+    expect(result.file.state.graph.groups!.find(group => group.id === 'blocks.0.ff1.layer')!.detail).toEqual(snapshot.graph.groups!.find(group => group.id === 'blocks.0.ff1.layer')!.detail)
+    file.state.graph.view!.inspectedNeuron!.unitIndex = 7
+    expect(snapshot.graph.view.inspectedNeuron!.unitIndex).toBe(2)
+  })
+
+  it('saves manual block and projected-node placement with independent cloned coordinates', () => {
+    const snapshot = projectSnapshot()
+    snapshot.graph.view = { expandedGroupIds: [], layoutOffsets: {
+      'visual-group:blocks.0': { x: 120, y: -35 },
+      'inspect:blocks.0.ff1.layer:0:w0': { x: 24, y: 12 },
+    } }
+    const cloned = cloneGraph(snapshot.graph)
+    cloned.view!.layoutOffsets!['visual-group:blocks.0'].x = 999
+    expect(snapshot.graph.view.layoutOffsets!['visual-group:blocks.0'].x).toBe(120)
+
+    const file = createProjectStateFile(snapshot)
+    const result = parseProjectStateFile(JSON.stringify(file))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.file.state.graph.view!.layoutOffsets).toEqual(snapshot.graph.view.layoutOffsets)
+    result.file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y = 999
+    expect(file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)
+    expect(snapshot.graph.view.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)
+  })
+
+  it('round-trips the wiring-independent layout without sharing mutable edge references', () => {
+    const snapshot = projectSnapshot()
+    snapshot.graph.view = { expandedGroupIds: [], semanticZoom: true, layoutEdges: [{ id: 'layout-edge', source: 'x', target: 'mul', inputSlot: 0 }] }
+    const file = createProjectStateFile(snapshot)
+    const result = parseProjectStateFile(JSON.stringify(file))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.file.state.graph.view!.layoutEdges).toEqual(snapshot.graph.view.layoutEdges)
+    result.file.state.graph.view!.layoutEdges![0].source = 'changed'
+    expect(file.state.graph.view!.layoutEdges![0].source).toBe('x')
+    expect(snapshot.graph.view.layoutEdges![0].source).toBe('x')
+    const malformed = { ...file, state: { ...file.state, graph: { ...file.state.graph, view: { expandedGroupIds: [], layoutEdges: [{ source: 'x' }] } } } }
+    expect(parseProjectStateFile(JSON.stringify(malformed)).ok).toBe(false)
+  })
+
+  it('rejects malformed semantic layout coordinates when loading a project', () => {
+    for (const offset of [{ x: '10', y: 0 }, { x: null, y: 0 }, { x: 4 }, []]) {
+      const file = createProjectStateFile(projectSnapshot())
+      const graph = { ...file.state.graph, view: { expandedGroupIds: [], layoutOffsets: { block: offset } } }
+      expect(parseProjectStateFile(JSON.stringify({ ...file, state: { ...file.state, graph } })).ok).toBe(false)
+    }
+  })
+
   it('rejects malformed project state files with a helpful error', () => {
     expect(parseProjectStateFile('{').ok).toBe(false)
     expect(parseProjectStateFile(JSON.stringify({ kind: 'session-summary', version: 1 })).ok).toBe(false)
@@ -99,7 +158,7 @@ describe('project state files', () => {
           savedAt: new Date().toISOString(),
           state: { graph: { nodes: [], learningRate: 0.1 } },
         }),
-      ).ok,
+    ).ok,
     ).toBe(false)
   })
 })

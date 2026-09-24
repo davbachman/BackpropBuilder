@@ -51,6 +51,18 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   activation: Box,
   target: CircleDot,
   loss: Sigma,
+  embedding: Database,
+  transpose: Crosshair,
+  slice: Crosshair,
+  concat: Crosshair,
+  softmax: Sigma,
+  'causal-mask': Box,
+  'layer-norm': Sigma,
+  reshape: Box,
+  mean: Sigma,
+  'cross-entropy': Sigma,
+  conv2d: Crosshair,
+  avgpool2d: Sigma,
 }
 
 export function BuilderNode(props: NodeProps): ReactElement {

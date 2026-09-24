@@ -1,68 +1,59 @@
 # Validation and scope
 
-The implementation has an executable miniature decoder, rather than a static transformer diagram. All computation is local. New network, probability, embedding, attention, and decoder lessons share the tensor/autodiff implementation in `src/learning/math.ts`. The existing free graph builder remains available with its own scalar/tensor graph execution API.
+All gallery presets now run through the editable `GraphModel` execution API. The architecture view, scalar arithmetic inspection, parameter editor, dataset experiments, and token generation share canonical parameters. The former lesson components remain in source for their numerical/reference tests but are no longer gallery destinations.
 
-## Recorded checks
+## Verification
 
-Run these commands from the project root:
+Run `npm test`, `npm run build`, and `npm run lint` from the project root.
 
-```sh
-npm test
-npm run build
-npm run lint
-```
+The final test run on September 23, 2026 passed **383 tests across 36 files**.
 
-Final verification on 2026-09-23: **176 tests across 18 files passed**, the TypeScript/Vite production build passed, and ESLint passed. The production app is split into smaller lazy-loaded bundles; no bundle-size warning remains.
+The suite checks:
 
-A real Chromium browser opened all ten presets, completed the exact neuron update fixture, trained the classifier, selected a neuron, checked the V-only attention intervention, traced a transformer token through an attention row and feedforward neuron, and completed scores → distribution → choose → append → recalculate. Browser console: zero errors and zero warnings. Screenshots were visually inspected at 1440×1000 and 820×1180; the gallery was also checked at 1280×800. Tablet decoder and free-builder layouts were checked, and the decoder page width matched its 820px viewport with no horizontal page overflow.
+- Every preset is executable and opens directly in the same graph workspace.
+- Transformer logits, probabilities, and intermediate tensors match the reference decoder for both checkpoints.
+- All transformer parameter gradients agree with reference autograd; an SGD update reduces loss.
+- Finite-difference checks cover broadcasting, embedding reuse, matrix operations, softmax, masking, normalization, cross-entropy, convolution, and pooling.
+- Dense-neuron projections do not mutate canonical graphs. Edited scalar coordinates map to shared tensor parameters. Wire gradients are per-use contributions; node gradients accumulate shared uses.
+- Forward and backward traces hide unreached results. Flow bands reverse direction for backpropagation and respect reduced motion.
+- Nested groups preserve values, gradients, selection, copying, undo, and saved inspection state. Recursive layouts keep siblings from overlapping.
+- Every preset is checked at each hierarchy level for wires crossing unrelated blocks. Routing also covers projected neuron arithmetic, staggered obstacles, live geometry changes, and forward/backward animation along the same rounded path.
+- Continuous zoom keeps every nested region in fixed canvas coordinates, fades covers in both directions, and joins forward/gradient wire segments at exact card boundary ports. Tests cover all eleven presets, nested containment, routing clearance, subpixel geometry, camera stability, and dragging revealed regions.
+- Redundant single-child containers are skipped without altering the executable model. Linear/ReLU neurons reveal their arithmetic directly; navigation targets calculation bounds, and operations and wires remain accessible at maximum zoom.
+- All presets keep nested wire routes inside their owning frames. Regressions cover misplaced neuron weights/biases, bounded routing around obstacles, one-time layout repair, drag boundaries, and camera stability while arranging calculations.
+- Linear and ReLU overviews keep targets close to their inputs and align target-to-loss wires beneath the neuron without a large empty band. The Compact layout action clears manual placements and fits the scene without changing the computation graph or trained parameters.
+- Repeated palette insertions across every preset preserve existing block geometry and place new nodes at the clicked canvas coordinates. Tests cover both zoom modes, manual offsets, projected neuron inspection, camera stability, and undo.
+- Connection edits preserve layout at every hierarchy level across all presets and both zoom modes. Tests verify live execution/routing, projected neurons, further insertions, camera stability, Compact layout, undo, and saved layout isolation.
+- Safari was checked at neuron computation depth through forward and backward steps and further zooming: text and wires remain sharp. Compositing stays on the unscaled canvas container; flow bands retain their own forward/backward animation. Browser checks also confirmed unchanged node bounds and camera position during stepping.
+- Native browser text selection is disabled on the canvas, with editable fields exempted. The reported Safari selection highlight cleared after this change; actual wire creation and canvas box selection were checked independently.
+- Block dragging preserves manual offsets through nested zoom and saved projects. Expanded groups move their contents together, primary drags select/move blocks, and secondary pointer drags pan without changing selections or model parameters.
+- Copied neuron outputs remain available for wiring without duplicating occupied destination ports.
+- Dataset plots and training read the current canvas parameters; training/test splits remain separate.
+- Dataset nodes expose all six dataset choices on the card and in the inspector, with labeled feature and target ports. Both zoom modes preserve feature/target values and target wiring through 1D/2D changes and undo.
+- Decoder generation uses live edited parameters, validates prompts, refreshes positions, and stops at the context or end-token limit.
 
-Local screenshots are in `output/playwright/`: `gallery-desktop.png`, `gallery-tablet.png`, `network-desktop.png`, `attention-head-desktop.png`, `decoder-tablet.png`, and `builder-tablet.png`. The automated rendered tests use React Testing Library and jsdom; the browser checks complement those tests.
+## Decoder checkpoint evidence
 
-| Requirement | Verified evidence |
-| --- | --- |
-| Persistent modules | `src/domain/nestedModules.test.ts` checks independent expansion, preserved values/gradients/identities/layout, hierarchy, explicit ungrouping, descendant movement, nested copying, and saved view state. |
-| Rendered builder navigation | `src/App.modules.test.tsx` opens nested arithmetic while its neighbor stays collapsed, restores a selected internal node after closing/reopening, undoes navigation, and runs target-free inference. |
-| Preserved builder editing | Existing App/domain suites cover node values, tensor values, datasets and ports, connections, copy/paste, graph edits, phase traces, saving/importing, and plots. |
-| Elementwise versus matrix multiplication | `src/domain/matmul.test.ts` verifies non-square matrix multiplication and finite-difference gradients, including a parameter feeding both operands. Existing multiplication tests retain elementwise behavior. |
-| Full-square neuron fixture | `src/learning/network.test.ts` verifies prediction 7, loss 4, gradients −8/−4, simultaneous update to weights 3.4/1.2, prediction 8, and loss 1. |
-| Network calculation consistency | Every inspected scalar neuron reconstructs the batched tensor calculation. Finite differences check network weights/biases and classifier cross-entropy. Builder export is checked against the lesson calculation. |
-| Controlled network training | Deterministic 2D labels and disjoint training/validation splits are verified. Repeated seeded training produces the same parameters; validation samples are excluded from updates. |
-| Preset gallery and navigation | `src/learning/LearningStudio.test.tsx` launches all ten real lazy-loaded lessons, opens blank/prepared builders, and checks sidebar/gallery navigation. |
-| Rendered transformer activities | `src/learning/TransformerLesson.test.tsx` checks attention masking/interventions, token/head/neuron tracing, selection and breadcrumb preservation, stale-result invalidation, distinct generation phases, parameter edits, undo, comparisons, and import. Saving a chosen sampled token preserves its advanced seed and reproduces the next generation cycle. |
-| Rendered network activities | `src/learning/NetworkLesson.test.tsx` checks separate forward/loss/backward/update phases, independent modules, arithmetic navigation, stale-result invalidation, plotted-point selection, held-out protection, fixed training budgets, resets, and imports. |
-| Tensor backward rules | `src/learning/math.test.ts` checks broadcasting reduction, matrix multiplication, shared paths, reductions, reshape, transpose, head slicing/concatenation, repeated embedding indices, softmax, masking, ReLU, cross-entropy, and layer normalization. |
-| Independent transformer reference | `src/learning/decoder.test.ts` compares both supplied checkpoints with an independent ordinary-array implementation at each block, attention head, logit, and probability. |
-| Attention intervention | The requested weights `[1/4,1/2,1/4]` produce `[1,1.5]`, and changing the middle value to `[0,4]` produces `[1,2.5]`. Decoder-level V interventions preserve the selected head's Q, K, and weights. |
-| Causality | Changing later token IDs leaves earlier decoder outputs unchanged; every masked future attention entry is exactly zero. |
-| Transformer gradients | Central finite differences check representative coordinates across embeddings, attention projections, normalization, both feedforward matrices, and output projection; repeated token IDs test shared embedding accumulation. |
-| Inference and generation immutability | Decoder forward passes and seeded sampling leave parameters unchanged. Training changes parameters. Temperature/top-k affect sampling distributions; greedy selection works independently of positive-temperature sampling. |
-| Reproducible checkpoints | The test retrains from seed 7 for the complete 360-update budget and compares every parameter exactly with the included trained checkpoint. |
-| Saved experiments | Graph, network, and token-exploration tests restore inputs, parameters, seeds, display controls, and module selections, then reproduce numerical outputs. Invalid shapes and malformed files are rejected. |
+The decoder has two pre-normalized blocks, model width 8, two attention heads of width 4, ReLU feed-forward width 16, learned positions for 12 tokens, and a five-token vocabulary. Input embeddings and output projection are separate parameters.
 
-## Checkpoint evidence
+It learns the repeating sequence `red → green → blue`. Training prefix lengths are 4, 7, and 10; validation lengths are 5 and 8, across all three cycle phases. `<eos>` is reserved and untrained.
 
-The decoder has two pre-normalized blocks, model width 8, two attention heads of width 4, ReLU feedforward width 16, learned positions for 12 tokens, and a five-token vocabulary. Its output projection is separate from its input embedding table.
+The supplied checkpoint records training loss `0.0005509947040016146` and validation loss `0.000549696741021241` after 360 Adam updates with learning rate 0.01 and seed 7. The automated suite reproduces its parameters. These metrics describe only the synthetic task.
 
-Training learns the repeating sequence `red → green → blue`. Training prefix lengths are 4, 7, and 10; validation prefix lengths are 5 and 8, across all three cycle phases. The reserved `<eos>` token is never trained. This is a finite synthetic pattern task, not a natural-language model.
+## Practical limits
 
-The included checkpoint records training loss `0.0005509947040016146` and validation loss `0.000549696741021241` after 360 Adam updates at learning rate 0.01. These values describe only the supplied synthetic task.
+- The transformer is a complete tiny decoder trained on a color cycle. It does not understand ordinary language. Its context is limited to 12 tokens.
+- Computation and bounded training run on the browser's main thread. Large models and datasets are not the target.
+- Opening tensor MLP arithmetic projects one neuron's coordinates for a selected token onto the canvas. Its parameters and gradients belong to the shared model; execution still uses the efficient tensor operations. User-built scalar neurons remain ordinary executable operation groups.
+- Automatic layout supplies initial positions; manual offsets persist across semantic views. Graph edits and connections change the executable topology. Groups are views, not separate numerical modules.
+- Save/import uses local JSON files. Switching presets discards unsaved working state. Broad migration compatibility is intentionally outside scope.
+- The digit example uses UCI 8×8 images rather than MNIST. Checkpoint metrics and dataset attribution are documented with the CNN assets.
+- Keyboard controls, numeric alternatives to colors, responsive panels, and reduced-motion styles are provided. A formal screen-reader audit and physical touch-device test have not been performed.
 
-To reproduce and export both the bundled checkpoints and the standalone trained checkpoint:
 
-```sh
-node --experimental-strip-types scripts/train-decoder.ts
-```
+## Scratch authoring and dataset-backed presets
 
-The script writes `src/learning/decoder-checkpoints.json` and `public/checkpoints/mini-decoder.json`. Reproduction is also exercised in the automated suite, so running the export script is unnecessary for normal use.
-
-## Remaining limits
-
-- The new lessons share one tensor engine, but the free builder retains its existing engine. A network can be exported to a numerically equivalent scalar graph; this is a copied prepared state, not a live two-way connection to the lesson. Transformer topology is not exportable to the free builder.
-- Free editing is broadest in the graph builder. The network playground supports bounded hidden-layer changes. The decoder's two-block architecture is fixed; its inputs, checkpoint, learned parameter coordinates, and sampling controls are editable. A general transformer architecture editor is not implemented.
-- Transformer execution uses recorded forward snapshots with module-aware forward stepping and a top-level phase indicator. It does not present a complete interactive backward/update trace. Training and checkpoint export are available through the reproducible local script; browser transformer training was optional and is not included.
-- Lesson workspaces use zoom controls, native touch scrolling, and mouse-drag panning on empty workspace/diagram surfaces. Ordinary node dragging and graph pan/zoom are retained in the free builder; the transformer lesson does not have freely positioned nodes or automatic zoom-triggered expansion. Saved lesson views retain zoom, module expansion, and selections, but do not serialize native scroll offsets.
-- Sharing uses downloaded JSON files. There is no hosted sharing service or account system. Navigating to a different preset starts that preset's default state; save a prepared experiment before leaving it.
-- The maximum decoder context is 12 tokens. Generation stops at that limit. Checkpoint performance does not establish useful behavior on arbitrary prompts or ordinary language.
-- Network training is bounded and runs on the browser's main thread. It is not backed by a worker or GPU; larger training workloads are outside this implementation.
-- Responsive laptop/tablet layouts were checked in Chromium. Numeric alternatives to color, keyboard-operable controls, and reduced-motion styles are included. A physical touch-device trial, formal screen-reader/accessibility audit, and classroom projector hardware test were not performed.
-- Broad compatibility/migration guarantees for older saved projects are not part of this delivery, following the user's clarification. Existing builder save/import behavior and its loss convention remain covered by the regression tests.
+- Palette-based integration tests assemble a two-filter CNN and a complete two-head transformer block from `createNode`, tensor initialization, and `connectGraphNodes`, without presets, checkpoints, or reserved node IDs. Both differentiate, reduce training loss, evaluate held-out data, and survive a project save/import round trip.
+- Every gallery preset is checked for a visible Dataset source and data/target wires; example changes preserve parameters. Dataset tests check aligned shapes, finite values, and train/test splits. Changing held-out labels leaves training updates unchanged; cancellation leaves the input graph unchanged.
+- Numeric batch tests cover inferred reshape dimensions and switching between training, test and full batches. UI tests cover tensor initialization, operation settings, generic filter editing, prompt generation, and dataset training/evaluation.
+- Browser verification: initialized a 4×3×3×1 He filter from Blank builder; evaluated the CNN (100% training / 97% held-out accuracy for the included checkpoint) and completed an epoch through the Dataset panel. The user’s Safari model was left intact.

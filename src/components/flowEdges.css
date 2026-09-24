@@ -1,0 +1,72 @@
+.builder-edge-flow {
+  --edge-flow-color: #7952be;
+  --edge-scale: 1;
+  outline: none;
+  cursor: pointer;
+}
+
+.builder-edge-flow.is-backward {
+  --edge-flow-color: #cf765c;
+}
+
+.react-flow .react-flow__edge .builder-edge-flow path.builder-edge {
+  stroke: var(--edge-flow-color);
+  stroke-opacity: var(--edge-intensity);
+  stroke-width: var(--edge-width);
+  stroke-dasharray: none;
+  animation: none;
+  filter: none;
+  transition: stroke-opacity 180ms ease;
+}
+
+.react-flow .react-flow__edge .builder-edge-flow.is-unreached path.builder-edge {
+  stroke: #8b95a7;
+  stroke-opacity: .28;
+}
+
+.react-flow .react-flow__edge .builder-edge-flow.is-selected path.builder-edge,
+.react-flow .react-flow__edge .builder-edge-flow:focus-visible path.builder-edge {
+  stroke-width: calc(3.2 * var(--edge-scale));
+  stroke-opacity: 1;
+}
+
+.builder-edge-flow .builder-edge-bands {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: .62;
+  stroke-width: var(--edge-width);
+  stroke-dasharray: calc(7 * var(--edge-scale)) calc(14 * var(--edge-scale));
+  stroke-linecap: butt;
+  pointer-events: none;
+  animation: edge-band-forward 1200ms linear infinite;
+}
+
+.builder-edge-flow.is-backward .builder-edge-bands {
+  animation-name: edge-band-backward;
+}
+
+.builder-edge-flow.is-selected .builder-edge-bands {
+  stroke-width: calc(3.2 * var(--edge-scale));
+}
+
+@keyframes edge-band-forward {
+  from { stroke-dashoffset: 0px; }
+  to { stroke-dashoffset: calc(-21px * var(--edge-scale)); }
+}
+
+@keyframes edge-band-backward {
+  from { stroke-dashoffset: 0px; }
+  to { stroke-dashoffset: calc(21px * var(--edge-scale)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .builder-edge-flow .builder-edge-bands {
+    animation: none;
+  }
+
+  .react-flow .react-flow__edge .builder-edge-flow path.builder-edge {
+    transition: none;
+  }
+}
+
+.builder-edge-flow[aria-hidden="true"] path { pointer-events: none !important; }

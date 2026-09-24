@@ -1,3 +1,4 @@
+import type { GraphModel } from './types'
 import { describe, expect, it } from 'vitest'
 import { copyGraphSelection, pasteGraphClipboard } from './clipboard'
 import { createEmptyGraph, createNode, createStarterGraph } from './examples'
@@ -41,7 +42,7 @@ describe('graph clipboard', () => {
     expect(result.selection.nodeIds).toEqual([])
     expect(result.selection.groupId).toBe('group-2')
     expect(result.graph.nodes).toHaveLength(groupedGraph.nodes.length + 2)
-    expect(result.graph.edges).toHaveLength(groupedGraph.edges.length + 5)
+    expect(result.graph.edges).toHaveLength(groupedGraph.edges.length + 4)
     expect(result.graph.groups).toHaveLength(2)
 
     const pastedGroup = result.graph.groups?.find((group) => group.id === result.selection.groupId)
@@ -62,6 +63,7 @@ describe('graph clipboard', () => {
     const pastedInterface = visualGroupInterface(result.graph, pastedGroup!)
     expect(pastedInterface.inputs).toHaveLength(3)
     expect(pastedInterface.outputs).toHaveLength(1)
+    expect(result.graph.edges.filter(edge => edge.target === 'pred')).toHaveLength(1)
   })
 
   it('pastes copied source nodes with the next generated label for that node type', () => {
@@ -79,4 +81,23 @@ describe('graph clipboard', () => {
       }),
     )
   })
+})
+
+
+it('does not reconnect a missing external input to an unrelated newly generated node ID', () => {
+  const original: GraphModel = {
+    learningRate: .01,
+    nodes: [
+      { id: 'weight-1', label: 'External parameter', type: 'weight', params: { value: 3 }, position: { x: 0, y: 0 } },
+      { id: 'weight-2', label: 'Internal parameter', type: 'weight', params: { value: 4 }, position: { x: 200, y: 0 } },
+      { id: 'add', label: 'Sum', type: 'add', params: {}, position: { x: 400, y: 0 } },
+    ],
+    edges: [{ id: 'external', source: 'weight-1', target: 'add', inputSlot: 0 }, { id: 'internal', source: 'weight-2', target: 'add', inputSlot: 1 }],
+    groups: [{ id: 'g', label: 'Building block', nodeIds: ['weight-2', 'add'], position: { x: 200, y: 0 }, dimensions: {} }],
+  }
+  const fragment = copyGraphSelection(original, { nodeIds: [], groupId: 'g' })!
+  const pasted = pasteGraphClipboard({ nodes: [], edges: [], learningRate: .01 }, fragment, { x: 0, y: 0 }).graph
+  expect(pasted.nodes.some(node => node.id === 'weight-1')).toBe(true)
+  expect(pasted.edges).toHaveLength(1)
+  expect(pasted.edges[0].inputSlot).toBe(1)
 })

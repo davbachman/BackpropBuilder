@@ -8,6 +8,7 @@ import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
 import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
 import { createStarterGraph } from './domain/examples'
+import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
 import { scalarValue, tensorValue } from './domain/tensor'
 import './index.css'
@@ -22,9 +23,9 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Show visualization/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
-    expect(screen.getByText(/Node palette/i)).toBeInTheDocument()
+    expect(screen.getByText(/Build the model/i)).toBeInTheDocument()
     expect(screen.getByText(/Graph canvas/i)).toBeInTheDocument()
-    expect(screen.queryByText(/Inspector/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Inspector$/i)).not.toBeInTheDocument()
     expect(screen.getByText(/Current step/i)).toBeInTheDocument()
     expect(screen.queryByText(/Validation/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Show math layer/i)).not.toBeInTheDocument()
@@ -105,7 +106,7 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
-    expect(screen.getByText(/x = 2/i)).toBeInTheDocument()
+    expect(screen.getByText('Neuron examples')).toBeInTheDocument()
     expect(screen.getByText(/w = 0.500/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
@@ -430,10 +431,8 @@ describe('Backprop Builder app', () => {
   })
 
   it('accepts tensor literals in source nodes and keeps node tensor displays compact with full hover text', async () => {
-    const user = userEvent.setup()
-    render(<App />)
+    render(<App initialGraph={createStarterGraph()} />)
 
-    await chooseFileMenuItem(user, /^Starter$/i)
 
     const xInput = screen.getByDisplayValue('2')
     fireEvent.change(xInput, { target: { value: '[1,2,3]' } })
@@ -544,9 +543,8 @@ describe('Backprop Builder app', () => {
 
   it('moves from the last real backward computation to parameter updates instead of leaf inputs', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialGraph={createStarterGraph()} />)
 
-    await chooseFileMenuItem(user, /^Starter$/i)
     for (let index = 0; index < 8; index += 1) {
       await user.click(screen.getByRole('button', { name: /^Step$/i }))
     }
@@ -583,6 +581,28 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByText(/Click the graph canvas to place Multiply/i)).not.toBeInTheDocument()
   })
 
+  it('places a palette node without moving the preset and restores the view on undo', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<App initialGraph={createModelPreset('linear')} />)
+    const positions = () => new Map(Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node')).map(node => [node.dataset.id!, node.style.transform]))
+    const before = positions()
+    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    const viewport = container.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform
+    fireEvent.click(container.querySelector('.react-flow__pane')!, { clientX: 580, clientY: 350 })
+    const after = positions()
+    for (const [id, transform] of before) expect(after.get(id)).toBe(transform)
+    const added = [...after].filter(([id]) => !before.has(id))
+    expect(added).toHaveLength(1)
+    const numbers = (transform: string) => [...transform.matchAll(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/g)].map(match => Number(match[0]))
+    const [panX, panY, zoom] = numbers(viewport)
+    const [nodeX, nodeY] = numbers(added[0][1])
+    expect(nodeX * zoom + panX).toBeCloseTo(580)
+    expect(nodeY * zoom + panY).toBeCloseTo(350)
+    expect(container.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform).toBe(viewport)
+    fireEvent.keyDown(document, { key: 'z', metaKey: true })
+    expect(positions()).toEqual(before)
+  })
+
   it('undoes graph edits repeatedly with Command-Z', async () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
@@ -612,18 +632,16 @@ describe('Backprop Builder app', () => {
     fireEvent.keyDown(document, { key: 'c', metaKey: true })
     fireEvent.keyDown(document, { key: 'v', metaKey: true })
 
-    expect(screen.getByText('9 nodes, 7 edges')).toBeInTheDocument()
+    expect(screen.getByText('10 nodes, 9 edges')).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'z', metaKey: true })
 
-    expect(screen.getByText('8 nodes, 7 edges')).toBeInTheDocument()
+    expect(screen.getByText('9 nodes, 9 edges')).toBeInTheDocument()
   })
 
   it('undoes source value edits with Command-Z', async () => {
-    const user = userEvent.setup()
-    render(<App />)
+    render(<App initialGraph={createStarterGraph()} />)
 
-    await chooseFileMenuItem(user, /^Starter$/i)
     const xInput = screen.getByDisplayValue('2')
     fireEvent.change(xInput, { target: { value: '[1,2,3]' } })
 
@@ -700,14 +718,14 @@ describe('Backprop Builder app', () => {
     await user.click(screen.getByRole('button', { name: /^Weight$/i }))
     expect(screen.getByText(/Click the graph canvas to place Weight/i)).toBeInTheDocument()
 
-    fireEvent.pointerDown(screen.getByText('x'))
+    fireEvent.pointerDown(container.querySelector('[data-id="x"]')!)
     expect(screen.queryByText(/Click the graph canvas to place Weight/i)).not.toBeInTheDocument()
 
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
     fireEvent.click(pane!, { clientX: 600, clientY: 360 })
 
-    expect(screen.getByText('8 nodes, 7 edges')).toBeInTheDocument()
+    expect(screen.getByText('9 nodes, 9 edges')).toBeInTheDocument()
   })
 
   it('keeps editable controls inside graph nodes out of React Flow drag and wheel gestures', async () => {

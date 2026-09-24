@@ -33,6 +33,8 @@ const NODE_TYPES = new Set([
   'activation',
   'target',
   'loss',
+  'conv2d', 'avgpool2d',
+  'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
 ])
 const ACTIVATION_KINDS = new Set<ActivationKind>(['identity', 'relu', 'sigmoid', 'tanh'])
 const LOSS_KINDS = new Set<LossKind>(['squared-error', 'mse', 'mae', 'binary-cross-entropy'])
@@ -180,8 +182,11 @@ function isGraphEdge(value: unknown): value is GraphEdge {
 
 function isGraphView(value: unknown): boolean {
   if (!isRecord(value)) return false
-  return Array.isArray(value.expandedGroupIds) && value.expandedGroupIds.every((id) => typeof id === 'string') &&
+  return (value.semanticZoom === undefined || typeof value.semanticZoom === 'boolean') && Array.isArray(value.expandedGroupIds) && value.expandedGroupIds.every((id) => typeof id === 'string') &&
     (value.focusedGroupId === undefined || typeof value.focusedGroupId === 'string') &&
+    (value.layoutOffsets === undefined || (isRecord(value.layoutOffsets) && Object.values(value.layoutOffsets).every(isPosition))) &&
+    (value.layoutEdges === undefined || (Array.isArray(value.layoutEdges) && value.layoutEdges.every(isGraphEdge))) &&
+    (value.inspectedNeuron === undefined || (isRecord(value.inspectedNeuron) && typeof value.inspectedNeuron.groupId === 'string' && isNonNegativeInteger(value.inspectedNeuron.unitIndex) && isNonNegativeInteger(value.inspectedNeuron.row))) &&
     (value.viewport === undefined || (isRecord(value.viewport) && isPosition(value.viewport) && isFiniteNumber(value.viewport.zoom) && value.viewport.zoom > 0))
 }
 
@@ -191,6 +196,8 @@ function isGraphGroup(value: unknown): boolean {
     typeof value.id === 'string' &&
     typeof value.label === 'string' &&
     (value.parentId === undefined || typeof value.parentId === 'string') &&
+    (value.kind === undefined || typeof value.kind === 'string') &&
+    (value.detail === undefined || isRecord(value.detail)) &&
     Array.isArray(value.nodeIds) &&
     value.nodeIds.every((id) => typeof id === 'string') &&
     isPosition(value.position) &&
@@ -205,7 +212,18 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.activation === undefined || ACTIVATION_KINDS.has(value.activation as ActivationKind)) &&
     (value.loss === undefined || LOSS_KINDS.has(value.loss as LossKind)) &&
     (value.dataset === undefined || isDatasetKind(value.dataset as DatasetKind)) &&
-    isOptionalNonNegativeInteger(value.inputCount)
+    (value.datasetMode === undefined || value.datasetMode === 'sample' || value.datasetMode === 'batch') &&
+    isOptionalNonNegativeInteger(value.datasetIndex) &&
+    (value.datasetSplit === undefined || ['all', 'train', 'test'].includes(String(value.datasetSplit))) &&
+    (value.datasetValues === undefined || (Array.isArray(value.datasetValues) && value.datasetValues.every(isTensorValue))) &&
+    isOptionalNonNegativeInteger(value.inputCount) &&
+    isOptionalNonNegativeInteger(value.axis) &&
+    isOptionalNonNegativeInteger(value.start) &&
+    isOptionalNonNegativeInteger(value.end) &&
+    (value.axes === undefined || (Array.isArray(value.axes) && value.axes.every(isNonNegativeInteger))) &&
+    (value.shape === undefined || (Array.isArray(value.shape) && value.shape.every(d => isNonNegativeInteger(d) || d === -1))) &&
+    (value.epsilon === undefined || (isFiniteNumber(value.epsilon) && value.epsilon > 0)) &&
+    (value.keepDims === undefined || typeof value.keepDims === 'boolean')
   )
 }
 

@@ -29,7 +29,8 @@ export function isTensorValue(value: unknown): value is TensorValue {
     Array.isArray(candidate.data) &&
     candidate.shape.every((dimension) => Number.isInteger(dimension) && dimension >= 0) &&
     candidate.data.every((entry) => typeof entry === 'number' && Number.isFinite(entry)) &&
-    tensorSize(candidate.shape) === candidate.data.length
+    tensorSize(candidate.shape) === candidate.data.length &&
+    (candidate.excluded === undefined || (Array.isArray(candidate.excluded) && candidate.excluded.length === candidate.data.length && candidate.excluded.every((entry) => typeof entry === 'boolean')))
   )
 }
 
@@ -40,7 +41,7 @@ export function toTensor(value: TensorValue | number | undefined, fallback = 0):
 }
 
 export function cloneTensor(value: TensorValue): TensorValue {
-  return { shape: [...value.shape], data: [...value.data] }
+  return { shape: [...value.shape], data: [...value.data], ...(value.excluded ? { excluded: [...value.excluded] } : {}) }
 }
 
 export function tensorSize(shape: number[]): number {
@@ -75,11 +76,16 @@ export function tensorShapesEqual(first: number[], second: number[]): boolean {
 }
 
 export function broadcastShapeForShapes(shapes: number[][]): number[] | undefined {
-  const nonScalarShapes = shapes.filter((shape) => shape.length > 0)
-  if (nonScalarShapes.length === 0) return []
-  const [firstShape] = nonScalarShapes
-  if (nonScalarShapes.every((shape) => tensorShapesEqual(shape, firstShape))) return [...firstShape]
-  return undefined
+  const rank = Math.max(0, ...shapes.map((shape) => shape.length))
+  const output = Array<number>(rank).fill(1)
+  for (const shape of shapes) {
+    for (let axis = 0; axis < rank; axis += 1) {
+      const dimension = shape[shape.length - rank + axis] ?? 1
+      if (output[axis] !== dimension && output[axis] !== 1 && dimension !== 1) return undefined
+      if (dimension !== 1) output[axis] = dimension
+    }
+  }
+  return output
 }
 
 export function broadcastShapeForTensors(values: TensorValue[]): number[] | undefined {
@@ -97,7 +103,7 @@ export function elementwiseTensors(
   const size = tensorSize(shape)
   return tensorValue(
     shape,
-    Array.from({ length: size }, (_, index) => operation(values.map((value) => valueAtBroadcastIndex(value, index)))),
+    Array.from({ length: size }, (_, index) => operation(values.map((value) => valueAtBroadcastIndex(value, index, shape)))),
   )
 }
 
@@ -122,13 +128,16 @@ export function scaleTensor(value: TensorValue, scale: number): TensorValue {
 
 export function reduceToShape(value: TensorValue, targetShape: number[]): TensorValue {
   if (tensorShapesEqual(value.shape, targetShape)) return cloneTensor(value)
-  if (targetShape.length === 0) {
-    return scalarValue(value.data.reduce((sum, entry) => sum + entry, 0))
-  }
   if (isScalarTensor(value)) {
     return tensorValue(targetShape, Array.from({ length: tensorSize(targetShape) }, () => scalarFromTensor(value)))
   }
-  throw new Error(`Cannot reduce tensor shape ${formatShape(value.shape)} to ${formatShape(targetShape)}.`)
+  const broadcast = broadcastShapeForShapes([value.shape, targetShape])
+  if (!broadcast || !tensorShapesEqual(broadcast, value.shape)) {
+    throw new Error(`Cannot reduce tensor shape ${formatShape(value.shape)} to ${formatShape(targetShape)}.`)
+  }
+  const data = Array<number>(tensorSize(targetShape)).fill(0)
+  value.data.forEach((entry, index) => { data[broadcastIndex(index, value.shape, targetShape)] += entry })
+  return tensorValue(targetShape, data)
 }
 
 export function sumTensor(value: TensorValue): number {
@@ -185,8 +194,23 @@ function formatScalarNumber(value: number | undefined, digits: number): string {
   return value.toFixed(digits)
 }
 
-function valueAtBroadcastIndex(value: TensorValue, index: number): number {
-  return isScalarTensor(value) ? value.data[0] ?? 0 : value.data[index] ?? 0
+function valueAtBroadcastIndex(value: TensorValue, index: number, outputShape: number[]): number {
+  return value.data[broadcastIndex(index, outputShape, value.shape)] ?? 0
+}
+
+function broadcastIndex(index: number, outputShape: number[], inputShape: number[]): number {
+  let inputIndex = 0
+  let inputStride = 1
+  for (let axis = outputShape.length - 1; axis >= 0; axis -= 1) {
+    const coordinate = index % outputShape[axis]
+    index = Math.floor(index / outputShape[axis])
+    const inputAxis = axis - (outputShape.length - inputShape.length)
+    if (inputAxis >= 0) {
+      if (inputShape[inputAxis] !== 1) inputIndex += coordinate * inputStride
+      inputStride *= inputShape[inputAxis]
+    }
+  }
+  return inputIndex
 }
 
 function tensorFromNested(value: unknown): TensorValue | undefined {

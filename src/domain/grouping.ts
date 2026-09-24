@@ -1,3 +1,4 @@
+import { denseGroupDetail } from './authoring'
 import {
   MIN_NODE_HEIGHT,
   NODE_WIDTH,
@@ -53,13 +54,15 @@ export function mergeNodesIntoVisualGroup(graph: GraphModel, nodeIds: string[]):
   const group: GraphGroup = {
     id,
     label: `Group ${groupIndexFromId(id)}`,
+    kind: nodes.filter(node => node.type === 'activation').length === 1 ? 'neuron' : 'module',
     ...(parent ? { parentId: parent.id } : {}),
     nodeIds: ids,
     position: collapsedPositionForNodes(nodes),
     dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
   }
+  group.detail = denseGroupDetail(graph, group)
   return {
-    graph: { ...graph, groups: [...groups.map((candidate) =>
+    graph: { ...graph, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: true }, groups: [...groups.map((candidate) =>
       candidate.parentId === parent?.id && candidate.nodeIds.every((nodeId) => selected.has(nodeId))
         ? { ...candidate, parentId: id } : candidate), group] },
     group,

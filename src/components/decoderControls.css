@@ -1,0 +1,31 @@
+.decoder-controls { padding:18px; border:1px solid #d7e3e9; border-radius:16px; background:linear-gradient(145deg,#f7fbfc,#fff 55%); color:#273a46; box-shadow:0 5px 20px #32495606; }
+.decoder-controls-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.decoder-eyebrow { font-size:9px; font-weight:800; letter-spacing:.14em; color:#468284; }
+.decoder-context-count { color:#7b8c95; font-size:10px; font-variant-numeric:tabular-nums; }
+.decoder-controls h3 { margin:9px 0 8px; font-size:17px; font-weight:650; letter-spacing:-.025em; }
+.decoder-explanation { margin:0 0 18px; font-size:11px; line-height:1.7; color:#70818c; }
+.decoder-cycle { display:inline-flex; align-items:center; gap:3px; }
+.decoder-cycle i { font-style:normal; font-weight:600; }
+.decoder-cycle [data-token="red"] { color:#c17076; }.decoder-cycle [data-token="green"] { color:#518e77; }.decoder-cycle [data-token="blue"] { color:#5885ba; }
+.decoder-field-label { display:block; margin-bottom:7px; font-size:10px; font-weight:650; color:#667985; }
+.decoder-controls textarea { box-sizing:border-box; width:100%; resize:vertical; min-height:66px; border:1px solid #dce5ea; border-radius:9px; padding:10px 11px; background:#fff; color:#314958; font:12px/1.7 ui-monospace,SFMono-Regular,monospace; }
+.decoder-controls textarea:focus-visible,.decoder-controls select:focus-visible,.decoder-controls input:focus-visible,.decoder-controls button:focus-visible { outline:2px solid #468284; outline-offset:3px; }
+.decoder-vocabulary { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 12px; }
+.decoder-vocabulary button { padding:4px 7px; border:1px solid #e2e8ed; border-radius:5px; background:#f4f7f9; font:10px ui-monospace,SFMono-Regular,monospace; color:#7c8a95; cursor:pointer; }
+.decoder-vocabulary [data-token="red"] { background:#fcf1f1; border-color:#efd8d9; color:#ac656b; }
+.decoder-vocabulary [data-token="green"] { background:#eef7f2; border-color:#d5e8dd; color:#56816a; }
+.decoder-vocabulary [data-token="blue"] { background:#edf4fb; border-color:#d5e3f3; color:#6486b1; }
+.decoder-apply { display:flex; justify-content:center; align-items:center; gap:7px; width:100%; border:1px solid #dce5ea; padding:8px; border-radius:8px; background:#fff; color:#657b89; cursor:pointer; font-size:11px; }
+.decoder-sampling-controls { margin-top:18px; padding-top:16px; border-top:1px solid #e5edf0; }
+.decoder-sampling-controls label { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#778793; font-size:10px; }
+.decoder-sampling-controls select,.decoder-sampling-controls input { max-width:115px; border:1px solid #dae4e9; border-radius:6px; padding:5px 6px; background:#fff; color:#435d6a; font-size:10px; }
+.decoder-sampling-fields { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }.decoder-sampling-fields input { width:48px; }.decoder-sampling-fields select { width:43px; }
+.decoder-distribution-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:5px; margin:18px 0 12px; font-size:9px; color:#82929d; }.decoder-distribution-heading span:first-child { font-weight:650; color:#5a7180; }
+.decoder-distribution { display:flex; flex-direction:column; gap:9px; margin-bottom:19px; }
+.decoder-probability-row { display:grid; grid-template-columns:40px minmax(30px,1fr) 38px; align-items:center; gap:8px; font:10px ui-monospace,SFMono-Regular,monospace; color:#82909a; }
+.decoder-probability-row output { text-align:right; font-size:9px; font-variant-numeric:tabular-nums; }
+.decoder-probability-track { height:5px; background:#eef2f5; border-radius:5px; overflow:hidden; }.decoder-probability-track > div { height:100%; min-width:0; background:#879baa; border-radius:5px; transition:width .25s ease; }
+.decoder-probability-row[data-token="red"] .decoder-probability-track > div { background:#d69a9e; }.decoder-probability-row[data-token="green"] .decoder-probability-track > div { background:#8dbcaa; }.decoder-probability-row[data-token="blue"] .decoder-probability-track > div { background:#93b7db; }
+.decoder-generate { display:flex; justify-content:center; align-items:center; gap:9px; width:100%; padding:11px 8px; border:0; border-radius:9px; background:#345e65; color:white; font-size:11px; font-weight:600; box-shadow:0 3px 8px #345e6519; cursor:pointer; }.decoder-generate:hover { background:#294f56; }.decoder-generate:disabled { opacity:.5; cursor:default; }
+.decoder-status,.decoder-error { font-size:10px; line-height:1.6; margin:9px 0 0; color:#81909c; }.decoder-error { color:#b45561; }
+.decoder-checkpoints { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin:17px 0 0; padding-top:14px; border-top:1px solid #e6edf0; }.decoder-checkpoints span { margin-right:auto; color:#8b99a3; font-size:9px; }.decoder-checkpoints button { border:0; background:transparent; color:#5d7c89; padding:2px 0; font-size:10px; text-decoration:underline; text-decoration-color:#bfced5; text-underline-offset:3px; cursor:pointer; }

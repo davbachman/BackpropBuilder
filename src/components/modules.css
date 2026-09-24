@@ -1,7 +1,7 @@
 .module-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 14px; border-bottom:1px solid var(--border, #dadde3); font-size:12px; background:var(--panel-bg, #f8fafc); }
 .module-navigation button { display:inline-flex; align-items:center; gap:4px; border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; background:#fff; color:#334155; cursor:pointer; }
 .module-navigation button:disabled { opacity:.45; cursor:default; }
-.visual-group-node.is-expanded { background:rgba(82,114,177,.035); border:2px dashed #91a5c7; border-radius:14px; pointer-events:none; }
+.visual-group-node.is-expanded { background:transparent; border:2px dashed #91a5c7; border-radius:14px; pointer-events:none; }
 .visual-group-node.is-expanded .visual-group-title-row { pointer-events:auto; justify-content:flex-start; width:max-content; max-width:100%; background:#f4f7fc; padding:8px; border-radius:8px; }
 .visual-group-node.is-expanded .node-metrics { display:none; }
 .expanded-module-frame { pointer-events:none !important; }

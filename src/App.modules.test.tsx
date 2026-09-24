@@ -10,6 +10,7 @@ function nestedGraph() {
   graph = mergeNodesIntoVisualGroup(graph, ['x', 'w', 'mul']).graph
   graph = mergeNodesIntoVisualGroup(graph, ['x', 'w', 'mul', 'b', 'add', 'pred']).graph
   graph = mergeNodesIntoVisualGroup(graph, ['target', 'loss']).graph
+  graph.view = { ...graph.view!, semanticZoom: false }
   return graph
 }
 
@@ -18,28 +19,28 @@ describe('module navigation in the builder', () => {
     const user = userEvent.setup()
     const { container } = render(<App initialGraph={nestedGraph()} />)
     expect(container.querySelectorAll('.builder-node')).toHaveLength(0)
-    await user.click(screen.getByRole('button', { name: 'Open module Group 2' }))
-    expect(screen.getByRole('button', { name: 'Open module Group 3' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Open module Group 1' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
+    expect(screen.getByRole('button', { name: 'Zoom into Group 3' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Zoom into Group 1' }))
     const multiplication = container.querySelector('[data-id="mul"]')!
     fireEvent.click(multiplication)
     expect(multiplication).toHaveClass('selected')
-    expect(multiplication).toHaveTextContent('out 6.000')
-    await user.click(screen.getByRole('button', { name: 'Close module Group 2' }))
+    expect(multiplication).toHaveTextContent('6.000')
+    await user.click(screen.getByRole('button', { name: 'Zoom out of Group 2' }))
     expect(container.querySelector('[data-id="mul"]')).not.toBeInTheDocument()
     expect(screen.getByText('8 nodes, 7 edges, 3 groups')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Open module Group 2' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
     expect(container.querySelector('[data-id="mul"]')).toHaveClass('selected')
-    expect(container.querySelector('[data-id="mul"]')).toHaveTextContent('out 6.000')
-    expect(screen.getByRole('button', { name: 'Open module Group 3' })).toBeInTheDocument()
+    expect(container.querySelector('[data-id="mul"]')).toHaveTextContent('6.000')
+    expect(screen.getByRole('button', { name: 'Zoom into Group 3' })).toBeInTheDocument()
   })
 
   it('undoes module navigation without erasing the module', async () => {
     const user = userEvent.setup()
     render(<App initialGraph={nestedGraph()} />)
-    await user.click(screen.getByRole('button', { name: 'Open module Group 2' }))
+    await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
     fireEvent.keyDown(document, { key: 'z', ctrlKey: true })
-    expect(screen.getByRole('button', { name: 'Open module Group 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom into Group 2' })).toBeInTheDocument()
     expect(screen.getByText('8 nodes, 7 edges, 3 groups')).toBeInTheDocument()
   })
 

@@ -9,6 +9,18 @@ export type NodeType =
   | 'activation'
   | 'target'
   | 'loss'
+  | 'embedding'
+  | 'transpose'
+  | 'slice'
+  | 'concat'
+  | 'softmax'
+  | 'causal-mask'
+  | 'layer-norm'
+  | 'reshape'
+  | 'mean'
+  | 'cross-entropy'
+  | 'conv2d'
+  | 'avgpool2d'
 
 export type ActivationKind = 'identity' | 'relu' | 'sigmoid' | 'tanh'
 export type LossKind = 'squared-error' | 'mse' | 'mae' | 'binary-cross-entropy'
@@ -19,7 +31,15 @@ export type DatasetKind =
   | 'threshold-1d'
   | 'circle-center'
   | 'parabola-boundary'
-export type DatasetTask = 'regression' | 'binary-classification'
+  | 'xor'
+  | 'digits-8x8'
+  | 'color-cycle'
+  | 'counting'
+  | 'attention-query'
+  | 'attention-sequence'
+  | 'class-scores'
+  | 'neuron-basics'
+export type DatasetTask = 'regression' | 'binary-classification' | 'classification' | 'sequence' | 'attention'
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
 
@@ -33,7 +53,19 @@ export interface NodeParams {
   activation?: ActivationKind
   loss?: LossKind
   dataset?: DatasetKind
+  datasetMode?: 'sample' | 'batch'
+  datasetIndex?: number
+  datasetSplit?: 'all' | 'train' | 'test'
+  /** An editable experiment supplied by the dataset, e.g. a token prompt. */
+  datasetValues?: TensorValue[]
   inputCount?: number
+  axis?: number
+  start?: number
+  end?: number
+  axes?: number[]
+  shape?: number[]
+  epsilon?: number
+  keepDims?: boolean
 }
 
 export interface NodeDimensions {
@@ -72,6 +104,9 @@ export interface GraphEdge {
 }
 
 export interface GraphGroup {
+  kind?: string
+  /** Semantic inspection metadata; identifiers refer to the same executable graph. */
+  detail?: Record<string, unknown>
   /** Parent module; nodeIds includes all descendant computation nodes. */
   parentId?: string
   id: string
@@ -82,6 +117,12 @@ export interface GraphGroup {
 }
 
 export interface GraphViewState {
+  semanticZoom?: boolean
+  inspectedNeuron?: { groupId: string; unitIndex: number; row: number }
+  /** User adjustments to semantic auto-layout; group keys use `visual-group:`. */
+  layoutOffsets?: Record<string, Position>
+  /** Connection reference for layout only. Live wiring can change independently. */
+  layoutEdges?: Array<Pick<GraphEdge, 'id' | 'source' | 'target' | 'inputSlot' | 'sourceSlot'>>
   expandedGroupIds: string[]
   focusedGroupId?: string
   viewport?: { x: number; y: number; zoom: number }
@@ -105,6 +146,7 @@ export interface ValidationIssue {
     | 'invalid-arity'
     | 'unknown-node'
     | 'shape-mismatch'
+    | 'invalid-value'
   message: string
   nodeId?: string
   edgeId?: string
@@ -113,6 +155,8 @@ export interface ValidationIssue {
 export interface TensorValue {
   shape: number[]
   data: number[]
+  /** Exact masking metadata consumed by softmax, independent of display sentinels. */
+  excluded?: boolean[]
 }
 
 export interface EvaluationTraceStep {

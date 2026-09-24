@@ -48,7 +48,8 @@ export function pasteGraphClipboard(
   offset: Position,
 ): GraphClipboardPasteResult {
   const source = cloneClipboardFragment(fragment)
-  const usedNodeIds = new Set(graph.nodes.map((node) => node.id))
+  const existingNodeIds = new Set(graph.nodes.map((node) => node.id))
+  const usedNodeIds = new Set(existingNodeIds)
   const usedEdgeIds = new Set(graph.edges.map((edge) => edge.id))
   const usedGroupIds = new Set((graph.groups ?? []).map((group) => group.id))
   const nodeIdMap = new Map<string, string>()
@@ -65,8 +66,12 @@ export function pasteGraphClipboard(
   })
 
   const pastedEdges = source.edges.flatMap((edge) => {
-    const sourceId = nodeIdMap.get(edge.source) ?? (usedNodeIds.has(edge.source) ? edge.source : undefined)
-    const targetId = nodeIdMap.get(edge.target) ?? (usedNodeIds.has(edge.target) ? edge.target : undefined)
+    // A copied neuron keeps its existing inputs, but its output is a new
+    // connection point. Reusing external destinations would attach two wires
+    // to the same input port and silently change the original computation.
+    if (nodeIdMap.has(edge.source) && !nodeIdMap.has(edge.target)) return []
+    const sourceId = nodeIdMap.get(edge.source) ?? (existingNodeIds.has(edge.source) ? edge.source : undefined)
+    const targetId = nodeIdMap.get(edge.target) ?? (existingNodeIds.has(edge.target) ? edge.target : undefined)
     if (!sourceId || !targetId) return []
 
     return [
@@ -158,11 +163,22 @@ function createPastedGroup(
   return {
     ...group,
     id,
-    label: `Group ${index}`,
+    label: /^Group \d+$/.test(group.label) ? `Group ${index}` : `${group.label} copy`,
     nodeIds: group.nodeIds.map((nodeId) => nodeIdMap.get(nodeId)).filter((nodeId): nodeId is string => Boolean(nodeId)),
     position: translatePosition(group.position, offset),
     dimensions: { ...group.dimensions },
+    detail: group.detail ? remapDetail(group.detail, nodeIdMap) : undefined,
   }
+}
+
+function remapDetail(detail: Record<string, unknown>, nodeIdMap: Map<string, string>): Record<string, unknown> {
+  const remap = (value: unknown): unknown => {
+    if (typeof value === 'string') return nodeIdMap.get(value) ?? value
+    if (Array.isArray(value)) return value.map(remap)
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, remap(child)]))
+    return value
+  }
+  return remap(detail) as Record<string, unknown>
 }
 
 function nextNodeId(type: NodeType, usedIds: Set<string>): { id: string; index: number } {

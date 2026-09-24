@@ -1,4 +1,5 @@
 import { inputArityForNode, outputArityForNode } from './engine'
+import { preserveLayoutForWiring } from './layoutState'
 import type { GraphModel, GraphNode } from './types'
 
 export interface GraphConnection {
@@ -31,7 +32,7 @@ export function connectGraphNodes(
   if (createsCycle(graphWithSlotCleared, candidate.source.id, candidate.target.id)) return undefined
 
   return {
-    ...graphWithSlotCleared,
+    ...preserveLayoutForWiring(graph),
     edges: [
       ...graphWithSlotCleared.edges,
       {

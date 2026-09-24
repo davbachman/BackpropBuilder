@@ -262,8 +262,17 @@
 }
 
 .flow-shell {
+  /* Wire and box-selection drags are canvas gestures, not browser text
+     selections. Safari otherwise highlights large blank SVG regions. */
+  -webkit-user-select: none;
+  user-select: none;
   min-height: 0;
   height: 100%;
+}
+
+.flow-shell :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .placement-mode {

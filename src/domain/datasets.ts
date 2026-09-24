@@ -1,5 +1,13 @@
 import type { DatasetKind, DatasetTask, GraphNode, TensorValue } from './types'
 import { tensorValue } from './tensor'
+import digits from '../learning/digits.json'
+
+export interface DatasetExample {
+  label: string
+  split: 'train' | 'test'
+  features: TensorValue[]
+  target: TensorValue
+}
 
 export interface ToyDataset {
   kind: DatasetKind
@@ -9,6 +17,11 @@ export interface ToyDataset {
   targetLabel: string
   featureValues: TensorValue[]
   targetValue: TensorValue
+  examples?: DatasetExample[]
+  description?: string
+  vocabulary?: string[]
+  maxLength?: number
+  source?: string
 }
 
 export const DATASET_OPTIONS: ToyDataset[] = [
@@ -83,42 +96,73 @@ export const DATASET_OPTIONS: ToyDataset[] = [
   },
 ]
 
+// Tensor examples retain their image/sequence axes; they are not batch axes.
+function tensorDataset(kind: DatasetKind, label: string, task: DatasetTask, featureLabels: string[], targetLabel: string, examples: DatasetExample[], metadata: Partial<ToyDataset> = {}): ToyDataset {
+  return { kind, label, task, featureLabels, targetLabel, featureValues: examples[0].features, targetValue: examples[0].target, examples, ...metadata }
+}
+DATASET_OPTIONS.push(tensorDataset('neuron-basics', 'Neuron basics · binary labels', 'binary-classification', ['x'], 'y', Array.from({length:20},(_,i)=>({label:`Example ${i+1}`,split:i % 4 === 3 ? 'test' : 'train',features:[tensorValue([], [i === 0 ? 2 : (i-10)/5])],target:tensorValue([], [Number(i === 0 || i >= 10)])}))))
+let xorSeed = 137
+const random = () => { xorSeed = (1664525 * xorSeed + 1013904223) >>> 0; return xorSeed / 4294967296 }
+const xorPoints = Array.from({ length: 64 }, () => [random() * 2 - 1, random() * 2 - 1])
+DATASET_OPTIONS.push({ kind: 'xor', label: 'XOR · opposite quadrants', task: 'binary-classification', featureLabels: ['x1', 'x2'], targetLabel: 'class', featureValues: [0, 1].map(axis => tensorValue([64], xorPoints.map(p => p[axis]))), targetValue: tensorValue([64], xorPoints.map(p => Number(p[0] * p[1] < 0))) })
+DATASET_OPTIONS.push(tensorDataset('digits-8x8', 'Handwritten digits · 8 × 8', 'classification', ['image'], 'digit', digits.map(digit => ({ label: `${digit.label} · ${digit.id}`, split: digit.split as 'train' | 'test', features: [tensorValue([8, 8, 1], digit.pixels.map(pixel => pixel / 16))], target: tensorValue([1], [digit.label]) })), { description: '500 UCI handwritten digits: 400 training images and 100 held-out images. Pixels are normalized to 0–1; labels are classes 0–9.', source: 'https://archive.ics.uci.edu/dataset/80/optical+recognition+of+handwritten+digits' }))
+for (const kind of ['color-cycle', 'counting'] as const) {
+  const vocabulary = kind === 'color-cycle' ? ['<bos>', 'red', 'green', 'blue', '<eos>'] : ['<bos>', 'one', 'two', 'three', 'four', 'five', '<eos>']
+  const period = vocabulary.length - 2
+  // Match the checkpoint's task: BOS predicts the first symbol; prefixes
+  // without BOS may begin at any phase. Lengths 5 and 8 stay held out, as in
+  // the supplied checkpoint, so evaluation does not relabel its training data.
+  const examples: DatasetExample[] = Array.from({ length: 8 }, (_, i) => i + 3).flatMap(length =>
+    Array.from({ length: period + 1 }, (_, phase) => {
+      const tokens = Array.from({ length }, (_, step) => phase === 0 ? (step === 0 ? 0 : (step - 1) % period + 1) : (step + phase - 1) % period + 1)
+      const target = tokens.map(token => token % period + 1)
+      return { label: tokens.map(id => vocabulary[id]).join(' '), split: length === 5 || length === 8 ? 'test' as const : 'train' as const, features: [tensorValue([length], tokens), tensorValue([length], tokens.map((_, i) => i))], target: tensorValue([length], target) }
+    }))
+  DATASET_OPTIONS.push(tensorDataset(kind, kind === 'color-cycle' ? 'Color cycle · next token' : 'Counting · next token', 'sequence', ['token IDs', 'position IDs'], 'next-token IDs', examples, { vocabulary, maxLength: 12, description: 'Synthetic repeating sequences with training and held-out examples. Outputs are integer token IDs, matching position IDs, and one next-token target per position.' }))
+}
+for (const causal of [false, true]) {
+  const examples: DatasetExample[] = Array.from({ length: 12 }, (_, i) => ({ label: `Message lookup ${i + 1}`, split: i % 4 === 3 ? 'test' : 'train', features: [tensorValue(causal ? [3, 2] : [1, 2], causal ? [1, 0, 0, 1, 1, 1] : [1, .5 + i / 10]), tensorValue([3, 2], [1, 0, 0, 1, 1, 1]), tensorValue([3, 2], [1 + i / 10, 0, 0, 2, 1, 1])], target: tensorValue(causal ? [3, 2] : [1, 2], causal ? [1 + i / 10, 0, 0, 2, 1, 1] : [1, 1]) }))
+  DATASET_OPTIONS.push(tensorDataset(causal ? 'attention-sequence' : 'attention-query', causal ? 'Attention · three-token messages' : 'Attention · query and messages', 'attention', ['queries', 'keys', 'values'], 'desired message', examples, { description: 'Query/key/value tensors for tracing attention. The target is a desired retrieved message for optional regression experiments.' }))
+}
+DATASET_OPTIONS.push(tensorDataset('class-scores', 'Class scores · softmax experiment', 'classification', ['scores'], 'class', Array.from({ length: 16 }, (_, i) => {
+  const scores = [2, 1, .1, -1].map((_, j, values) => values[(j + i) % 4] * (1 + Math.floor(i / 4) / 5))
+  return { label: `Class ${(4 - i % 4) % 4} · example ${i + 1}`, split: i >= 12 ? 'test' : 'train', features: [tensorValue([1, 4], scores)], target: tensorValue([1], [scores.indexOf(Math.max(...scores))]) }
+})))
+
 export function datasetForNode(node: GraphNode): ToyDataset {
-  return DATASET_OPTIONS.find((dataset) => dataset.kind === node.params.dataset) ?? DATASET_OPTIONS[0]
+  return DATASET_OPTIONS.find(dataset => dataset.kind === node.params.dataset) ?? DATASET_OPTIONS[0]
 }
-
+export function datasetExamples(dataset: ToyDataset): DatasetExample[] {
+  return dataset.examples ?? dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task === 'binary-classification' ? [1] : [], [target]) }))
+}
+export function datasetExampleIndex(node: GraphNode): number {
+  return Math.min(datasetExamples(datasetForNode(node)).length - 1, Math.max(0, node.params.datasetIndex ?? 0))
+}
+export function datasetMode(node: GraphNode): 'sample' | 'batch' {
+  return datasetForNode(node).examples ? 'sample' : node.params.datasetMode ?? 'batch'
+}
 export function datasetOutputCountForNode(node: GraphNode): number {
-  const dataset = datasetForNode(node)
-  return dataset.featureValues.length + 1
+  return datasetForNode(node).featureValues.length + 1
 }
-
 export function datasetOutputLabelForSlot(node: GraphNode, slot: number): string {
   const dataset = datasetForNode(node)
   return dataset.featureLabels[slot] ?? dataset.targetLabel
 }
-
 export function datasetOutputValueForSlot(node: GraphNode, slot: number): TensorValue {
-  const dataset = datasetForNode(node)
-  return dataset.featureValues[slot] ?? dataset.targetValue
+  if (node.params.datasetValues?.[slot]) return node.params.datasetValues[slot]
+  const dataset = datasetForNode(node), examples = datasetExamples(dataset)
+  if (datasetMode(node) === 'sample') {
+    const example = examples[datasetExampleIndex(node)]
+    return example.features[slot] ?? example.target
+  }
+  const selected = examples.filter(example => !node.params.datasetSplit || node.params.datasetSplit === 'all' || example.split === node.params.datasetSplit)
+  return tensorValue([selected.length], selected.map(example => (example.features[slot] ?? example.target).data[0]))
 }
-
 export function remapDatasetOutputSlot(fromNode: GraphNode, toNode: GraphNode, fromSlot: number): number | undefined {
-  const role = datasetOutputRoleForSlot(fromNode, fromSlot)
-  if (!role) return undefined
-  if (role === 'target') return datasetForNode(toNode).featureValues.length
-
-  const featureIndex = Number(role.replace('feature-', ''))
-  return featureIndex < datasetForNode(toNode).featureValues.length ? featureIndex : undefined
+  const from = datasetForNode(fromNode), to = datasetForNode(toNode)
+  if (fromSlot === from.featureValues.length) return to.featureValues.length
+  return fromSlot >= 0 && fromSlot < Math.min(from.featureValues.length, to.featureValues.length) ? fromSlot : undefined
 }
-
 export function isDatasetKind(value: string): value is DatasetKind {
-  return DATASET_OPTIONS.some((dataset) => dataset.kind === value)
-}
-
-function datasetOutputRoleForSlot(node: GraphNode, slot: number): string | undefined {
-  const dataset = datasetForNode(node)
-  if (slot < 0) return undefined
-  if (slot < dataset.featureValues.length) return `feature-${slot}`
-  if (slot === dataset.featureValues.length) return 'target'
-  return undefined
+  return DATASET_OPTIONS.some(dataset => dataset.kind === value)
 }

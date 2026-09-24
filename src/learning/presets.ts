@@ -9,6 +9,7 @@ export type LessonKind =
   | 'causal'
   | 'block'
   | 'decoder'
+  | 'cnn'
 
 export const LESSONS: Array<{
   id: LessonKind
@@ -118,6 +119,16 @@ export const LESSONS: Array<{
       'Compare trained and initial parameters, then step through a generation cycle.',
     level: '10 · Transformers',
     symbol: '✳',
+  },
+  {
+    id: 'cnn',
+    title: 'Read a handwritten digit',
+    subtitle: 'Convolution, filters & feature maps',
+    question: 'What does a small filter find when it slides across an image?',
+    experiment:
+      'Choose a feature-map cell, inspect its input patch, and edit a shared filter weight.',
+    level: '11 · Images',
+    symbol: '▦',
   },
 ]
 

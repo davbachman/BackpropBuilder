@@ -1,0 +1,140 @@
+.semantic-flow { position: relative; background: radial-gradient(ellipse at 45% 35%, #fff 0%, #f5f8fc 72%, #eef3f9 100%); }
+/* Keep Safari's compositing layer on the unscaled renderer. Putting it on the
+   zoomed viewport lets a trace update rasterize the whole graph at 1x, then
+   magnify that bitmap. The screen-sized parent keeps text and wires sharp.
+   Related WebKit layering issue: https://bugs.webkit.org/show_bug.cgi?id=160661 */
+.semantic-flow .react-flow__renderer { transform: translateZ(0); }
+.semantic-flow .react-flow__background { opacity: .65; }
+.semantic-flow .react-flow__edge-path { stroke: #91a1bc; stroke-width: 1.8; }
+.semantic-flow .builder-edge.is-residual { stroke: #c59a59; stroke-width: 2.3; stroke-dasharray: 7 4; }
+.semantic-flow .react-flow__controls { border: 1px solid #dce3ed; border-radius: 12px; box-shadow: 0 5px 18px #27364d0a; overflow: hidden; }
+.semantic-flow .react-flow__controls button { background: #fff; border-color: #edf1f6; }
+.semantic-flow .react-flow__minimap { border-radius: 12px; border: 1px solid #dce3ed; background: #fff; box-shadow: 0 5px 18px #27364d0a; height: 85px; width: 130px; }
+.semantic-zoom-switch { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: #67758c; font-size: 11px; white-space: nowrap; }
+.semantic-zoom-switch input { accent-color: #6478cb; width: 13px; height: 13px; }
+.semantic-canvas-hint { position: absolute; z-index: 4; pointer-events: none; bottom: 16px; left: 50%; transform: translateX(-50%); background: #ffffffed; border: 1px solid #e0e5ed; box-shadow: 0 4px 20px #29385506; border-radius: 24px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 11px; color: #6b7890; width: max-content; max-width: calc(100% - 90px); text-align: center; }
+.semantic-canvas-hint svg { flex-shrink: 0; }
+.semantic-canvas-hint button { display: none; }
+.visual-group-node.semantic-group { --group-ink: #6780bd; --group-tint: #eef3ff; border: 1.5px solid #bdcbe3; border-radius: 16px; background: #fff; padding: 14px; box-shadow: 0 4px 13px #344a6f08; }
+.semantic-group.group-kind-attention, .semantic-group.group-kind-head { --group-ink: #8f71bb; --group-tint: #f4eefa; border-color: #cbb9df; }
+.semantic-group.group-kind-layer, .semantic-group.group-kind-mlp, .semantic-group.group-kind-network, .semantic-group.group-kind-neuron { --group-ink: #479594; --group-tint: #e9f6f3; border-color: #a5cdc5; }
+.semantic-group.group-kind-transformer-block { --group-ink: #657ec3; --group-tint: #eff3fc; }
+.semantic-group .visual-group-title-row { display: flex; align-items: flex-start; gap: 9px; }
+.semantic-group .visual-group-title-row > div { min-width: 0; }
+.semantic-group .visual-group-title-row strong { display: block; color: #33435b; font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 154px; }
+.semantic-group .visual-group-title-row span:last-child { color: var(--group-ink); font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; margin-top: 3px; }
+.semantic-group .visual-group-title-row .node-icon { height: 26px; width: 26px; display: grid; place-items: center; border-radius: 8px; color: var(--group-ink); background: var(--group-tint); flex-shrink: 0; }
+.semantic-group .group-explode-button { margin-left: auto; border: 0; background: transparent; border-radius: 5px; color: var(--group-ink); padding: 2px; height: 22px; width: 20px; }
+.semantic-group .group-explode-button:hover { background: var(--group-tint); }
+.semantic-group .architecture-preview { width: 100%; height: 61px; display: block; margin-top: 8px; }
+.semantic-group .architecture-preview path { stroke: var(--group-ink); stroke-width: .9px; opacity: .3; fill: none; }
+.semantic-group .architecture-preview circle { stroke: var(--group-ink); fill: var(--group-tint); stroke-width: 1.4px; }
+.semantic-group .architecture-preview rect { stroke: var(--group-ink); fill: var(--group-tint); stroke-width: 1px; }
+.semantic-group .architecture-preview text { fill: var(--group-ink); font-size: 10px; font-family: inherit; }
+.semantic-group .attention-preview rect { stroke: none; fill: var(--group-ink); }
+.semantic-group .node-metrics { border-top: 1px solid #eef1f6; padding: 7px 0 0; margin: 8px 0 0; display: block; color: #728097; font-size: 9px; font-family: 'SFMono-Regular', Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.semantic-group .node-metrics > span:not(:first-child) { display: none; }
+.semantic-group.is-expanded { background: transparent; border: 1.5px solid color-mix(in srgb, var(--group-ink) 30%, transparent); border-radius: 20px; padding: 14px 20px; box-shadow: none; }
+.semantic-group.is-expanded .visual-group-title-row { padding: 0; background: transparent; width: 100%; max-width: unset; gap: 8px; }
+.semantic-group.is-expanded .visual-group-title-row strong { max-width: unset; font-size: 13px; }
+.semantic-group.is-expanded .visual-group-title-row .node-icon { background: var(--group-tint); }
+.semantic-group.is-expanded .group-explode-button { margin-left: 12px; }
+.semantic-group.is-selected { border-color: var(--group-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-ink) 13%, transparent); }
+.semantic-group.is-active { border-color: #d09043; box-shadow: 0 0 0 4px #d0904322; }
+.semantic-group .group-handle { background: var(--group-ink); border: 2px solid white; width: 8px; height: 8px; }
+.semantic-group.is-model-stage:not(.is-expanded) { padding: 10px 14px; border-radius: 13px; }
+.semantic-group.is-model-stage:not(.is-expanded) .visual-group-title-row strong { max-width: 182px; white-space: normal; font-size: 19px; line-height: 1.12; }
+.semantic-group.is-model-stage:not(.is-expanded) .visual-group-title-row > div { width: 172px; }
+.semantic-group.is-model-stage:not(.is-expanded) .visual-group-title-row .node-icon { display: none; }
+.semantic-group.is-model-stage:not(.is-expanded) .visual-group-title-row span:last-child { font-size: 9px; }
+.semantic-group.is-model-stage:not(.is-expanded) .architecture-preview { position: absolute; right: 22px; top: 12px; width: 184px; height: 56px; margin: 0; }
+.semantic-group.is-model-stage:not(.is-expanded) .node-metrics { display: none; }
+.semantic-group.is-model-stage.is-selected:not(.is-expanded) .node-metrics { display: block; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #dce5ef; border-radius: 8px; padding: 5px 8px; margin-top: 4px; }
+.semantic-group.is-model-stage:not(.is-expanded) .group-explode-button { position: absolute; right: 8px; top: 6px; z-index: 1; }
+.semantic-group.is-model-stage:not(.is-expanded) .layer-neuron-preview { position: absolute; right: 22px; top: 24px; width: 180px; min-height: 0; margin: 0; }
+.semantic-group.is-model-stage:not(.is-expanded) .layer-neuron-preview > span { font-size: 8px; }
+.semantic-group.is-model-stage:not(.is-expanded) .unit-grid { gap: 6px; margin-top: 9px; }
+.semantic-group.group-kind-neuron { padding: 11px 9px; border: 0; background: transparent; box-shadow: none; }
+.semantic-group.group-kind-neuron:not(.is-expanded) .visual-group-title-row { justify-content: center; }
+.semantic-group.group-kind-neuron:not(.is-expanded) .node-icon { display: none; }
+.semantic-group.group-kind-neuron:not(.is-expanded) .visual-group-title-row strong { max-width: 85px; font-size: 11px; }
+.semantic-group.group-kind-neuron:not(.is-expanded) .visual-group-title-row span:last-child { font-size: 8px; }
+.semantic-group.group-kind-neuron:not(.is-expanded) .group-explode-button { position: absolute; right: 0; top: 2px; }
+.semantic-group.group-kind-neuron.is-expanded { border: 1.5px solid #a5cdc5; padding: 14px 20px; }
+.neuron-glyph svg { width: 100%; height: 64px; margin-top: 4px; }
+.neuron-glyph path { stroke: #87aba7; fill: none; stroke-width: 1; }
+.neuron-glyph circle { fill: #edf8f5; stroke: #68a39a; stroke-width: 1.6; }
+.neuron-glyph text { font-size: 21px; text-anchor: middle; fill: #478980; font-family: Georgia, serif; }
+.layer-neuron-preview { margin-top: 15px; min-height: 51px; }
+.semantic-group.is-expanded .layer-neuron-preview { position: absolute; top: 0; left: 310px; width: 210px; margin-top: 11px; min-height: 0; pointer-events: auto; }
+.semantic-group.is-expanded .layer-neuron-preview .unit-grid { margin-top: 6px; gap: 3px; }
+.layer-neuron-preview > span { display: flex; justify-content: space-between; font-size: 9px; color: #7a8b94; }
+.layer-neuron-preview > span > span { color: #58988f; }
+.unit-grid { display: grid; gap: 5px; margin-top: 12px; justify-items: center; }
+.unit-dot { appearance: none; padding: 0; min-height: 0; width: 9px; height: 9px; border-radius: 50%; background: #4b9b91; border: 1px solid #328377; cursor: pointer; transition: transform 120ms, box-shadow 120ms; }
+.unit-dot:hover, .unit-dot:focus-visible { opacity: 1 !important; transform: scale(1.55); box-shadow: 0 0 0 3px #89beb442; outline: none; }
+.semantic-operation { width: 176px; height: 112px; box-sizing: border-box; padding: 12px 13px; border: 1px solid #d6deea; border-radius: 12px; background: #fff; box-shadow: 0 3px 10px #283e5905; color: #475773; }
+.semantic-operation-heading { display: flex; gap: 7px; align-items: center; font-size: 11px; font-weight: 600; }
+.semantic-operation-heading svg { flex-shrink: 0; color: #8394b1; }
+.semantic-operation-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-operation.is-model-stage { height: 84px; padding: 10px 12px; }
+.semantic-operation.is-model-stage .semantic-operation-heading { font-size: 14px; }
+.semantic-operation.is-model-stage .semantic-operation-formula { display: none; }
+.semantic-operation.is-model-stage .semantic-operation-value { font-size: 13px; margin-top: 8px; }
+.semantic-operation.is-model-stage .semantic-shape { margin-top: 5px; }
+.semantic-operation.is-compact-stage { height: 64px; padding: 8px 10px; }
+.semantic-operation.is-compact-stage .semantic-operation-heading { font-size: 11px; }
+.semantic-operation.is-compact-stage .semantic-operation-value { margin-top: 5px; font-size: 12px; }
+.semantic-operation.is-compact-stage .semantic-shape { margin-top: 3px; font-size: 7px; }
+.semantic-operation.is-image-input .semantic-operation-heading { max-width: 101px; }
+.semantic-operation.is-image-input .semantic-operation-value { visibility: hidden; height: 8px; }
+.semantic-image-thumbnail { position: absolute; right: 8px; top: 8px; display: grid; grid-template-columns: repeat(8,5.5px); grid-template-rows: repeat(8,5.5px); gap: .5px; }
+.semantic-image-thumbnail span { border-radius: .4px; }
+.semantic-operation-formula { margin-top: 8px; font-size: 9px; color: #97a1b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-operation-value { margin-top: 9px; color: #596d8a; font: 11px 'SFMono-Regular', Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-shape { display: block; font-size: 8px; letter-spacing: .6px; color: #9ca6b4; margin-top: 7px; }
+.semantic-operation.is-parameter { background: #fffcf6; border-color: #e6d8bf; }
+.semantic-operation.is-parameter .semantic-operation-heading svg { color: #bb9863; }
+.semantic-operation.is-parameter .semantic-operation-value { color: #a18457; }
+.semantic-operation.operation-activation { border-color: #b9d9cd; background: #fbfefd; }
+.semantic-operation.operation-loss { background: #fff9f7; border-color: #e9c5b4; }
+.semantic-operation.is-selected { border-color: #728bc5; box-shadow: 0 0 0 3px #718cc51a; }
+.semantic-operation.is-active { border-color: #d5974a; box-shadow: 0 0 0 4px #d5974a20; }
+.semantic-operation .node-handle { width: 7px; height: 7px; background: #a2b2cb; border: 1.5px solid white; }
+.semantic-operation.operation-dataset { position: relative; background: #f8fcff; border-color: #c7dbe7; }
+.semantic-operation.operation-dataset:not(.is-model-stage) { padding-right: 36px; }
+.semantic-dataset-select { display: block; width: 100%; min-width: 0; margin-top: 9px; padding: 5px 3px; border: 1px solid #d6e2eb; border-radius: 5px; background: white; color: #526b81; font-family: inherit; font-size: 9px; line-height: 1.3; cursor: pointer; text-overflow: ellipsis; }
+.semantic-dataset-select:focus-visible { outline: 2px solid #728bc5; outline-offset: 2px; }
+.semantic-dataset-summary { display: block; margin-top: 9px; color: #8a9eac; font-size: 8px; }
+.semantic-dataset-port { position: absolute; right: 8px; transform: translateY(-50%); color: #567a90; font: 9px/1 ui-monospace, monospace; }
+.semantic-dataset-port.is-target { color: #ad765c; }
+.semantic-operation .dataset-target-handle { background: #bc8b70; }
+.operation-dataset.is-model-stage .semantic-dataset-port { right: auto; top: auto; bottom: 6px; transform: translateX(-50%); }
+.operation-dataset.is-model-stage .semantic-dataset-select { margin-top: 7px; padding: 3px; }
+.operation-dataset.is-model-stage .semantic-dataset-summary { display: none; }
+.semantic-operation.is-coordinate { width: 112px; height: 64px; padding: 9px; border-radius: 10px; }
+.semantic-operation.is-coordinate .semantic-operation-heading { font-size: 11px; gap: 5px; }
+.semantic-operation.is-coordinate .semantic-operation-heading svg { width: 12px; height: 12px; }
+.semantic-operation.is-coordinate .semantic-operation-formula, .semantic-operation.is-coordinate .semantic-shape { display: none; }
+.semantic-operation.is-coordinate .semantic-operation-value { margin-top: 9px; font-size: 14px; }
+@media (max-width: 850px) { .semantic-canvas-hint { font-size: 9px; padding: 7px 9px; bottom: 10px; } .semantic-flow .react-flow__minimap { display: none; } .semantic-zoom-switch { margin-left: 0; } }
+
+/* Cards and their real contents occupy the same permanent canvas space. Only
+   the cover fades; ancestor fills never accumulate over a deeply zoomed view. */
+.continuous-module { pointer-events: none; }
+.continuous-group-surface { position: relative; transform-origin: top left; pointer-events: none; }
+.continuous-card-cover, .continuous-group-heading { position: absolute; inset: 0; }
+.continuous-card-cover .visual-group-node.semantic-group { background: #fff; border: 1.5px solid #c4d6df; border-radius: 16px; box-shadow: 0 5px 16px #344a6f08; }
+.continuous-card-cover .visual-group-node.group-kind-neuron { padding: 14px; }
+.continuous-card-cover .visual-group-node.is-model-stage { padding: 20px; }
+.continuous-card-cover .is-model-stage .architecture-preview { top: 70px; right: 35px; width: 350px; height: 72px; }
+.continuous-card-cover .is-model-stage .visual-group-title-row strong { max-width: 345px; font-size: 18px; }
+.continuous-card-cover .is-model-stage .visual-group-title-row > div { width: auto; }
+.continuous-card-cover .is-model-stage .layer-neuron-preview { top: 83px; right: 35px; width: 350px; }
+.continuous-group-heading .visual-group-node.is-expanded { border: 0; box-shadow: none; padding: 10px 12px; }
+.continuous-group-heading .visual-group-title-row strong { font-size: 11px; }
+.continuous-group-heading .visual-group-title-row span:last-child { font-size: 7px; }
+.continuous-group-heading .visual-group-title-row .node-icon { height: 22px; width: 22px; }
+.continuous-group-heading .layer-neuron-preview { left: 12px; top: auto; bottom: 8px; width: calc(100% - 24px); }
+.continuous-group-heading[aria-hidden=true] *, .continuous-card-cover[aria-hidden=true] * { pointer-events: none !important; }
+.continuous-group-outline { position: absolute; inset: 0; border: solid #c6d9df; border-radius: 16px; pointer-events: none; }

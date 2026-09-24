@@ -4,13 +4,18 @@ import { scalarValue, zeroLike } from './tensor'
 
 const LR = 0.1
 
-export function createStarterGraph(): GraphModel {
-  return createSingleNeuronGraph('sigmoid', {
+export function createStarterGraph(datasetBacked = false): GraphModel {
+  const graph = createSingleNeuronGraph('sigmoid', {
     x: 2,
     w: 0.5,
     b: -0.3,
     target: 1,
   })
+  if (datasetBacked) {
+    graph.nodes.unshift({id:'starter-data',type:'dataset',label:'Neuron examples',position:{x:-240,y:60},params:{dataset:'neuron-basics',datasetMode:'sample'}})
+    graph.edges.push({id:'data-x',source:'starter-data',sourceSlot:0,target:'x',inputSlot:0},{id:'data-y',source:'starter-data',sourceSlot:1,target:'target',inputSlot:0})
+  }
+  return graph
 }
 
 export function createReluGateGraph(): GraphModel {
