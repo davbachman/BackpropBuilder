@@ -42,7 +42,7 @@
 .semantic-group.is-expanded .visual-group-title-row .node-icon { background: var(--group-tint); }
 .semantic-group.is-expanded .group-explode-button { margin-left: 12px; }
 .semantic-group.is-selected { border-color: var(--group-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-ink) 13%, transparent); }
-.semantic-group.is-active { border-color: #d09043; box-shadow: 0 0 0 4px #d0904322; }
+.semantic-group.is-active { border-color: #b99b72; box-shadow: inset 3px 0 #b99b72; }
 .semantic-group .group-handle { background: var(--group-ink); border: 2px solid white; width: 8px; height: 8px; }
 .semantic-group.is-model-stage:not(.is-expanded) { padding: 10px 14px; border-radius: 13px; }
 .semantic-group.is-model-stage:not(.is-expanded) .visual-group-title-row strong { max-width: 182px; white-space: normal; font-size: 19px; line-height: 1.12; }
@@ -101,7 +101,7 @@
 .semantic-operation.operation-activation { border-color: #b9d9cd; background: #fbfefd; }
 .semantic-operation.operation-loss { background: #fff9f7; border-color: #e9c5b4; }
 .semantic-operation.is-selected { border-color: #728bc5; box-shadow: 0 0 0 3px #718cc51a; }
-.semantic-operation.is-active { border-color: #d5974a; box-shadow: 0 0 0 4px #d5974a20; }
+.semantic-operation.is-active { border-color: #b99b72; box-shadow: inset 3px 0 #b99b72; }
 .semantic-operation .node-handle { width: 7px; height: 7px; background: #a2b2cb; border: 1.5px solid white; }
 .semantic-operation.operation-dataset { position: relative; background: #f8fcff; border-color: #c7dbe7; }
 .semantic-operation.operation-dataset:not(.is-model-stage) { padding-right: 36px; }
@@ -147,7 +147,10 @@
 .continuous-group-heading[aria-hidden=true] *, .continuous-card-cover[aria-hidden=true] * { pointer-events: none !important; }
 .continuous-group-outline { position: absolute; inset: 0; border: solid #c6d9df; border-radius: 16px; pointer-events: none; }
 .semantic-operation.is-selected { border-color: #8057af; box-shadow: 0 0 0 4px #8057af30, 0 8px 22px #3c27501f; }
+.semantic-operation.is-active.is-selected { border-color: #b99b72; box-shadow: inset 3px 0 #b99b72; }
 .continuous-card-cover .visual-group-node.semantic-group.is-selected,
 .visual-group-node.semantic-group.is-selected { border-color: #8057af; box-shadow: 0 0 0 4px #8057af30, 0 8px 22px #3c27501f; }
+.continuous-card-cover .visual-group-node.semantic-group.is-active.is-selected,
+.visual-group-node.semantic-group.is-active.is-selected { border-color: #b99b72; box-shadow: inset 3px 0 #b99b72; }
 .continuous-group-heading .visual-group-node.semantic-group.is-expanded.is-selected { border: 0; box-shadow: none; }
 .continuous-group-outline.is-selected { border-color: #8057af; background: #8057af05; }

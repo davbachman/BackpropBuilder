@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react'
 import { ArrowUp, Combine, Maximize, Ungroup, ScanSearch, LayoutGrid, Search } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   MAX_FLEX_INPUT_COUNT,
   NODE_WIDTH,
@@ -658,14 +658,14 @@ function GraphCanvasInner({
   const previousNodeSyncKey = useRef(nodeSyncKey)
   const previousEdgeSyncKey = useRef(edgeSyncKey)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (dragPositions.current) return
     if (previousNodeSyncKey.current === nodeSyncKey) return
     previousNodeSyncKey.current = nodeSyncKey
     setNodes(reactNodes)
   }, [nodeSyncKey, reactNodes, setNodes])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (previousEdgeSyncKey.current === edgeSyncKey) return
     previousEdgeSyncKey.current = edgeSyncKey
     setEdges(reactEdges)

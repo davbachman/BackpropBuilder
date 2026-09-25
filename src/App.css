@@ -283,19 +283,21 @@
   background: var(--panel-bg);
   box-shadow: 0 10px 24px rgba(24, 33, 47, 0.1);
   padding: 10px;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .builder-node.is-active:not(.is-selected) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow);
-  transform: translateY(-1px);
+  box-shadow: inset 3px 0 var(--accent), 0 10px 24px rgba(24, 33, 47, 0.1);
 }
 
 .builder-node.is-selected {
   border-color: var(--forward);
   box-shadow: 0 0 0 3px var(--forward-soft), var(--shadow);
-  transform: translateY(-1px);
+}
+
+.builder-node.is-active.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 var(--accent), 0 10px 24px rgba(24, 33, 47, 0.1);
 }
 
 .node-weight,
@@ -331,7 +333,7 @@
 
 .visual-group-node.is-active:not(.is-selected) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow);
+  box-shadow: inset 3px 0 var(--accent), 0 14px 32px rgba(24, 33, 47, 0.14);
 }
 
 .visual-group-node.is-selected {
