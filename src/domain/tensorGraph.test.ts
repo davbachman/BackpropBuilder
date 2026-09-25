@@ -50,11 +50,13 @@ describe('tensor primitives in the editable graph', () => {
     expectNumericalGradients(operationGraph('slice', [matrix], { axis: 1, start: 1, end: 3 }))
     expectNumericalGradients(operationGraph('reshape', [matrix], { shape: [3, 2] }))
     expectNumericalGradients(operationGraph('concat', [matrix, t([2, 1], [0.5, 0.7])], { axis: 1 }))
+    expectNumericalGradients(operationGraph('concat', [t([2], [0.5, 0.7]), t([2], [0.2, 0.4])], { axis: 1 }))
+    expectNumericalGradients(operationGraph('concat', [matrix, t([2], [0.5, 0.7])], { axis: 1 }))
     expectNumericalGradients(operationGraph('mean', [matrix], { axis: 1, keepDims: true }))
     expectNumericalGradients(operationGraph('mean', [matrix]))
   })
 
-  it('explains that vector concatenation on axis 1 needs a reshape first', () => {
+  it('stacks equal-length vectors as columns on axis 1 without changing axis 0 concatenation', () => {
     const vectors = Array.from({ length: 4 }, (_, index) => t([112], Array.from({ length: 112 }, (_, row) => row + index)))
     const graph: GraphModel = {
       learningRate: 0.01,
@@ -64,16 +66,22 @@ describe('tensor primitives in the editable graph', () => {
       ],
       edges: vectors.map((_, index) => ({ id: `e${index}`, source: `x${index}`, target: 'concat', inputSlot: index })),
     }
-    expect(validateGraph(graph).find(issue => issue.code === 'shape-mismatch')?.message)
-      .toContain('Reshape each [112] input to [112, 1], then concatenate on axis 1 to get [112, 4]')
-
-    graph.nodes.splice(4, 0, ...vectors.map((_, index): GraphNode => ({ id: `reshape${index}`, label: `reshape${index}`, type: 'reshape', params: { shape: [112, 1] }, position: { x: 150, y: index * 100 } })))
-    graph.edges = vectors.flatMap((_, index) => [
-      { id: `input-reshape${index}`, source: `x${index}`, target: `reshape${index}`, inputSlot: 0 },
-      { id: `reshape-concat${index}`, source: `reshape${index}`, target: 'concat', inputSlot: index },
-    ])
     expect(validateGraph(graph)).toEqual([])
-    expect(forwardPass(graph).graph.nodes.find(node => node.id === 'concat')?.value?.shape).toEqual([112, 4])
+    expect(formulaForNode(graph.nodes.at(-1)!, graph)).toContain('column_stack(')
+    const stacked = forwardPass(graph).graph.nodes.find(node => node.id === 'concat')!.value!
+    expect(stacked.shape).toEqual([112, 4])
+    expect(stacked.data.slice(0, 8)).toEqual([0, 1, 2, 3, 1, 2, 3, 4])
+
+    graph.nodes.at(-1)!.params.axis = 0
+    const joined = forwardPass(graph).graph.nodes.find(node => node.id === 'concat')!.value!
+    expect(joined.shape).toEqual([448])
+    expect(joined.data.slice(0, 4)).toEqual([0, 1, 2, 3])
+  })
+
+  it('rejects mismatched column lengths instead of silently broadcasting them', () => {
+    const graph = operationGraph('concat', [t([3], [1, 2, 3]), t([2], [4, 5])], { axis: 0 })
+    graph.nodes.find(node => node.id === 'op')!.params.axis = 1
+    expect(validateGraph(graph)).toContainEqual(expect.objectContaining({ code: 'shape-mismatch', nodeId: 'op', message: expect.stringContaining('same row count') }))
   })
 
   it('differentiates softmax, layer norm and cross entropy', () => {

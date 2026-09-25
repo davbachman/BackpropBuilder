@@ -135,7 +135,7 @@ describe('Backprop Builder app', () => {
       learningRate: 0.1,
       nodes: [
         { id: 'a', type: 'input', label: 'a', params: { value: tensorValue([3], [1, 2, 3]) }, position: { x: 40, y: 50 } },
-        { id: 'b', type: 'input', label: 'b', params: { value: tensorValue([3], [4, 5, 6]) }, position: { x: 40, y: 230 } },
+        { id: 'b', type: 'input', label: 'b', params: { value: tensorValue([2], [4, 5]) }, position: { x: 40, y: 230 } },
         { id: 'join', type: 'concat', label: 'Join', params: { axis: 1, inputCount: 2 }, position: { x: 330, y: 130 } },
       ],
       edges: [
@@ -152,7 +152,7 @@ describe('Backprop Builder app', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
     fireEvent.click(joinCard()!.querySelector('.node-title-row strong')!)
     expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('alert', { name: 'Selected block errors' })).toHaveTextContent('Axis 1 does not exist in a vector')
+    expect(screen.getByRole('alert', { name: 'Selected block errors' })).toHaveTextContent('same row count')
 
     fireEvent.change(screen.getByLabelText('axis'), { target: { value: '0' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply operation' }))

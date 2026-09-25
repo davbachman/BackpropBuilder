@@ -20,7 +20,7 @@ export const operationHelp: Partial<Record<NodeType, string>> = {
   embedding: 'Port 1: table [vocabulary, width]. Port 2: integer IDs [tokens]. Output: [tokens, width].',
   transpose: 'Empty axes reverses the axes. For a matrix, 1, 0 swaps rows and columns.',
   slice: 'Choose an axis and a start-inclusive, end-exclusive range. Slice Q, K and V on axis 1 to build attention heads.',
-  concat: 'Join tensors along an existing axis; all inputs must have the same rank and match on every other axis. To turn four [112] vectors into [112, 4], reshape each to [112, 1], then concatenate on axis 1. Axis 0 would join the original vectors into [448].',
+  concat: 'Axis 1 treats vectors as single columns: four [112] inputs become [112, 4]. Vectors can join matrices with the same row count. Axis 0 joins vectors end to end; higher-rank tensors keep their original shape rules.',
   softmax: 'Normalizes the last axis into probabilities. For classification training, wire logits directly to Cross-entropy.',
   'causal-mask': 'Masks positions above the diagonal of a square [tokens, tokens] score matrix before softmax.',
   'layer-norm': 'Ports: input [tokens, width], learned scale γ [width], learned bias β [width]. Initialize γ to ones and β to zeros.',

@@ -198,7 +198,9 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
     case 'embedding': return `${outputLabel} = ${inputLabels[0]}[${inputLabels[1]}]`
     case 'transpose': return `${outputLabel} = transpose(${inputLabels[0]})`
     case 'slice': return `${outputLabel} = slice(${inputLabels[0]}, axis=${node.params.axis ?? 0}, ${node.params.start ?? 0}:${node.params.end ?? '?'})`
-    case 'concat': return `${outputLabel} = concat(${inputLabels.join(', ')}, axis=${node.params.axis ?? 1})`
+    case 'concat': return node.params.axis === undefined || node.params.axis === 1
+      ? `${outputLabel} = column_stack(${inputLabels.join(', ')})`
+      : `${outputLabel} = concat(${inputLabels.join(', ')}, axis=${node.params.axis})`
     case 'softmax': return `${outputLabel} = softmax(${inputLabels[0]})`
     case 'causal-mask': return `${outputLabel}[i,j] = ${inputLabels[0]}[i,j] if j ≤ i; otherwise −∞`
     case 'layer-norm': return `${outputLabel} = γ · (${inputLabels[0]} − mean) / √(variance + ε) + β`
@@ -583,8 +585,8 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
     }
 
     const axis = node.params.axis ?? 1
-    const concatHint = node.type === 'concat' && inputShapes[0]?.length === 1 && axis === 1
-      ? ` Axis 1 does not exist in a vector. Reshape each ${formatShape(inputShapes[0])} input to [${inputShapes[0][0]}, 1], then concatenate on axis 1 to get [${inputShapes[0][0]}, ${incoming.length}].`
+    const concatHint = node.type === 'concat' && axis === 1 && inputShapes.some(shape => shape?.length === 1)
+      ? ' Axis 1 treats vectors as single columns; all inputs must have the same row count. Higher-rank tensors need explicit reshapes.'
       : node.type === 'concat'
         ? ` Concatenation on axis ${axis} requires equal ranks and matching sizes on every other axis.`
         : ' Use matching shapes or scalars.'
@@ -619,8 +621,12 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
     return first.map((dimension, index) => index === axis ? end - start : dimension)
   }
   if (node.type === 'concat') {
-    if (!Number.isInteger(axis) || axis < 0 || axis >= first.length || inputShapes.some((shape) => shape.length !== first.length || shape.some((d, index) => index !== axis && d !== first[index]))) return undefined
-    return first.map((d, index) => index === axis ? inputShapes.reduce((sum, shape) => sum + shape[axis], 0) : d)
+    const shapes = axis === 1 && inputShapes.some(shape => shape.length === 1) && inputShapes.every(shape => shape.length === 1 || shape.length === 2)
+      ? inputShapes.map(shape => shape.length === 1 ? [shape[0], 1] : shape)
+      : inputShapes
+    const baseline = shapes[0]
+    if (!Number.isInteger(axis) || axis < 0 || axis >= baseline.length || shapes.some((shape) => shape.length !== baseline.length || shape.some((d, index) => index !== axis && d !== baseline[index]))) return undefined
+    return baseline.map((d, index) => index === axis ? shapes.reduce((sum, shape) => sum + shape[axis], 0) : d)
   }
   if (node.type === 'softmax') return first.length && first.at(-1)! > 0 ? [...first] : undefined
   if (node.type === 'causal-mask') return first.length === 2 && first[0] === first[1] ? [...first] : undefined
@@ -1385,7 +1391,12 @@ function tensorOperation(node: GraphNode, values: TensorValue[], requiresGrad = 
     case 'embedding': output = autograd.embedding(first, second.data); break
     case 'transpose': output = autograd.transpose(first, node.params.axes); break
     case 'slice': output = autograd.slice(first, node.params.axis ?? 0, node.params.start ?? 0, node.params.end ?? first.shape[node.params.axis ?? 0]); break
-    case 'concat': output = autograd.concat(operands, node.params.axis ?? 1); break
+    case 'concat': {
+      const axis = node.params.axis ?? 1
+      const columns = axis === 1 && operands.some(value => value.shape.length === 1) && operands.every(value => value.shape.length === 1 || value.shape.length === 2)
+      output = autograd.concat(columns ? operands.map(value => value.shape.length === 1 ? autograd.reshape(value, [value.shape[0], 1]) : value) : operands, axis)
+      break
+    }
     case 'softmax': output = autograd.softmax(first); break
     case 'causal-mask': output = autograd.causalMask(first); break
     case 'layer-norm': output = autograd.layerNorm(first, second, third, node.params.epsilon ?? 1e-5); break

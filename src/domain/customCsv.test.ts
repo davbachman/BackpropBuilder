@@ -52,6 +52,17 @@ describe('custom CSV datasets', () => {
     expect(runTrainingStep(initial.graph).loss).toBeLessThan(initial.loss!)
   })
 
+  it('assembles separate CSV feature columns into one row-by-feature matrix', () => {
+    const graph = createStarterGraph(true)
+    const source = graph.nodes.find(node => node.type === 'dataset')!
+    source.params = { dataset: 'custom-csv', customCsv: parseCustomCsv('a,b,c,target\n1,2,3,0\n4,5,6,1\n', 'features.csv'), datasetMode: 'batch', datasetSplit: 'all' }
+    const join = { id: 'features', type: 'concat' as const, label: 'Features', params: { axis: 1, inputCount: 3 }, position: { x: 250, y: 0 } }
+    graph.nodes = [source, join]
+    graph.edges = [0, 1, 2].map(index => ({ id: `column-${index}`, source: source.id, sourceSlot: index, target: join.id, inputSlot: index }))
+
+    expect(forwardPass(graph).graph.nodes.find(node => node.id === join.id)?.value).toEqual({ shape: [2, 3], data: [1, 2, 3, 4, 5, 6] })
+  })
+
   it('reserves canvas space for long column names', () => {
     const csv = parseCustomCsv('very_long_feature_column_name,second_long_feature_column_name,target_label\n1,2,3\n2,3,5\n3,4,7\n', 'wide.csv')
     const graph = createStarterGraph(true)
