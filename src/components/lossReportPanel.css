@@ -6,7 +6,14 @@
 .loss-report-download { margin-top: 8px; padding: 2px 0; border: 0; background: transparent; color: #7753aa; font-size: 10px; text-decoration: underline; text-underline-offset: 2px; }
 .loss-report-panel svg { display: block; width: 100%; margin-top: 12px; overflow: visible; }
 .loss-report-panel svg line { stroke: #d9d1e2; stroke-width: 1; }
-.loss-report-panel svg path { fill: none; stroke: #7650aa; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.loss-report-panel svg path { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.loss-report-panel svg path.is-train { stroke: #7650aa; }
+.loss-report-panel svg path.is-held-out { stroke: #d47c57; }
+.loss-report-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; color: #655a70; font-size: 10px; }
+.loss-report-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.loss-report-legend span::before { content: ''; display: inline-block; width: 13px; height: 3px; border-radius: 2px; background: #7650aa; }
+.loss-report-legend span.is-held-out::before { background: #d47c57; }
+.loss-report-warning { margin: 8px 0 0; color: #a34d36; font-size: 10px; line-height: 1.4; }
 .loss-report-range { display: flex; justify-content: space-between; color: #91869b; font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .loss-report-list { max-height: 260px; overflow-y: auto; margin-top: 12px; border-top: 1px solid #eee9f3; }
 .loss-report-note { margin: 8px 0 0; color: #81758c; font-size: 10px; line-height: 1.4; }

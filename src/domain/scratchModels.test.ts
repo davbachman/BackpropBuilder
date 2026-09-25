@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { scratchModel } from '../test/scratchModels'
 import { backwardPass, forwardPass, parameterValues, runTrainingStep, validateGraph } from './engine'
 import { datasetExamples, datasetExamplesForNode, datasetForNode, datasetOutputValueForSlot, DATASET_OPTIONS } from './datasets'
-import { evaluateDataset, predictionNode, trainDataset, withDatasetExample } from './datasetTraining'
+import { evaluateDataset, predictionNode, supportsNumericBatches, trainDataset, trainingBatches, withDatasetExample } from './datasetTraining'
 import { createModelPreset } from './modelPresets'
 import { LESSONS } from '../learning/presets'
 import { createProjectStateFile, parseProjectStateFile } from './session'
@@ -13,6 +13,28 @@ import { parseCustomCsv } from './customCsv'
 import { tensorValue } from './tensor'
 
 describe('models built from palette primitives', () => {
+  it('forms fresh mini-batches without repeating or leaking examples', () => {
+    const indices = Array.from({ length: 13 }, (_, index) => index)
+    const first = trainingBatches(indices, 4, 0)
+    expect(first.map(batch => batch.length)).toEqual([4, 4, 4, 1])
+    expect(first.flat().sort((a, b) => a - b)).toEqual(indices)
+    expect(trainingBatches(indices, 4, 0)).toEqual(first)
+    expect(trainingBatches(indices, 4, 1)).not.toEqual(first)
+    expect(trainingBatches(indices, 4, 1, false).flat()).toEqual(indices)
+  })
+
+  it('can train a scalar preset with a mini-batch while preserving its inspected example', async () => {
+    const graph = createModelPreset('linear')
+    const data = graph.nodes.find(node => node.type === 'dataset')!
+    const original = structuredClone(data.params)
+    expect(supportsNumericBatches(data)).toBe(true)
+    const progress: number[] = []
+    const trained = await trainDataset(graph, data.id, 1, { batchSize: 4, progress: done => progress.push(done) })
+    expect(progress).toEqual([4, 8, 12, 15])
+    expect(trained.nodes.find(node => node.id === data.id)?.params).toEqual(original)
+    expect(Number.isFinite(evaluateDataset(trained, data.id, 'test').loss)).toBe(true)
+  })
+
   it('makes a reproducible, class-balanced train/test split for a custom CSV', () => {
     const data = createNode('dataset', 1)
     const rows = Array.from({ length: 24 }, (_, index) => `${index},${index < 12 ? 'A' : 'B'}`)
@@ -66,6 +88,11 @@ describe('models built from palette primitives', () => {
     const before = evaluateDataset(graph,data.id,'train')
     const trained = await trainDataset(graph,data.id,5)
     expect(evaluateDataset(trained,data.id,'train').loss).toBeLessThan(before.loss)
+    const progress: number[] = []
+    const miniBatched = await trainDataset(graph,data.id,1,{batchSize:4,progress:done=>progress.push(done)})
+    expect(progress).toEqual([4,8,12,15])
+    expect(evaluateDataset(miniBatched,data.id,'train').loss).toBeLessThan(before.loss)
+    expect(miniBatched.nodes.find(node=>node.id === data.id)?.params).toEqual(data.params)
     expect(evaluateDataset(trained,data.id,'test').examples).toBe(5)
     expect(trained.nodes.find(node=>node.id === column.id)?.value?.shape).toEqual([20,1])
     expect(resolveReshape([-1,2],12)).toEqual([6,2])
@@ -75,6 +102,8 @@ describe('models built from palette primitives', () => {
 
   it.each(['cnn','transformer'] as const)('executes, differentiates, trains and saves a %s with arbitrary IDs', async kind => {
     const {graph,datasetId} = scratchModel(kind)
+    expect(supportsNumericBatches(graph.nodes.find(node=>node.id === datasetId)!)).toBe(false)
+    await expect(trainDataset(graph,datasetId,1,{batchSize:2})).rejects.toThrow('one tensor example')
     expect(validateGraph(graph).filter(issue=>issue.code !== 'disconnected')).toEqual([])
     const forward = forwardPass(graph), backward = backwardPass(forward.graph)
     expect(predictionNode(forward.graph)?.value?.shape).toEqual(kind === 'cnn' ? [1,10] : [3,5])

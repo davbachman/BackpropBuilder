@@ -33,6 +33,8 @@
 .run-field input:not([type="range"]), .run-field select { width: 100%; min-width: 0; padding: 7px; border: 1px solid #ded6e7; border-radius: 7px; background: #fff; color: #443a50; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .run-field input[type="range"] { width: 100%; }
 .run-field > span { margin-top: -4px; font-weight: 400; }
+.run-field.run-checkbox { display: flex; align-items: center; gap: 8px; line-height: 1.35; }
+.run-field.run-checkbox input[type="checkbox"] { width: auto; margin: 0; padding: 0; accent-color: #7650aa; }
 .run-number-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .run-section-divider { height: 1px; margin: 19px 0; background: #e9e3ef; }
 .run-full-step, .run-epochs-button { width: 100%; }

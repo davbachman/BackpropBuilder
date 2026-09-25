@@ -12,7 +12,7 @@ Use **Edit → Undo**, Copy, Paste, and Duplicate while building. The app does n
 
 **File → Export Python file** downloads `backprop-builder-model.py`. **File → Export PyTorch notebook** downloads `backprop-builder-model.ipynb`. The export turns a supported connected graph into PyTorch tensor calculations with its current parameter values and dataset. A graph must have exactly one Dataset block, complete connections, and at most one Loss block. If it cannot be translated, the app shows an export error instead of a misleading file.
 
-The generated program is a starting point for experiments outside the visual app. It includes a small training loop when the graph has a loss and emits evaluation results. It is not a hosted training service or an export of the canvas layout.
+The generated program is a starting point for experiments outside the visual app. It includes a small training loop when the graph has a loss and emits evaluation results. The current **Train** settings carry over: batch size, reshuffling, epoch count, and reporting interval. At each report it evaluates training and held-out loss without updating parameters on the held-out examples, and plots both curves when Matplotlib is available. It is not a hosted training service or an export of the canvas layout.
 
 ## Open in Google Colab
 

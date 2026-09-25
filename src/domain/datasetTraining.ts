@@ -1,4 +1,4 @@
-import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputValueForSlot } from './datasets'
+import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputCountForNode, datasetOutputValueForSlot, datasetTargetSlotForNode } from './datasets'
 import { forwardPass, isLossNode, runTrainingStep } from './engine'
 import type { GraphModel, GraphNode } from './types'
 
@@ -10,6 +10,49 @@ export function withDatasetExample(graph: GraphModel, id: string, index: number)
 
 function withDatasetBatch(graph: GraphModel, id: string, split: 'train' | 'test'): GraphModel {
   return {...graph,nodes:graph.nodes.map(node=>node.id === id ? {...node,params:{...node.params,datasetSplit:split,datasetValues:undefined}} : node)}
+}
+
+/** A numeric batch is assembled from aligned feature and target rows. */
+export function supportsNumericBatches(source: GraphNode): boolean {
+  return datasetExamplesForNode(source).every(example =>
+    example.target.data.length === 1 && example.features.every(feature => feature.data.length === 1))
+}
+
+export function withDatasetIndices(graph: GraphModel, id: string, indices: number[]): GraphModel {
+  const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
+  if (!source) throw new Error('Choose a dataset block.')
+  if (!indices.length || !supportsNumericBatches(source)) throw new Error('This graph needs one tensor example per update; numeric mini-batches require scalar dataset columns.')
+  const examples = datasetExamplesForNode(source)
+  const targetSlot = datasetTargetSlotForNode(source)
+  const values = Array.from({ length: datasetOutputCountForNode(source) }, (_, slot) => ({
+    shape: [indices.length],
+    data: indices.map(index => {
+      const example = examples[index]
+      if (!example) throw new Error('A batch contains an unknown dataset example.')
+      const featureIndex = slot < targetSlot ? slot : slot - 1
+      return (slot === targetSlot ? example.target : example.features[featureIndex]).data[0]
+    }),
+  }))
+  return { ...graph, nodes: graph.nodes.map(node => node.id === id
+    ? { ...node, params: { ...node.params, datasetValues: values } }
+    : node) }
+}
+
+/** Returns each training example once per epoch, in fresh seeded order. */
+export function trainingBatches(indices: number[], batchSize: number, epoch: number, shuffle = true): number[][] {
+  if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error('Batch size must be a positive whole number.')
+  const order = [...indices]
+  if (shuffle) {
+    let seed = 42 + epoch
+    for (let i = order.length - 1; i > 0; i--) {
+      seed = (1664525 * seed + 1013904223) >>> 0
+      const j = Math.floor(seed / 4294967296 * (i + 1))
+      ;[order[i], order[j]] = [order[j], order[i]]
+    }
+  }
+  const batches: number[][] = []
+  for (let index = 0; index < order.length; index += batchSize) batches.push(order.slice(index, index + batchSize))
+  return batches
 }
 
 /** Discover the scores through the loss connection, independent of node names. */
@@ -72,31 +115,27 @@ function displayPrediction(value: number, categorical: boolean, classLabels?: st
 
 /** SGD traverses training examples only and restores the inspected example.
  * Yield between chunks so the canvas remains responsive and training can stop. */
-export async function trainDataset(graph: GraphModel, id: string, epochs: number, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void; epochOffset?: number } = {}): Promise<GraphModel> {
+export async function trainDataset(graph: GraphModel, id: string, epochs: number, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void; epochOffset?: number; batchSize?: number; shuffleEachEpoch?: boolean } = {}): Promise<GraphModel> {
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
   if (graph.nodes.filter(node => node.type === 'dataset').length !== 1) throw new Error('Use one dataset block to keep features and targets synchronized during training.')
   const indices = datasetExamplesForNode(source).flatMap((example, index) => example.split === 'train' ? [index] : [])
   if (!indices.length || !Number.isInteger(epochs) || epochs < 1) throw new Error('Choose training examples and a positive epoch count.')
-  const batch = datasetMode(source) === 'batch'
+  const batchSize = options.batchSize ?? (datasetMode(source) === 'batch' ? indices.length : 1)
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > indices.length) throw new Error(`Choose a batch size from 1 to ${indices.length}.`)
+  if (batchSize > 1 && !supportsNumericBatches(source)) throw new Error('This graph needs one tensor example per update; numeric mini-batches require scalar dataset columns.')
   let next = graph, done = 0
   for (let epoch = 0; epoch < epochs; epoch++) {
-    // Included image files are sorted by class. Shuffle each epoch so SGD
-    // doesn't forget earlier classes while processing a long run of one digit.
-    const order = [...indices]
-    let seed = 42 + (options.epochOffset ?? 0) + epoch
-    for (let i = order.length - 1; i > 0; i--) {
-      seed = (1664525 * seed + 1013904223) >>> 0
-      const j = Math.floor(seed / 4294967296 * (i + 1))
-      ;[order[i], order[j]] = [order[j], order[i]]
-    }
-    for (const index of batch ? order.slice(0,1) : order) {
+    for (const batch of trainingBatches(indices, batchSize, (options.epochOffset ?? 0) + epoch, options.shuffleEachEpoch ?? true)) {
       if (options.signal?.aborted) throw new Error('Training stopped; the previous parameters are unchanged.')
-      next = runTrainingStep(batch ? withDatasetBatch(next,id,'train') : withDatasetExample(next, id, index)).graph
+      const input = batch.length === 1 && datasetMode(source) === 'sample'
+        ? withDatasetExample(next, id, batch[0])
+        : withDatasetIndices(next, id, batch)
+      next = runTrainingStep(input).graph
       if (next.nodes.some(node => node.value?.data.some(value => !Number.isFinite(value)))) throw new Error('Training diverged. Lower the learning rate and try again.')
-      done += batch ? indices.length : 1
+      done += batch.length
       options.progress?.(done, epochs * indices.length)
-      if (batch || done % 4 === 0) await new Promise(resolve => setTimeout(resolve, 0))
+      if (batch.length > 1 || done % 4 === 0) await new Promise(resolve => setTimeout(resolve, 0))
     }
   }
   if (options.signal?.aborted) throw new Error('Training stopped; the previous parameters are unchanged.')

@@ -54,6 +54,19 @@ describe('PyTorch export', () => {
     expect(script).toContain('TRAIN_EPOCHS = 10')
   })
 
+  it('exports mini-batch and dual-loss reporting settings', () => {
+    const script = generatePyTorchExport(createModelPreset('linear'), { batchSize: 4, shuffleEachEpoch: false, epochs: 3, reportEvery: 2 }).script
+    expect(script).toContain('BATCH_MODE = EVALUATE_FULL_BATCH or BATCH_SIZE > 1')
+    expect(script).toContain('BATCH_SIZE = 4')
+    expect(script).toContain('train_loader = DataLoader(')
+    expect(script).toContain('SHUFFLE_EACH_EPOCH = False')
+    expect(script).toContain('TRAIN_EPOCHS = 3')
+    expect(script).toContain('REPORT_EVERY = 2')
+    expect(script).toContain('held_out_loss')
+    expect(script).toContain("label='Held-out (validation)'")
+    expect(() => generatePyTorchExport(createModelPreset('attention'), { batchSize: 4 })).toThrow('tensor-shaped dataset')
+  })
+
   it('exports a hand-built arithmetic graph with custom CSV columns', () => {
     const exported = generatePyTorchExport(customArithmeticGraph())
     expect(exported.script).toContain('Custom CSV · measurements.csv')
@@ -70,6 +83,14 @@ describe('PyTorch export', () => {
   })
 
   const python = process.env.PYTORCH_TEST_PYTHON
+  it.skipIf(!python)('runs the exported mini-batch loop and reports both losses', () => {
+    const script = generatePyTorchExport(createModelPreset('linear'), { batchSize: 4, epochs: 2, reportEvery: 1 }).script
+    const run = spawnSync(python!, ['-c', 'import sys; exec(sys.stdin.read())'], { input: script, encoding: 'utf8', timeout: 120_000, env: { ...process.env, MPLBACKEND: 'Agg' } })
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout).toContain('Epoch 2: train loss=')
+    expect(run.stdout).toContain('held-out loss=')
+  }, 120_000)
+
   it.skipIf(!python)('runs every preset in PyTorch and matches builder losses', () => {
     for (const { id: preset } of LESSONS) {
       const graph = createModelPreset(preset)

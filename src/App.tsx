@@ -61,7 +61,7 @@ import { GraphCanvas } from './components/GraphCanvas'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { LossReportPanel, type LossReport } from './components/LossReportPanel'
 import { InferenceReportPanel } from './components/InferenceReportPanel'
-import { evaluateDataset, trainDataset } from './domain/datasetTraining'
+import { evaluateDataset, supportsNumericBatches, trainDataset } from './domain/datasetTraining'
 import {
   copyGraphSelection,
   pasteGraphClipboard,
@@ -224,7 +224,10 @@ function App({
   const [epoch, setEpoch] = useState(0)
   const [epochsPerRun, setEpochsPerRun] = useState('10')
   const [reportEvery, setReportEvery] = useState('1')
+  const [batchSizeInput, setBatchSizeInput] = useState('')
+  const [shuffleEachEpoch, setShuffleEachEpoch] = useState(true)
   const [lossReports, setLossReports] = useState<LossReport[]>([])
+  const [reportingWarning, setReportingWarning] = useState<string>()
   const [isTraining, setIsTraining] = useState(false)
   const [trainingStatus, setTrainingStatus] = useState('')
   const trainingController = useRef<AbortController | null>(null)
@@ -624,8 +627,14 @@ function App({
 
   const epochCount = Number(epochsPerRun)
   const reportInterval = Number(reportEvery)
+  const trainingDataset = graph.nodes.find(node => node.type === 'dataset')
+  const trainingExampleCount = trainingDataset ? datasetExamplesForNode(trainingDataset).filter(example => example.split === 'train').length : 0
+  const defaultBatchSize = trainingDataset && datasetMode(trainingDataset) === 'batch' ? trainingExampleCount : 1
+  const batchSize = batchSizeInput === '' ? defaultBatchSize : Number(batchSizeInput)
+  const validBatchSize = !trainingDataset || (Number.isInteger(batchSize) && batchSize >= 1 && batchSize <= trainingExampleCount
+    && (batchSize === 1 || supportsNumericBatches(trainingDataset)))
   const validRunSettings = Number.isInteger(epochCount) && epochCount >= 1 && epochCount <= 100000
-    && Number.isInteger(reportInterval) && reportInterval >= 1 && reportInterval <= 100000
+    && Number.isInteger(reportInterval) && reportInterval >= 1 && reportInterval <= 100000 && validBatchSize
   const canRunEpochs = validRunSettings && blockingIssues.length === 0 && hasLoss && !isTraining
     && (!heldOutSample || graph.nodes.some(node => node.type === 'dataset'))
 
@@ -636,14 +645,30 @@ function App({
     setIsTraining(true)
     setIsPlaying(false)
     setTrainingStatus(`Training 0 / ${epochCount} epochs`)
+    setReportingWarning(undefined)
     pushHistory()
     let nextGraph = graph, completed = 0, lastReported = 0
     const startEpoch = epoch
-    const dataset = graph.nodes.find(node => node.type === 'dataset')
+    const dataset = trainingDataset
+    const hasHeldOut = dataset && datasetExamplesForNode(dataset).some(example => example.split === 'test')
     let lastLoss = currentLoss
-    const publish = () => {
-      const loss = dataset ? evaluateDataset(nextGraph, dataset.id, 'train').loss : lastLoss
+    const reportLosses = (sourceGraph: GraphModel, reportEpoch: number) => {
+      const loss = dataset ? evaluateDataset(sourceGraph, dataset.id, 'train').loss : lastLoss
       if (loss === null || loss === undefined || !Number.isFinite(loss)) throw new Error('Training diverged. Lower the learning rate and try again.')
+      let heldOutLoss: number | undefined
+      if (dataset && hasHeldOut) {
+        try { heldOutLoss = evaluateDataset(sourceGraph, dataset.id, 'test').loss }
+        catch (error) { setReportingWarning(`Held-out loss unavailable: ${error instanceof Error ? error.message : 'evaluation failed.'}`) }
+        if (heldOutLoss !== undefined && !Number.isFinite(heldOutLoss)) {
+          setReportingWarning('Held-out loss diverged. Reduce the learning rate or inspect the model inputs.')
+          heldOutLoss = undefined
+        } else if (heldOutLoss !== undefined) setReportingWarning(undefined)
+      }
+      setLossReports(reports => appendLossReport(reports, { epoch: reportEpoch, loss, heldOutLoss }))
+      return loss
+    }
+    const publish = () => {
+      const loss = reportLosses(nextGraph, startEpoch + completed)
       setGraph(nextGraph)
       setVisualizationGraph(nextGraph)
       setInferenceResult(undefined)
@@ -652,17 +677,19 @@ function App({
       setPhase('update')
       setEpoch(startEpoch + completed)
       setCurrentLoss(loss)
-      setLossReports(reports => appendLossReport(reports, { epoch: startEpoch + completed, loss }))
       lastReported = completed
     }
     try {
-      const initialLoss = dataset ? evaluateDataset(graph, dataset.id, 'train').loss : forwardPass(graph).loss
-      if (initialLoss !== undefined && Number.isFinite(initialLoss))
-        setLossReports(reports => appendLossReport(reports, { epoch: startEpoch, loss: initialLoss }))
+      if (dataset) reportLosses(graph, startEpoch)
+      else {
+        const initialLoss = forwardPass(graph).loss
+        if (initialLoss !== undefined && Number.isFinite(initialLoss))
+          setLossReports(reports => appendLossReport(reports, { epoch: startEpoch, loss: initialLoss }))
+      }
       for (let index = 0; index < epochCount; index++) {
         if (controller.signal.aborted) break
         if (dataset) {
-          nextGraph = await trainDataset(nextGraph, dataset.id, 1, { signal: controller.signal, epochOffset: startEpoch + index })
+          nextGraph = await trainDataset(nextGraph, dataset.id, 1, { signal: controller.signal, epochOffset: startEpoch + index, batchSize, shuffleEachEpoch })
         } else {
           const result = runTrainingStep(nextGraph)
           nextGraph = result.graph
@@ -690,7 +717,7 @@ function App({
       trainingController.current = null
       setIsTraining(false)
     }
-  }, [canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval])
+  }, [batchSize, canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset])
 
   const runInference = useCallback(() => {
     const dataset = graph.nodes.find(node => node.type === 'dataset')
@@ -1150,7 +1177,7 @@ function App({
     setExportNotice(undefined)
     setColabOpenUrl(undefined)
     try {
-      const exported = generatePyTorchExport(graph)
+      const exported = generatePyTorchExport(graph, { batchSize: batchSizeInput === '' ? undefined : Number(batchSizeInput), shuffleEachEpoch, epochs: epochCount, reportEvery: reportInterval })
       const blob = new Blob([format === 'notebook' ? exported.notebook : exported.script], {
         type: format === 'notebook' ? 'application/x-ipynb+json' : 'text/x-python',
       })
@@ -1214,7 +1241,7 @@ function App({
     setExportNotice(undefined)
     setColabOpenUrl(undefined)
     let notebook: string
-    try { notebook = generatePyTorchExport(graph).notebook }
+    try { notebook = generatePyTorchExport(graph, { batchSize: batchSizeInput === '' ? undefined : Number(batchSizeInput), shuffleEachEpoch, epochs: epochCount, reportEvery: reportInterval }).notebook }
     catch (error) { setImportError(error instanceof Error ? error.message : 'Could not export this model to PyTorch.'); return }
     const colabTab = window.open('about:blank', '_blank')
     if (colabTab) {
@@ -1597,6 +1624,12 @@ function App({
             <label className="run-field">Epochs per run<input type="number" min="1" max="100000" step="1" value={epochsPerRun} onChange={event => setEpochsPerRun(event.target.value)} /></label>
             <label className="run-field">Report loss every<input type="number" min="1" max="100000" step="1" value={reportEvery} onChange={event => setReportEvery(event.target.value)} /><span>epochs</span></label>
           </div>
+          {trainingDataset ? <>
+            <label className="run-field">Examples per update<input type="number" min="1" max={trainingExampleCount} step="1" value={batchSizeInput} placeholder={String(defaultBatchSize)} onChange={event => setBatchSizeInput(event.target.value)} disabled={isTraining} /></label>
+            <p className="run-intro">Batch size {validBatchSize ? batchSize : '—'} of {trainingExampleCount} training examples for Run epochs. Leave blank to use the Dataset’s current output mode; Step follows the canvas example.</p>
+            <label className="run-field run-checkbox"><input type="checkbox" checked={shuffleEachEpoch} onChange={event => setShuffleEachEpoch(event.target.checked)} disabled={isTraining} /> Reshuffle training examples each epoch</label>
+            {!validBatchSize && <p className="run-status" role="alert">{batchSize > 1 && !supportsNumericBatches(trainingDataset) ? 'This tensor-shaped dataset currently trains one example at a time. A larger batch needs a graph built with a batch dimension.' : `Choose a batch size from 1 to ${trainingExampleCount}.`}</p>}
+          </> : null}
           {isTraining ? <button type="button" className="run-epochs-button" onClick={() => trainingController.current?.abort()}>Stop training</button>
             : <button type="button" className="run-epochs-button primary-button" aria-keyshortcuts="Shift+Enter" onClick={() => void runEpochs()} disabled={!canRunEpochs}>Run {validRunSettings ? epochCount : '—'} {epochCount === 1 ? 'epoch' : 'epochs'} <kbd aria-hidden="true">⇧ Return</kbd></button>}
           <label className="run-field">Learning rate · η = {graph.learningRate.toFixed(graph.learningRate < 0.01 ? 3 : 2)}<input type="range" min="0.001" max="0.5" step="0.001" value={graph.learningRate} onChange={event => updateLearningRate(Number(event.target.value))} disabled={isTraining} /></label>
@@ -1825,7 +1858,7 @@ function App({
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}
         </div>
         <div className="right-panel-scroll right-visualization-scroll" hidden={rightTab !== 'visualization'} role="tabpanel" aria-label="Model reporting">
-          {rightTab === 'visualization' ? <><VisualizationPanel graph={visualizationGraph} /><LossReportPanel reports={lossReports} />{inferenceResult && <InferenceReportPanel metrics={inferenceResult.metrics} split={inferenceResult.split} task={graph.nodes.find(node => node.type === 'dataset') ? datasetForNode(graph.nodes.find(node => node.type === 'dataset')!).task : undefined} />}</> : null}
+          {rightTab === 'visualization' ? <><VisualizationPanel graph={visualizationGraph} /><LossReportPanel reports={lossReports} warning={reportingWarning} />{inferenceResult && <InferenceReportPanel metrics={inferenceResult.metrics} split={inferenceResult.split} task={graph.nodes.find(node => node.type === 'dataset') ? datasetForNode(graph.nodes.find(node => node.type === 'dataset')!).task : undefined} />}</> : null}
         </div>
       </aside>
     </main>
