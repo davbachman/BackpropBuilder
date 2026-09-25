@@ -69,6 +69,7 @@ export interface NodeParams {
   datasetMode?: 'sample' | 'batch'
   datasetIndex?: number
   datasetSplit?: 'all' | 'train' | 'test'
+  trainPercent?: number
   /** An editable experiment supplied by the dataset, e.g. a token prompt. */
   datasetValues?: TensorValue[]
   inputCount?: number

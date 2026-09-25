@@ -1,4 +1,4 @@
-import { DATASET_OPTIONS, datasetExamples, datasetExampleIndex, datasetForNode, datasetMode } from './datasets'
+import { DATASET_OPTIONS, datasetExamplesForNode, datasetExampleIndex, datasetForNode, datasetMode } from './datasets'
 import { forwardPass, isLossNode, runTrainingStep } from './engine'
 import { toTensor } from './tensor'
 import type { DatasetKind, GraphModel } from './types'
@@ -71,7 +71,7 @@ export function graphWithDatasetSample(graph: GraphModel, dataset: ModelDataset,
 export function isHeldOutSample(graph: GraphModel): boolean {
   const sources = graph.nodes.filter(node => node.type === 'dataset')
   if (sources.length) return sources.some(node => !node.params.datasetValues && (datasetMode(node) === 'sample'
-    ? datasetExamples(datasetForNode(node))[datasetExampleIndex(node)].split === 'test'
+    ? datasetExamplesForNode(node)[datasetExampleIndex(node)].split === 'test'
     : node.params.datasetSplit !== 'train'))
   const digitId = graph.groups?.find(group => group.id === 'features')?.detail?.sampleId
   const digit = typeof digitId === 'string' ? CNN_DIGITS.find(sample => sample.id === digitId) : undefined

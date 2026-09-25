@@ -177,8 +177,43 @@ export function datasetForNode(node: GraphNode): ToyDataset {
 export function datasetExamples(dataset: ToyDataset): DatasetExample[] {
   return dataset.examples ?? dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task.includes('classification') ? [1] : [], [target]) }))
 }
+const splitCache = new WeakMap<ToyDataset, Map<number, DatasetExample[]>>()
+/** An optional, deterministic split overrides the included examples' default
+ * split. Classification examples are divided within each class. */
+export function datasetExamplesForNode(node: GraphNode): DatasetExample[] {
+  const dataset = datasetForNode(node)
+  const percent = node.params.trainPercent
+  if (percent === undefined) return datasetExamples(dataset)
+  const cached = !dataset.examples && splitCache.get(dataset)?.get(percent)
+  if (cached) return cached
+  const examples = datasetExamples(dataset)
+  const groups = new Map<string, number[]>()
+  examples.forEach((example, index) => {
+    const key = dataset.task.includes('classification') ? String(example.target.data[0]) : 'all'
+    groups.set(key, [...(groups.get(key) ?? []), index])
+  })
+  const training = new Set<number>()
+  for (const [key, indexes] of groups) {
+    const shuffled = [...indexes]
+    let seed = [...key].reduce((value, character) => Math.imul(value ^ character.charCodeAt(0), 16777619) >>> 0, 2166136261)
+    for (let index = shuffled.length - 1; index > 0; index--) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      const swap = seed % (index + 1)
+      ;[shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]]
+    }
+    const trainCount = shuffled.length === 1 ? 1 : Math.max(1, Math.min(shuffled.length - 1, Math.round(shuffled.length * percent / 100)))
+    shuffled.slice(0, trainCount).forEach(index => training.add(index))
+  }
+  const split = examples.map((example, index) => ({ ...example, split: training.has(index) ? 'train' as const : 'test' as const }))
+  if (!dataset.examples) {
+    const byPercent = splitCache.get(dataset) ?? new Map<number, DatasetExample[]>()
+    byPercent.set(percent, split)
+    splitCache.set(dataset, byPercent)
+  }
+  return split
+}
 export function datasetExampleIndex(node: GraphNode): number {
-  return Math.min(datasetExamples(datasetForNode(node)).length - 1, Math.max(0, node.params.datasetIndex ?? 0))
+  return Math.min(datasetExamplesForNode(node).length - 1, Math.max(0, node.params.datasetIndex ?? 0))
 }
 export function datasetMode(node: GraphNode): 'sample' | 'batch' {
   return datasetForNode(node).examples ? 'sample' : node.params.datasetMode ?? 'batch'
@@ -200,7 +235,7 @@ export function datasetOutputLabelForSlot(node: GraphNode, slot: number): string
 }
 export function datasetOutputValueForSlot(node: GraphNode, slot: number): TensorValue {
   if (node.params.datasetValues?.[slot]) return node.params.datasetValues[slot]
-  const dataset = datasetForNode(node), examples = datasetExamples(dataset)
+  const examples = datasetExamplesForNode(node)
   const targetSlot = datasetTargetSlotForNode(node)
   const featureSlot = slot < targetSlot ? slot : slot - 1
   const fromExample = (example: DatasetExample) => slot === targetSlot ? example.target : example.features[featureSlot] ?? example.target

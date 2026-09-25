@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { scratchModel } from '../test/scratchModels'
 import { backwardPass, forwardPass, parameterValues, runTrainingStep, validateGraph } from './engine'
-import { datasetExamples, datasetForNode, datasetOutputValueForSlot, DATASET_OPTIONS } from './datasets'
+import { datasetExamples, datasetExamplesForNode, datasetForNode, datasetOutputValueForSlot, DATASET_OPTIONS } from './datasets'
 import { evaluateDataset, predictionNode, trainDataset, withDatasetExample } from './datasetTraining'
 import { createModelPreset } from './modelPresets'
 import { LESSONS } from '../learning/presets'
@@ -9,8 +9,52 @@ import { createProjectStateFile, parseProjectStateFile } from './session'
 import { createEmptyGraph, createNode } from './examples'
 import { connectGraphNodes } from './graphEditing'
 import { resolveReshape } from './reshape'
+import { parseCustomCsv } from './customCsv'
+import { tensorValue } from './tensor'
 
 describe('models built from palette primitives', () => {
+  it('makes a reproducible, class-balanced train/test split for a custom CSV', () => {
+    const data = createNode('dataset', 1)
+    const rows = Array.from({ length: 24 }, (_, index) => `${index},${index < 12 ? 'A' : 'B'}`)
+    data.params = { dataset: 'custom-csv', customCsv: parseCustomCsv(`feature,label\n${rows.join('\n')}\n`, 'classes.csv'), datasetMode: 'batch', trainPercent: 75 }
+    const examples = datasetExamplesForNode(data)
+    expect(examples.map(example => example.split)).toEqual(datasetExamplesForNode(data).map(example => example.split))
+    for (const label of [0, 1]) {
+      const matching = examples.filter(example => example.target.data[0] === label)
+      expect(matching.filter(example => example.split === 'train')).toHaveLength(9)
+      expect(matching.filter(example => example.split === 'test')).toHaveLength(3)
+    }
+    expect(datasetOutputValueForSlot({ ...data, params: { ...data.params, datasetSplit: 'train' } }, 0).shape).toEqual([18])
+    expect(datasetOutputValueForSlot({ ...data, params: { ...data.params, datasetSplit: 'test' } }, 0).shape).toEqual([6])
+  })
+
+  it('scores held-out classes from raw logits without a Softmax or Argmax block', () => {
+    const csv = parseCustomCsv('x,label\n-4,A\n-3,A\n-2,A\n-1,A\n1,B\n2,B\n3,B\n4,B\n', 'binary.csv')
+    const graph = createEmptyGraph()
+    graph.nodes = [
+      { id: 'data', type: 'dataset', label: 'Dataset', position: { x: 0, y: 0 }, params: { dataset: 'custom-csv', customCsv: csv, datasetMode: 'batch', trainPercent: 75 } },
+      { id: 'column', type: 'reshape', label: 'Column', position: { x: 100, y: 0 }, params: { shape: [-1, 1] } },
+      { id: 'weights', type: 'weight', label: 'Weights', position: { x: 100, y: 150 }, params: { value: tensorValue([1, 2], [-1, 1]) } },
+      { id: 'logits', type: 'matmul', label: 'Logits', position: { x: 250, y: 0 }, params: {} },
+      { id: 'target', type: 'target', label: 'Target', position: { x: 250, y: 150 }, params: {} },
+      { id: 'loss', type: 'loss', label: 'Cross entropy', position: { x: 400, y: 0 }, params: { loss: 'cross-entropy' } },
+    ]
+    graph.edges = [
+      { id: 'feature', source: 'data', sourceSlot: 0, target: 'column', inputSlot: 0 },
+      { id: 'column-logits', source: 'column', target: 'logits', inputSlot: 0 },
+      { id: 'weights-logits', source: 'weights', target: 'logits', inputSlot: 1 },
+      { id: 'label', source: 'data', sourceSlot: 1, target: 'target', inputSlot: 0 },
+      { id: 'prediction', source: 'logits', target: 'loss', inputSlot: 0 },
+      { id: 'target-loss', source: 'target', target: 'loss', inputSlot: 1 },
+    ]
+    const test = evaluateDataset(graph, 'data', 'test')
+    expect(test.accuracy).toBe(1)
+    expect(test.predictions).toBe(test.examples)
+    expect(test.examples).toBe(2)
+    expect(test.rows).toHaveLength(2)
+    expect(test.rows.every(row => row.actual === row.predicted && row.correct)).toBe(true)
+    expect(new Set(test.rows.map(row => row.predicted))).toEqual(new Set(['A', 'B']))
+  })
   it('trains numeric batches with an inferred reshape dimension across train/test splits', async () => {
     let graph = createEmptyGraph()
     graph.learningRate = .03

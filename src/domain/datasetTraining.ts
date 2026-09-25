@@ -1,4 +1,4 @@
-import { datasetExamples, datasetForNode, datasetMode, datasetOutputValueForSlot } from './datasets'
+import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputValueForSlot } from './datasets'
 import { forwardPass, isLossNode, runTrainingStep } from './engine'
 import type { GraphModel, GraphNode } from './types'
 
@@ -19,15 +19,18 @@ export function predictionNode(graph: GraphModel): GraphNode | undefined {
   return graph.nodes.find(node => node.id === edge?.source)
 }
 
-export interface DatasetMetrics { loss: number; accuracy?: number; examples: number; predictions: number }
+export interface DatasetPrediction { example: string; actual: string; predicted: string; correct?: boolean }
+export interface DatasetMetrics { loss: number; accuracy?: number; examples: number; predictions: number; rows: DatasetPrediction[] }
 
 export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 'test'): DatasetMetrics {
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
-  const examples = datasetExamples(datasetForNode(source))
+  const dataset = datasetForNode(source)
+  const examples = datasetExamplesForNode(source)
   const batch = datasetMode(source) === 'batch'
   const indices = examples.flatMap((example,index)=>example.split === split ? [index] : [])
   let loss = 0, count = 0, correct = 0, predictions = 0
+  const rows: DatasetPrediction[] = []
   for (const index of batch ? indices.slice(0,1) : indices) {
     const result = forwardPass(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index))
     if (result.loss === undefined || !Number.isFinite(result.loss)) throw new Error('Connect predictions and dataset targets to a loss before evaluating.')
@@ -38,19 +41,33 @@ export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 
     const targetEdge = result.graph.edges.find(edge => edge.target === lossNode.id && edge.inputSlot === 1)
     const targetNode = result.graph.nodes.find(node => node.id === targetEdge?.source)
     const target = targetNode?.type === 'dataset' ? datasetOutputValueForSlot(targetNode, targetEdge?.sourceSlot ?? 0) : targetNode?.value
-    if (output && target && (lossNode.type === 'cross-entropy' || (lossNode.type === 'loss' && lossNode.params.loss === 'cross-entropy'))) {
-      const width = output.shape.at(-1)!
-      target.data.forEach((label, row) => {
+    const categorical = dataset.task.includes('classification') || dataset.task === 'sequence' || lossNode.type === 'cross-entropy' || lossNode.params.loss === 'cross-entropy'
+    const width = output && target ? output.data.length / target.data.length : 0
+    if (output && target && Number.isInteger(width) && width >= 1 && (width === 1 || output.shape.at(-1) === width)) {
+      target.data.forEach((actual, row) => {
         const scores = output.data.slice(row * width, (row + 1) * width)
-        correct += Number(scores.indexOf(Math.max(...scores)) === label)
-        predictions++
+        const predicted = categorical && width > 1 ? scores.indexOf(Math.max(...scores))
+          : dataset.task === 'binary-classification' ? Number(scores[0] >= .5) : scores[0]
+        const scored = categorical && (width > 1 || dataset.task === 'binary-classification')
+        const matched = scored ? predicted === actual : undefined
+        if (matched !== undefined) { correct += Number(matched); predictions++ }
+        const exampleIndex = batch ? indices[row] : index
+        rows.push({
+          example: `${examples[exampleIndex]?.label ?? `Example ${exampleIndex + 1}`}${target.data.length > 1 && !batch ? ` · output ${row + 1}` : ''}`,
+          actual: displayPrediction(actual, scored, dataset.classLabels, dataset.vocabulary),
+          predicted: displayPrediction(predicted, scored, dataset.classLabels, dataset.vocabulary),
+          ...(matched === undefined ? {} : { correct: matched }),
+        })
       })
-    } else if (output && target && datasetForNode(source).task === 'binary-classification') {
-      target.data.forEach((label, row) => { correct += Number(Number(output.data[row] >= .5) === label); predictions++ })
     }
   }
   if (!count) throw new Error(`This dataset has no ${split} examples.`)
-  return { loss: loss / count, examples: indices.length, predictions, accuracy: predictions ? correct / predictions : undefined }
+  return { loss: loss / count, examples: indices.length, predictions, rows, accuracy: predictions ? correct / predictions : undefined }
+}
+
+function displayPrediction(value: number, categorical: boolean, classLabels?: string[], vocabulary?: string[]): string {
+  if (categorical) return classLabels?.[value] ?? vocabulary?.[value] ?? String(value)
+  return Number(value.toPrecision(5)).toString()
 }
 
 /** SGD traverses training examples only and restores the inspected example.
@@ -59,7 +76,7 @@ export async function trainDataset(graph: GraphModel, id: string, epochs: number
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
   if (graph.nodes.filter(node => node.type === 'dataset').length !== 1) throw new Error('Use one dataset block to keep features and targets synchronized during training.')
-  const indices = datasetExamples(datasetForNode(source)).flatMap((example, index) => example.split === 'train' ? [index] : [])
+  const indices = datasetExamplesForNode(source).flatMap((example, index) => example.split === 'train' ? [index] : [])
   if (!indices.length || !Number.isInteger(epochs) || epochs < 1) throw new Error('Choose training examples and a positive epoch count.')
   const batch = datasetMode(source) === 'batch'
   let next = graph, done = 0

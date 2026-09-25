@@ -224,6 +224,7 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.datasetMode === undefined || value.datasetMode === 'sample' || value.datasetMode === 'batch') &&
     isOptionalNonNegativeInteger(value.datasetIndex) &&
     (value.datasetSplit === undefined || ['all', 'train', 'test'].includes(String(value.datasetSplit))) &&
+    (value.trainPercent === undefined || (typeof value.trainPercent === 'number' && Number.isInteger(value.trainPercent) && value.trainPercent >= 1 && value.trainPercent <= 99)) &&
     (value.datasetValues === undefined || (Array.isArray(value.datasetValues) && value.datasetValues.every(isTensorValue))) &&
     isOptionalNonNegativeInteger(value.inputCount) &&
     (value.expression === undefined || typeof value.expression === 'string') &&
