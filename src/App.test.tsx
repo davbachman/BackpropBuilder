@@ -1221,7 +1221,24 @@ describe('Backprop Builder app', () => {
     await chooseFileMenuItem(user, /^Starter$/i)
 
     expect(screen.queryByText('Selected node')).not.toBeInTheDocument()
-    expect(screen.getByText(/Formula/i)).toBeInTheDocument()
+    expect(screen.queryByText('Mini calculation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Choose a node or press Step.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Numbers will appear here as each node evaluates.')).not.toBeInTheDocument()
+  })
+
+  it('shows only step-specific numbers and the backward derivative', () => {
+    render(<App initialGraph={createStarterGraph()} />)
+    expect(screen.queryByText('Mini calculation')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
+    expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
+    expect(screen.getByText('2.000 * 0.500 = 1.000')).toBeInTheDocument()
+    expect(screen.queryByText('Derivative')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run forward' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
+    expect(screen.getByRole('heading', { name: /Backpropagate through/ })).toBeInTheDocument()
+    expect(screen.getByText('Derivative')).toBeInTheDocument()
   })
 
   it('highlights the selected graph node with the selected highlight class', async () => {

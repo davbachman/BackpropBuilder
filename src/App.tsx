@@ -66,7 +66,6 @@ import {
   datasetOutputValueForSlot,
   formatNumber,
   forwardPass,
-  formulaForNode,
   parameterValues,
   runTrainingStep,
   remapDatasetOutputSlot,
@@ -225,7 +224,6 @@ function App({
     !selectedGroupId && selectedNodeIds.length === 1
       ? selectedNodeIds[0]
       : undefined
-  const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId)
   const traceGraph = useMemo(
     () => visibleGraphForTrace(graph, traceSteps, traceIndex, phase),
     [graph, phase, traceIndex, traceSteps],
@@ -1470,22 +1468,13 @@ function App({
         <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>
-          <div className="formula-box">
-            <strong>Formula</strong>
-            <span>
-              {activeStep?.formula ??
-                (selectedNode
-                  ? formulaForNode(selectedNode, graph)
-                  : 'Choose a node or press Step.')}
-            </span>
-          </div>
-          <div className="formula-box">
-            <strong>Mini calculation</strong>
-            <span>
-              {activeStep?.calculation ??
-                'Numbers will appear here as each node evaluates.'}
-            </span>
-          </div>
+          {activeStep && <div className="formula-box">
+            {activeStep.phase === 'backward' && <>
+              <strong>Derivative</strong>
+              <span>{activeStep.formula}</span>
+            </>}
+            <span>{activeStep.calculation}</span>
+          </div>}
         </section>
         </div>
         <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
