@@ -42,7 +42,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Reporting' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Show visualization|Hide visualization/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Randomize parameters/i })).not.toBeInTheDocument()
     expect(screen.getByText(/Build the model/i)).toBeInTheDocument()
     expect(screen.getByText(/Graph canvas/i)).toBeInTheDocument()
     expect(screen.queryByText(/^Inspector$/i)).not.toBeInTheDocument()
@@ -55,6 +55,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('tab', { name: 'Train' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Test' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Step$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step backward/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step forward/i })).not.toBeInTheDocument()
@@ -112,6 +113,23 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('button', { name: /Load starter example/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Save state/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Import state/i })).not.toBeInTheDocument()
+  })
+
+  it('opens About and links the title menu to the GitHub README', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const title = screen.getByRole('button', { name: 'Backprop Builder' })
+    await user.click(title)
+    const menu = screen.getByRole('menu', { name: 'Backprop Builder' })
+    const reference = within(menu).getByRole('menuitem', { name: /Reference/i })
+    expect(reference).toHaveAttribute('href', 'https://github.com/davbachman/BackpropBuilder#readme')
+    expect(reference).toHaveAttribute('target', '_blank')
+    await user.click(within(menu).getByRole('menuitem', { name: 'About' }))
+    const dialog = screen.getByRole('dialog', { name: 'About Backprop Builder' })
+    expect(dialog).toHaveTextContent('Created by David Bachman with Codex')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'About Backprop Builder' })).not.toBeInTheDocument()
   })
 
   it('puts selection editing in the Edit menu while keeping Details focused on the block', async () => {

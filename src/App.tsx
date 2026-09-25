@@ -188,6 +188,8 @@ function App({
   const [traceIndex, setTraceIndex] = useState(0)
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false)
   const [isEditMenuOpen, setIsEditMenuOpen] = useState(false)
+  const [isAppMenuOpen, setIsAppMenuOpen] = useState(false)
+  const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const runCanvasAction = useCallback((action: () => void) => {
     setExecutionError(undefined)
@@ -1162,16 +1164,23 @@ function App({
     action()
   }
 
+  const closeAbout = () => {
+    setIsAboutOpen(false)
+    window.setTimeout(() => document.getElementById('app-menu-trigger')?.focus(), 0)
+  }
+
   useEffect(() => {
     const closeOnPointerDown = (event: PointerEvent) => {
       if (event.target instanceof Element && event.target.closest('.topbar-menu')) return
       setIsFileMenuOpen(false)
       setIsEditMenuOpen(false)
+      setIsAppMenuOpen(false)
     }
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       setIsFileMenuOpen(false)
       setIsEditMenuOpen(false)
+      setIsAppMenuOpen(false)
     }
     document.addEventListener('pointerdown', closeOnPointerDown)
     document.addEventListener('keydown', closeOnEscape)
@@ -1246,11 +1255,20 @@ function App({
       style={{ '--left-size': leftOpen ? `${leftWidth}px` : '42px', '--right-size': rightOpen ? `${rightWidth}px` : '42px' } as CSSProperties}
     >
       <header className="top-bar">
-        <div className="top-brand">
-          <div className="brand-mark">BB</div>
-          <div>
-            <h1>Backprop Builder</h1>
-          </div>
+        <div className="top-brand topbar-menu">
+          <div className="brand-mark" aria-hidden="true">BB</div>
+          <h1><button
+            id="app-menu-trigger"
+            type="button"
+            className="brand-menu-button"
+            aria-haspopup="menu"
+            aria-expanded={isAppMenuOpen}
+            onClick={() => { setIsFileMenuOpen(false); setIsEditMenuOpen(false); setIsAppMenuOpen(open => !open) }}
+          >Backprop Builder <ChevronDown size={15} aria-hidden="true" /></button></h1>
+          {isAppMenuOpen ? <div className="topbar-menu-panel app-menu-panel" role="menu" aria-label="Backprop Builder">
+            <button type="button" role="menuitem" onClick={() => { setIsAppMenuOpen(false); setIsAboutOpen(true) }}>About</button>
+            <a role="menuitem" href="https://github.com/davbachman/BackpropBuilder#readme" target="_blank" rel="noopener noreferrer" onClick={() => setIsAppMenuOpen(false)}>Reference <ExternalLink size={14} aria-hidden="true" /></a>
+          </div> : null}
         </div>
 
         <div className="top-actions">
@@ -1286,7 +1304,7 @@ function App({
               className="topbar-button"
               aria-haspopup="menu"
               aria-expanded={isFileMenuOpen}
-              onClick={() => { setIsEditMenuOpen(false); setIsFileMenuOpen((open) => !open) }}
+              onClick={() => { setIsEditMenuOpen(false); setIsAppMenuOpen(false); setIsFileMenuOpen((open) => !open) }}
             >
               File
               <ChevronDown size={15} />
@@ -1347,7 +1365,7 @@ function App({
               className="topbar-button"
               aria-haspopup="menu"
               aria-expanded={isEditMenuOpen}
-              onClick={() => { setIsFileMenuOpen(false); setIsEditMenuOpen((open) => !open) }}
+              onClick={() => { setIsFileMenuOpen(false); setIsAppMenuOpen(false); setIsEditMenuOpen((open) => !open) }}
             >
               Edit
               <ChevronDown size={15} />
@@ -1369,14 +1387,6 @@ function App({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="topbar-button"
-            onClick={randomizeParameters}
-          >
-            <Shuffle size={16} />
-            Randomize parameters
-          </button>
           <input
             ref={importInputRef}
             type="file"
@@ -1393,6 +1403,23 @@ function App({
           {exportNotice ? <p className="export-notice" role="status">{exportNotice}</p> : null}
         </div>
       </header>
+
+      {isAboutOpen ? <div className="about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) closeAbout() }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="about-title" aria-describedby="about-description" className="about-dialog" onKeyDown={event => {
+          if (event.key === 'Escape') { event.preventDefault(); closeAbout() }
+          if (event.key !== 'Tab') return
+          const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')]
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}>
+          <div className="about-dialog-mark" aria-hidden="true">BB</div>
+          <h2 id="about-title">About Backprop Builder</h2>
+          <p id="about-description">Created by David Bachman with Codex. Build and explore machine-learning models from individual calculations through neural networks, attention, and transformers.</p>
+          <p>Learn more about <a href="https://pzacad.pitzer.edu/~dbachman/" target="_blank" rel="noopener noreferrer">David Bachman</a> and his AI podcast, <a href="https://profbachman.substack.com/" target="_blank" rel="noopener noreferrer"><em>Entropy Bonus</em></a>.</p>
+          <button type="button" autoFocus onClick={closeAbout}>Close</button>
+        </section>
+      </div> : null}
 
       {csvPickerOpen && <div className="csv-picker-backdrop">
         <section role="dialog" aria-modal="true" aria-labelledby="csv-picker-title" className="csv-picker-dialog" onKeyDown={event => { if (event.key === 'Escape') { pendingCustomCsvNodeId.current = undefined; setCsvPickerOpen(false) } }}>
@@ -1461,6 +1488,7 @@ function App({
           <label className="run-field">Playback speed<input type="range" min={MIN_PLAY_DELAY_MS} max={MAX_PLAY_DELAY_MS} step="50" value={speedSliderValue} onChange={event => setSpeedSliderValue(Number(event.target.value))} /></label>
           <div className="run-section-divider" />
           <p className="eyebrow">Train the model</p>
+          <button type="button" className="run-full-step randomize-button" onClick={randomizeParameters} disabled={isTraining}><Shuffle size={15} /> Randomize parameters</button>
           <button type="button" className="run-full-step" onClick={() => runCanvasAction(runOneTrainingStep)} disabled={blockingIssues.length > 0 || !hasLoss || heldOutSample || isTraining}><FastForward size={15} /> Run one full training step</button>
           <div className="run-number-grid">
             <label className="run-field">Epochs per run<input type="number" min="1" max="100000" step="1" value={epochsPerRun} onChange={event => setEpochsPerRun(event.target.value)} /></label>

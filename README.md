@@ -1,28 +1,25 @@
+Created by David Bachman with Codex
+
 # Backprop Builder
 
-[Open the app](https://davbachman.github.io/BackpropBuilder/)
+[Open Backprop Builder](https://davbachman.github.io/BackpropBuilder/)
 
-Created by David Bachman with GPT 5.5. To learn more about David see https://pzacad.pitzer.edu/~dbachman/, and subscribe to his AI podcast *Entropy Bonus* at https://profbachman.substack.com/.
+Backprop Builder is a visual, editable machine-learning workbench for students. Start with a blank canvas, connect individual calculations into a model, and watch values move forward and gradients move backward. Group calculations into neurons, layers, attention heads, or larger modules, then zoom between those scales. You can train and test on built-in or imported data and export a working PyTorch version of a supported graph.
 
-## Brief description
-BackpropBuilder is an editable neural-network canvas. It opens to a blank builder, where students can create models from individual calculations. Zoom from a complete model into layers, neurons, and calculations; watch values flow forward and gradients flow backward. Importable example files include dataset-backed regression and classification, attention, a working two-block transformer, and an 8×8 handwritten-digit CNN with editable filters and feature maps.
+## Guide
 
-## Instructions for use
-Run `npm install` and `npm run dev`, then open the displayed local URL. Build on the blank canvas, or [download a model JSON file](https://github.com/davbachman/BackpropBuilder/tree/main/public/models) and choose **File → Import**. Click a wire for its values, or a calculation to edit its parameters. Group a neuron and copy it into a larger network. **File → Save** downloads the working graph as JSON for later import.
+| Page | What it covers |
+| --- | --- |
+| [Get started](docs/USAGE.md) | A first model, the sidebars, and the route from blank canvas to a training run |
+| [Canvas and navigation](docs/CANVAS.md) | Adding, connecting, moving, grouping, zooming, and using the code outline |
+| [Block reference](docs/BLOCKS.md) | Every block in the palette, its inputs, and common tensor shapes |
+| [Build models from scratch](docs/BUILDING-MODELS.md) | Recipes for an MLP, attention, a transformer block, and a digit CNN |
+| [Datasets](docs/DATASETS.md) | Built-in data, custom CSVs, feature and target wiring, batches, and train/test splits |
+| [Training, testing, and reports](docs/TRAINING.md) | Backpropagation, epoch runs, inference, predictions, accuracy, and troubleshooting |
+| [Example models and lessons](docs/EXAMPLES.md) | Importable projects from a neuron through attention, a transformer, and a digit CNN |
+| [Saving and exporting](docs/FILES-AND-EXPORT.md) | Project JSON, PyTorch files and notebooks, and the Colab workflow |
+| [Development](docs/DEVELOPMENT.md) | Local setup, checks, model generation, and dataset attribution |
 
-See the [usage guide](docs/USAGE.md) for lesson workflows and the [validation report](docs/VALIDATION.md) for verified behavior and remaining limits. The decoder learns only a synthetic repeating color sequence; it does not understand ordinary language.
+The [importable model files](public/models/README.md) are editable projects made with the same blocks as the blank canvas. The full decoder is a small synthetic sequence model, and the image classifier uses UCI 8×8 digits rather than MNIST.
 
-## Development
-
-```sh
-npm test
-npm run build
-npm run lint
-npm run export:models
-npm run train:decoder
-node --experimental-strip-types scripts/train-cnn.ts
-```
-
-Checkpoint training requires Node.js with native TypeScript stripping (tested on Node 25). The deterministic script exports the bundled initial/trained checkpoints and `public/checkpoints/mini-decoder.json`. Normal app use needs no account, server inference, or large model download.
-
-The digit model uses the UCI optical-recognition dataset, not MNIST; see [dataset attribution and CNN reproduction](docs/CNN-DATA.md).
+Learn more about [David Bachman](https://pzacad.pitzer.edu/~dbachman/) and his AI podcast, [*Entropy Bonus*](https://profbachman.substack.com/).
