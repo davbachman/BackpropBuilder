@@ -100,6 +100,32 @@ describe('scratch model authoring controls',()=>{
     expect(disclosure).toHaveTextContent('Value')
   })
 
+  it('renames a selected block from its title, without the old selection heading',()=>{
+    const node=createNode('weight',1), onRename=vi.fn()
+    render(<ModelInspector {...callbacks} graph={{nodes:[node],edges:[],learningRate:.01}} node={node} onRename={onRename}/>)
+    expect(screen.queryByText('Selected block')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rename block')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Rename Param 1'}))
+    const name=screen.getByRole('textbox',{name:'Block name'})
+    fireEvent.change(name,{target:{value:'Kernel'}})
+    fireEvent.keyDown(name,{key:'Enter'})
+    expect(onRename).toHaveBeenCalledWith(node.id,'Kernel')
+  })
+
+  it('renames a group from its title while keeping its kind selector',()=>{
+    const group={id:'group-1',label:'Group 1',kind:'module',nodeIds:[],position:{x:0,y:0},dimensions:{width:200,height:100}}
+    const onGroupChange=vi.fn()
+    render(<ModelInspector {...callbacks} graph={{nodes:[],edges:[],groups:[group],learningRate:.01}} group={group} onGroupChange={onGroupChange}/>)
+    fireEvent.click(screen.getByRole('button',{name:'Rename Group 1'}))
+    const name=screen.getByRole('textbox',{name:'Block name'})
+    fireEvent.change(name,{target:{value:'Attention head'}})
+    fireEvent.blur(name)
+    expect(onGroupChange).toHaveBeenCalledWith(group.id,{label:'Attention head'})
+    fireEvent.click(screen.getByText('Group settings'))
+    fireEvent.change(screen.getByRole('combobox',{name:'Block kind'}),{target:{value:'head'}})
+    expect(onGroupChange).toHaveBeenCalledWith(group.id,{kind:'head'})
+  })
+
   it('generates on a transformer whose nodes have only palette IDs',()=>{
     const {graph,datasetId}=scratchModel('transformer'), changed=vi.fn()
     render(<DecoderControls graph={graph} onGraphChange={changed}/>)

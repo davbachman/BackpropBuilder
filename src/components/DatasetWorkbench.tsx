@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { DATASET_MENU_OPTIONS, datasetExampleIndex, datasetExamples, datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
 import { analyzeCustomCsv } from '../domain/customCsv'
+import { EditableBlockTitle } from './EditableBlockTitle'
 import type { CustomCsvData, DatasetKind, GraphModel, GraphNode, NodeParams } from '../domain/types'
 import './datasetWorkbench.css'
 
@@ -31,7 +32,7 @@ export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, o
   }
   const image = dataset.kind === 'digits-8x8' ? datasetOutputValueForSlot(node, 0) : undefined
   return <section className="dataset-workbench" aria-label="Dataset configuration">
-    <div className="dataset-workbench-heading"><p className="eyebrow">Dataset</p></div>
+    <EditableBlockTitle key={node.id} label={node.label} onRename={onRename ? label => onRename(node.id, label) : undefined}/>
     <label className="inspector-field">Source<select aria-label="Dataset selection" value={dataset.kind} onChange={event => onDataset(node.id, event.target.value as DatasetKind)}>
       {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
     </select></label>
@@ -67,7 +68,6 @@ export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, o
     </select></label>}
     {image && <div className="dataset-image-preview"><div role="img" aria-label={`Handwritten digit ${datasetOutputValueForSlot(node, 1).data[0]}`} style={{display:'grid',gridTemplateColumns:'repeat(8, 1fr)'}}>{image.data.map((pixel, i) => <i key={i} style={{background:`rgba(77,67,128,${pixel})`}} />)}</div><span>Label<strong>{datasetOutputValueForSlot(node, 1).data[0]}</strong><small>8 × 8 × 1 · normalized pixels</small></span></div>}
     {node.params.datasetValues && <p className="coordinate-note">Showing a custom experiment. Choose an example to return to the included data.</p>}
-    {onRename && <details className="dataset-name-editor"><summary>Block name</summary><label className="inspector-field">Name<input key={node.id} aria-label="Node name" defaultValue={node.label} onBlur={event => { if (event.target.value.trim() && event.target.value !== node.label) onRename(node.id, event.target.value.trim()) }}/></label></details>}
     {dataset.source && <a href={dataset.source} target="_blank" rel="noreferrer">Dataset source · UCI · CC BY 4.0 ↗</a>}
   </section>
 }

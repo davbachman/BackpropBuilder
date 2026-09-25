@@ -1,0 +1,5 @@
+.block-detail-title { margin: 0 0 12px; color: #352d42; font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: -.4px; overflow-wrap: anywhere; }
+.block-detail-title .editable-block-title { display: inline; min-height: 0; max-width: 100%; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; line-height: inherit; letter-spacing: inherit; text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: text; }
+.block-detail-title .editable-block-title:hover { color: #694998; text-decoration: underline dotted; text-underline-offset: 4px; }
+.block-detail-title .editable-block-title:focus-visible { outline: 2px solid #7952be; outline-offset: 3px; }
+.block-detail-title input { display: block; width: 100%; min-width: 0; padding: 3px 5px; border: 1px solid #7952be; border-radius: 5px; background: #fff; color: inherit; font: inherit; line-height: inherit; letter-spacing: inherit; }

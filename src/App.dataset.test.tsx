@@ -97,13 +97,14 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     expectResults('circle-center')
   })
 
-  it('keeps dataset renaming in a collapsed option', () => {
+  it('renames the selected dataset from its title', () => {
     const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
     fireEvent.click(container.querySelector('[data-id="dataset-1"]')!)
-    fireEvent.click(screen.getByText('Block name'))
-    const name = screen.getByRole('textbox', { name: 'Node name' })
+    fireEvent.click(screen.getByRole('button', { name: 'Rename dataset' }))
+    const name = screen.getByRole('textbox', { name: 'Block name' })
     fireEvent.change(name, { target: { value: 'Training data' } })
     fireEvent.blur(name)
     expect(container.querySelector('[data-id="dataset-1"]')).toHaveTextContent('Training data')
+    expect(screen.queryByText('Block name')).not.toBeInTheDocument()
   })
 })

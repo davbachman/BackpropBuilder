@@ -1384,6 +1384,35 @@ describe('Backprop Builder app', () => {
     }
   })
 
+  it('exports the current graph as a Colab notebook and opens Colab in a new tab', async () => {
+    const createObjectURL = vi.fn<(object: Blob | MediaSource) => string>(() => 'blob:notebook')
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() })
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const downloads: string[] = []
+    const originalCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (tagName === 'a') Object.defineProperty(element, 'click', { value: () => downloads.push((element as HTMLAnchorElement).download) })
+      return element
+    })
+    try {
+      const user = userEvent.setup()
+      render(<App initialGraph={createModelPreset('linear')} />)
+      await chooseFileMenuItem(user, /^Open in Colab$/i)
+      expect(downloads).toEqual(['backprop-builder-model.ipynb'])
+      expect(open).toHaveBeenCalledWith('https://colab.research.google.com/', '_blank', 'noopener,noreferrer')
+      const blob = createObjectURL.mock.calls[0]?.[0]
+      if (!(blob instanceof Blob)) throw new Error('Expected a notebook Blob.')
+      const notebook = JSON.parse(await blob.text())
+      expect(notebook.nbformat).toBe(4)
+      expect(screen.getByRole('status')).toHaveTextContent('Upload notebook')
+    } finally {
+      createElementSpy.mockRestore()
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('imports a saved project state and restores visible workspace state', async () => {
     const importedGraph = forwardPass(createStarterGraph()).graph
     const projectFile = createProjectStateFile({

@@ -1,6 +1,7 @@
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
+import { generatePyTorchExport } from './domain/pytorchExport'
 import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
 import {
@@ -15,6 +16,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Download,
+  ExternalLink,
   FastForward,
   Pause,
   Play,
@@ -224,6 +226,7 @@ function App({
   >()
   const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
   const [importError, setImportError] = useState<string | undefined>()
+  const [exportNotice, setExportNotice] = useState<string | undefined>()
   const [csvPickerOpen, setCsvPickerOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)
@@ -1095,6 +1098,7 @@ function App({
 
   const saveProjectState = () => {
     setImportError(undefined)
+    setExportNotice(undefined)
     downloadProjectStateFile(
       createProjectStateFile({
         graph,
@@ -1115,6 +1119,32 @@ function App({
         },
       }),
     )
+  }
+
+  const exportPyTorch = (format: 'notebook' | 'python', openColab = false) => {
+    setImportError(undefined)
+    setExportNotice(undefined)
+    try {
+      const exported = generatePyTorchExport(graph)
+      const blob = new Blob([format === 'notebook' ? exported.notebook : exported.script], {
+        type: format === 'notebook' ? 'application/x-ipynb+json' : 'text/x-python',
+      })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = format === 'notebook' ? 'backprop-builder-model.ipynb' : 'backprop-builder-model.py'
+      anchor.click()
+      const revoke = URL.revokeObjectURL.bind(URL)
+      window.setTimeout(() => revoke(url), 1000)
+      if (openColab) {
+        window.open('https://colab.research.google.com/', '_blank', 'noopener,noreferrer')
+        setExportNotice('Notebook downloaded. In the Colab tab, choose File → Upload notebook and select backprop-builder-model.ipynb.')
+      } else {
+        setExportNotice(`${anchor.download} downloaded.`)
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not export this model to PyTorch.')
+    }
   }
 
   const chooseProjectStateFile = () => {
@@ -1289,6 +1319,15 @@ function App({
                   <Upload size={15} />
                   Import
                 </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => exportPyTorch('notebook'))}>
+                  <Download size={15} /> Export PyTorch notebook
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => exportPyTorch('python'))}>
+                  <Download size={15} /> Export Python file
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => exportPyTorch('notebook', true))}>
+                  <ExternalLink size={15} /> Open in Colab
+                </button>
                 <button
                   type="button"
                   role="menuitem"
@@ -1351,6 +1390,7 @@ function App({
               {importError}
             </p>
           ) : null}
+          {exportNotice ? <p className="export-notice" role="status">{exportNotice}</p> : null}
         </div>
       </header>
 
@@ -1549,19 +1589,6 @@ function App({
             updates use training examples.
           </p>
         )}
-        {(selectedNodeId || selectedGroupId || selectedEdgeId) && (
-          <button
-            type="button"
-            className="inspection-return"
-            onClick={() => {
-              setSelectedNodeIds([])
-              setSelectedGroupId(undefined)
-              setSelectedEdgeId(undefined)
-            }}
-          >
-            ← Model controls
-          </button>
-        )}
         {inspectedEdge && (
           <section className="connection-inspector">
             <p className="eyebrow">Information in motion</p>
@@ -1644,7 +1671,7 @@ function App({
           group={selectedGroup}
           onParams={updateNodeParams}
           onRename={(id,label) => applyGraphChange({...graph,nodes:graph.nodes.map(node => node.id === id ? {...node,label} : node)})}
-          onGroupChange={(id,changes) => applyGraphChange({...graph,groups:graph.groups?.map(group => group.id === id ? {...group,...changes,detail:denseGroupDetail(graph,group)} : group)})}
+          onGroupChange={(id,changes) => applyGraphChange({...graph,groups:graph.groups?.map(group => group.id === id ? {...group,...changes,detail:denseGroupDetail(graph,{...group,...changes})} : group)})}
           onValue={updateNodeValue}
           onOpen={openGroup}
           onInspectNeuron={inspectNeuron}

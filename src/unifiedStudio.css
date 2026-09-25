@@ -128,13 +128,6 @@
 .model-inspector {
   margin-bottom: 25px;
 }
-.model-inspector h2 {
-  font-size: 18px;
-  line-height: 1.4;
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  margin: 0 0 12px;
-}
 .inspector-wide {
   width: 100%;
   padding: 9px;
@@ -365,13 +358,6 @@
   font-size: 11px;
   line-height: 1.7;
   color: #8e769e;
-}
-.inspection-return {
-  font-size: 10px;
-  color: #917ba6;
-  border: 0;
-  padding: 0 0 15px;
-  background: transparent;
 }
 .flow-legend { display: flex; gap: 12px; align-items: center; color: #998da5; font-size: 9px; margin-top: 8px; }
 .flow-legend span { display: inline-flex; align-items: center; gap: 4px; }

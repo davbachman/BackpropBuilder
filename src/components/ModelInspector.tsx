@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { initializeTensor, operationHelp, type Initializer } from '../domain/authoring'
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { TensorHeatmap } from './TensorHeatmap'
+import { EditableBlockTitle } from './EditableBlockTitle'
 import { lossKindForNode, lossOptionsForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
 import { formatFullTensor, toTensor } from '../domain/tensor'
 import type { CoordinateBinding } from '../domain/neuronProjection'
@@ -19,7 +20,7 @@ interface Props {
   node?: GraphNode
   binding?: CoordinateBinding
   group?: GraphGroup
-  onGroupChange?: (id: string, changes: Pick<GraphGroup, 'label' | 'kind'>) => void
+  onGroupChange?: (id: string, changes: Partial<Pick<GraphGroup, 'label' | 'kind'>>) => void
   onRename?: (id: string, label: string) => void
   onParams: (id: string, params: NodeParams) => void
   onValue: (id: string, value: TensorValue) => void
@@ -56,21 +57,14 @@ export function ModelInspector({
     graph.groups?.filter((candidate) => candidate.parentId === group?.id) ?? []
   return (
     <section className="model-inspector">
-      <p className="eyebrow">
-        {group
-          ? (group.kind ?? 'Building block')
-          : node
-            ? 'Selected block'
-            : 'Selection'}
-      </p>
-      <h2>{group?.label ?? node?.label ?? `${selectionCount} blocks selected`}</h2>
+      <EditableBlockTitle
+        key={group?.id ?? node?.id ?? 'selection'}
+        label={group?.label ?? node?.label ?? `${selectionCount} blocks selected`}
+        onRename={group && onGroupChange ? label => onGroupChange(group.id, { label }) : node && onRename && !binding ? label => onRename(node.id, label) : undefined}
+      />
       {group && (
         <>
-          {onGroupChange && <details className="inspector-disclosure"><summary>Group settings</summary><form key={group.id} onSubmit={event => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            onGroupChange(group.id, {label:String(form.get('name')).trim() || group.label,kind:String(form.get('kind'))})
-          }}><label className="inspector-field">Block name<input name="name" aria-label="Block name" defaultValue={group.label}/></label><label className="inspector-field">Block kind<select name="kind" aria-label="Block kind" defaultValue={group.kind ?? 'module'}>{['module','neuron','layer','mlp','head','attention','transformer-block','cnn','convolution','network','embedding','normalization','projection'].map(kind=><option key={kind}>{kind}</option>)}</select></label><button className="inspector-wide">Apply block details</button></form></details>}
+          {onGroupChange && <details className="inspector-disclosure"><summary>Group settings</summary><label className="inspector-field">Block kind<select aria-label="Block kind" value={group.kind ?? 'module'} onChange={event => onGroupChange(group.id, { kind: event.target.value })}>{['module','neuron','layer','mlp','head','attention','transformer-block','cnn','convolution','network','embedding','normalization','projection'].map(kind=><option key={kind}>{kind}</option>)}</select></label></details>}
           <button className="inspector-wide" onClick={() => onOpen(group.id)}>
             Zoom into {group.kind ?? 'block'} ↗
           </button>
@@ -244,7 +238,6 @@ export function ModelInspector({
               Gradient<strong>{formatFullTensor(node.grad)}</strong>
             </span>
           </div></details>}
-          {onRename && !binding && <details className="inspector-disclosure"><summary>Rename block</summary><label className="inspector-field">Name<input key={node.id} aria-label="Node name" defaultValue={node.label} onBlur={event => { if (event.target.value.trim() && event.target.value !== node.label) onRename(node.id,event.target.value.trim()) }}/></label></details>}
         </>
       )}
       {selectionCount > 1 && (
