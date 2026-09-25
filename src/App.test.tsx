@@ -11,6 +11,7 @@ import { DATASET_MENU_OPTIONS } from './domain/datasets'
 import { createNode, createStarterGraph } from './domain/examples'
 import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
+import { COLAB_CLIENT_ID_STORAGE_KEY } from './domain/googleColab'
 import { scratchModel } from './test/scratchModels'
 import { scalarValue, tensorValue } from './domain/tensor'
 import './index.css'
@@ -130,6 +131,45 @@ describe('Backprop Builder app', () => {
     expect(dialog).toHaveTextContent('Created by David Bachman with Codex')
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: 'About Backprop Builder' })).not.toBeInTheDocument()
+  })
+
+  it('can connect Drive and open an exported notebook directly in Colab', async () => {
+    const clientId = '123456789-demo.apps.googleusercontent.com'
+    const stored = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => { stored.set(key, value) },
+      removeItem: (key: string) => { stored.delete(key) },
+    })
+    const google = { accounts: { oauth2: {
+      initTokenClient: (config: { callback: (response: { access_token: string; expires_in: number }) => void }) => ({ requestAccessToken: () => config.callback({ access_token: 'drive-token', expires_in: 3600 }) }),
+      hasGrantedAllScopes: () => true,
+      revoke: vi.fn(),
+    } } }
+    vi.stubGlobal('google', google)
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ id: 'notebook-123' }) }))
+    vi.stubGlobal('fetch', fetcher)
+    const colabTab = { document: { title: '', body: { textContent: '' } }, location: { replace: vi.fn() }, opener: window, closed: false, close: vi.fn() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(colabTab as unknown as Window)
+    try {
+      const user = userEvent.setup()
+      render(<App initialGraph={createModelPreset('linear')} />)
+      await user.click(screen.getByRole('button', { name: /^File$/i }))
+      await user.click(screen.getByRole('menuitem', { name: /Colab connection/i }))
+      const dialog = screen.getByRole('dialog', { name: 'Colab connection' })
+      fireEvent.change(within(dialog).getByLabelText('Google OAuth web client ID'), { target: { value: clientId } })
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Connect Google Drive' })).toBeEnabled())
+      await user.click(within(dialog).getByRole('button', { name: 'Connect Google Drive' }))
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Upload & open current notebook' })).toBeEnabled())
+      await user.click(within(dialog).getByRole('button', { name: 'Upload & open current notebook' }))
+      await waitFor(() => expect(colabTab.location.replace).toHaveBeenCalledWith('https://colab.research.google.com/drive/notebook-123'))
+      expect(open).toHaveBeenCalledWith('about:blank', '_blank')
+      expect(fetcher).toHaveBeenCalledOnce()
+      expect(window.localStorage.getItem(COLAB_CLIENT_ID_STORAGE_KEY)).toBe(clientId)
+    } finally {
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
   })
 
   it('puts selection editing in the Edit menu while keeping Details focused on the block', async () => {

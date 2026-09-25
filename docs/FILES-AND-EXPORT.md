@@ -16,6 +16,23 @@ The generated program is a starting point for experiments outside the visual app
 
 ## Open in Google Colab
 
-Choose **File → Open in Colab**. The app downloads the notebook and opens a Colab tab. In Colab, choose **File → Upload notebook**, then select the downloaded `backprop-builder-model.ipynb`. Colab may ask you to connect a runtime before running cells. The browser cannot silently upload a local notebook to your Google account, so the upload step is intentional.
+Without a configured connection, **File → Open in Colab** downloads the notebook and opens Colab. In Colab, choose **File → Upload notebook**, then select `backprop-builder-model.ipynb`.
+
+## Direct Colab connection
+
+With a Google Drive connection, **File → Open in Colab** uploads the generated notebook to your Drive and opens that file in a new Colab tab. This is a direct browser-to-Drive upload; the app does not need a server or receive your Google password. Each export creates a new notebook file in your Drive. The notebook may include your model parameters and dataset, so choose this action only when you want those contents in your Google account.
+
+To configure it for one browser:
+
+1. In Google Cloud, create or select a project, enable the **Google Drive API**, configure the OAuth consent screen, and create an OAuth **Web application** client. Add `https://davbachman.github.io` as an authorized JavaScript origin. For local development, also add your Vite origin, such as `http://127.0.0.1:5173`.
+2. In the app, open **File → Colab connection…** and enter the **client ID** ending in `.apps.googleusercontent.com`. Do not enter a client secret. The ID is saved in this browser.
+3. Choose **Connect Google Drive** and approve Google's `drive.file` permission. This lets the app create and manage files it creates, without broad access to the rest of your Drive.
+4. Choose **Upload & open current notebook** there, or later use **File → Open in Colab**. If browser popup blocking prevents the tab from opening, the app provides an **Open notebook** link after upload.
+
+Access tokens remain in memory only; reconnect after a reload or token expiry. **Disconnect** revokes the current token. When no connection is configured, the download-and-upload path above remains available. Google may restrict access to OAuth test users until the Cloud project's consent screen is published.
+
+For a shared class deployment, the repository owner can set the GitHub Actions variable `GOOGLE_OAUTH_CLIENT_ID` to the same public web client ID. The Pages build then supplies it as the default for every browser; students still approve the Drive permission themselves. A locally saved client ID overrides that default.
+
+See Google's [web authorization setup](https://developers.google.com/identity/oauth2/web/guides/use-token-model), [Drive file scope](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), and [upload API](https://developers.google.com/workspace/drive/api/guides/manage-uploads) for the current platform requirements. Colab may ask you to connect a runtime before running cells.
 
 If you only want the guide, choose **Backprop Builder → Reference** in the app's top bar. It opens the GitHub README in a new tab.
