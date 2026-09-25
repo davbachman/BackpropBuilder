@@ -13,5 +13,9 @@
 .dataset-image-preview > span { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #8f849b; }
 .dataset-image-preview strong { font-size: 28px; color: #655182; }
 .dataset-workbench > a { color: #786397; font-size: 10px; }
+.csv-settings { display: grid; gap: 9px; margin: 14px 0; padding: 12px; border: 1px solid #e7e1ee; border-radius: 12px; background: #faf8fd; }
+.csv-settings .coordinate-note { margin: 0; }
+.csv-settings .coordinate-note strong { color: #4f3d69; }
+.csv-header-check { display: flex; align-items: center; gap: 8px; color: #665b73; font-size: 11px; }
 .tensor-initializer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin: 10px 0; }
 .tensor-initializer button { padding: 9px; margin-bottom: 12px; }

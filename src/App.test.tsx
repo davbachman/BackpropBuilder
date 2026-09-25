@@ -6,7 +6,8 @@ import appCss from './App.css?raw'
 import builderEdgeSource from './components/BuilderEdge.tsx?raw'
 import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
-import { DATASET_OPTIONS, MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
+import { MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
+import { DATASET_MENU_OPTIONS } from './domain/datasets'
 import { createStarterGraph } from './domain/examples'
 import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
@@ -397,7 +398,7 @@ describe('Backprop Builder app', () => {
     expect(datasetSelect).toBeDefined()
     expect(datasetSelect).toHaveValue('line-1d')
     expect(Array.from(datasetSelect!.querySelectorAll('option')).map((option) => option.textContent)).toEqual(
-      DATASET_OPTIONS.map((option) => option.label),
+      DATASET_MENU_OPTIONS.map((option) => option.label),
     )
 
     fireEvent.change(datasetSelect!, { target: { value: 'circle-center' } })
@@ -599,8 +600,25 @@ describe('Backprop Builder app', () => {
 
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
-    expect(screen.getByRole('heading', { name: 'Update w' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Update 2 parameters' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /Backpropagate through x|Backpropagate through y/ })).not.toBeInTheDocument()
+  })
+
+  it.each(['starter', 'linear'] as const)('starts a new forward pass immediately after the first %s training cycle', kind => {
+    const graph = kind === 'starter' ? createStarterGraph(true) : createModelPreset(kind)
+    render(<App initialGraph={graph} />)
+    const step = () => fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
+
+    for (let index = 0; index < 40 && !screen.queryByText('Epoch 1'); index += 1) step()
+    expect(screen.getByText('Epoch 1')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Update 2 parameters' })).toBeInTheDocument()
+    step()
+    expect(screen.getByRole('heading', { name: /^Evaluate / })).toBeInTheDocument()
+
+    for (let index = 0; index < 40 && !screen.queryByText('Epoch 2'); index += 1) step()
+
+    expect(screen.getByText('Epoch 2')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('uses palette selection as a one-shot canvas placement tool', async () => {
@@ -706,7 +724,7 @@ describe('Backprop Builder app', () => {
     await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
 
     expect(screen.getByText('Epoch 1')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Update w' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Update 2 parameters' })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'z', metaKey: true })
 

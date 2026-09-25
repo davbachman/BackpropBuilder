@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { datasetExampleIndex, datasetExamples, datasetForNode, datasetMode, datasetOutputValueForSlot } from '../domain/datasets'
+import { datasetExampleIndex, datasetExamples, datasetForNode, datasetMode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
+import { analyzeCustomCsv } from '../domain/customCsv'
 import { evaluateDataset, trainDataset, type DatasetMetrics } from '../domain/datasetTraining'
-import type { GraphModel, GraphNode, NodeParams } from '../domain/types'
+import type { CustomCsvData, GraphModel, GraphNode, NodeParams } from '../domain/types'
 import './datasetWorkbench.css'
 
 interface Props {
@@ -9,18 +10,27 @@ interface Props {
   node: GraphNode
   onParams: (id: string, params: NodeParams) => void
   onGraphChange: (graph: GraphModel, epochs?: number) => void
+  onChooseCustomCsv?: (nodeId: string) => void
 }
 
-export function DatasetWorkbench({ graph, node, onParams, onGraphChange }: Props) {
+export function DatasetWorkbench({ graph, node, onParams, onGraphChange, onChooseCustomCsv }: Props) {
   const dataset = datasetForNode(node), examples = datasetExamples(dataset)
   const index = datasetExampleIndex(node), mode = datasetMode(node)
   const [split, setSplit] = useState<'all' | 'train' | 'test'>('all')
   const [status, setStatus] = useState(''), [busy, setBusy] = useState(false)
+  const [csvSettingsError, setCsvSettingsError] = useState('')
   const [metrics, setMetrics] = useState<{ graph: GraphModel; train: DatasetMetrics; test: DatasetMetrics }>()
   const controller = useRef<AbortController | null>(null)
   useEffect(() => () => controller.current?.abort(), [])
   const counts = { train: examples.filter(example => example.split === 'train').length, test: examples.filter(example => example.split === 'test').length }
   const update = (params: NodeParams) => onParams(node.id, { datasetValues: undefined, ...params })
+  const updateCsv = (changes: Partial<CustomCsvData>) => {
+    const csv = node.params.customCsv
+    if (!csv) return
+    const next = { ...csv, ...changes }
+    try { analyzeCustomCsv(next); setCsvSettingsError(''); update({ customCsv: next }) }
+    catch (error) { setCsvSettingsError(error instanceof Error ? error.message : 'Invalid CSV settings.') }
+  }
   async function train(epochs: number) {
     const request = new AbortController()
     controller.current = request
@@ -37,7 +47,18 @@ export function DatasetWorkbench({ graph, node, onParams, onGraphChange }: Props
     <div className="dataset-workbench-heading"><p className="eyebrow">Data → model → evidence</p><span>{counts.train} train · {counts.test} test</span></div>
     <h3>{dataset.label}</h3>
     <p className="coordinate-note">{dataset.description ?? 'Features and targets stay synchronized. Inspect one example or feed a full numeric batch through the graph.'}</p>
-    {!dataset.examples && <label className="inspector-field">Output mode<select aria-label="Dataset output mode" value={mode} disabled={busy} onChange={event => update({ datasetMode: event.target.value as 'sample' | 'batch', datasetSplit: 'train' })}><option value="sample">One example</option><option value="batch">Numeric batch</option></select></label>}
+    {node.params.customCsv && <div className="csv-settings" aria-label="Custom CSV settings">
+      <button type="button" className="inspector-wide" onClick={() => onChooseCustomCsv?.(node.id)}>Replace CSV file</button>
+      <p className="coordinate-note">Outputs use the CSV column names. Connect a column to a Target block to use it as the target. {graph.edges.some(edge => edge.source === node.id && (edge.sourceSlot ?? 0) === node.params.customCsv!.targetColumn && graph.nodes.some(target => target.id === edge.target && (target.type === 'target' || ((target.type === 'loss' || target.type === 'cross-entropy') && edge.inputSlot === 1))))
+        ? <>Connected target: <strong>{datasetOutputLabelForSlot(node, node.params.customCsv.targetColumn)}</strong>.</>
+        : <>Until then, <strong>{datasetOutputLabelForSlot(node, node.params.customCsv.targetColumn)}</strong> is the preview target.</>}</p>
+      <label className="inspector-field">Task<select aria-label="CSV task" value={node.params.customCsv.task} onChange={event => updateCsv({ task: event.target.value as CustomCsvData['task'] })}>
+        <option value="regression">Regression</option><option value="binary-classification">Binary classification</option><option value="classification">Multiclass classification</option>
+      </select></label>
+      <label className="csv-header-check"><input type="checkbox" checked={node.params.customCsv.hasHeader} onChange={event => updateCsv({ hasHeader: event.target.checked })}/> First row contains headers</label>
+      {csvSettingsError && <p role="alert" className="coordinate-note">{csvSettingsError}</p>}
+    </div>}
+    {!dataset.examples && <label className="inspector-field">Output mode<select aria-label="Dataset output mode" value={mode} disabled={busy} onChange={event => update({ datasetMode: event.target.value as 'sample' | 'batch', datasetSplit: 'train', datasetIndex: Math.max(0, examples.findIndex(example => example.split === 'train')) })}><option value="sample">One example</option><option value="batch">Numeric batch</option></select></label>}
     <label className="inspector-field">Examples<select aria-label="Dataset split" value={mode === 'batch' ? node.params.datasetSplit ?? 'all' : split} disabled={busy} onChange={event => {
       const next = event.target.value as typeof split; setSplit(next)
       if (mode === 'batch') update({datasetSplit:next})

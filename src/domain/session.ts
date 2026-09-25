@@ -1,5 +1,6 @@
 import { cloneGraph } from './engine'
 import { isDatasetKind } from './datasets'
+import { isCustomCsvData } from './customCsv'
 import { cloneTensor, isTensorValue } from './tensor'
 import type {
   ActivationKind,
@@ -216,6 +217,8 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.activation === undefined || ACTIVATION_KINDS.has(value.activation as ActivationKind)) &&
     (value.loss === undefined || LOSS_KINDS.has(value.loss as LossKind)) &&
     (value.dataset === undefined || isDatasetKind(value.dataset as DatasetKind)) &&
+    (value.customCsv === undefined || isCustomCsvData(value.customCsv)) &&
+    (value.dataset !== 'custom-csv' || isCustomCsvData(value.customCsv)) &&
     (value.datasetMode === undefined || value.datasetMode === 'sample' || value.datasetMode === 'batch') &&
     isOptionalNonNegativeInteger(value.datasetIndex) &&
     (value.datasetSplit === undefined || ['all', 'train', 'test'].includes(String(value.datasetSplit))) &&

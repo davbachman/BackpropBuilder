@@ -39,7 +39,16 @@ export type DatasetKind =
   | 'attention-sequence'
   | 'class-scores'
   | 'neuron-basics'
+  | 'custom-csv'
 export type DatasetTask = 'regression' | 'binary-classification' | 'classification' | 'sequence' | 'attention'
+
+export interface CustomCsvData {
+  fileName: string
+  rows: string[][]
+  hasHeader: boolean
+  targetColumn: number
+  task: 'regression' | 'binary-classification' | 'classification'
+}
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
 
@@ -53,6 +62,7 @@ export interface NodeParams {
   activation?: ActivationKind
   loss?: LossKind
   dataset?: DatasetKind
+  customCsv?: CustomCsvData
   datasetMode?: 'sample' | 'batch'
   datasetIndex?: number
   datasetSplit?: 'all' | 'train' | 'test'

@@ -1,5 +1,6 @@
-import type { DatasetKind, DatasetTask, GraphNode, TensorValue } from './types'
+import type { CustomCsvData, DatasetKind, DatasetTask, GraphNode, TensorValue } from './types'
 import { tensorValue } from './tensor'
+import { analyzeCustomCsv } from './customCsv'
 import digits from '../learning/digits.json'
 
 export interface DatasetExample {
@@ -20,6 +21,7 @@ export interface ToyDataset {
   examples?: DatasetExample[]
   description?: string
   vocabulary?: string[]
+  classLabels?: string[]
   maxLength?: number
   source?: string
 }
@@ -129,11 +131,37 @@ DATASET_OPTIONS.push(tensorDataset('class-scores', 'Class scores · softmax expe
   return { label: `Class ${(4 - i % 4) % 4} · example ${i + 1}`, split: i >= 12 ? 'test' : 'train', features: [tensorValue([1, 4], scores)], target: tensorValue([1], [scores.indexOf(Math.max(...scores))]) }
 })))
 
+// The menu is separate from the built-in data catalog: selecting Custom CSV
+// opens a file picker rather than installing a placeholder dataset.
+export const DATASET_MENU_OPTIONS: { kind: DatasetKind; label: string }[] = [
+  ...DATASET_OPTIONS.map(({ kind, label }) => ({ kind, label })),
+  { kind: 'custom-csv', label: 'Custom CSV…' },
+]
+
+const customDatasetCache = new WeakMap<CustomCsvData, ToyDataset>()
+
 export function datasetForNode(node: GraphNode): ToyDataset {
+  if (node.params.dataset === 'custom-csv' && node.params.customCsv) {
+    const csv = node.params.customCsv
+    const cached = customDatasetCache.get(csv)
+    if (cached) return cached
+    const parsed = analyzeCustomCsv(csv)
+    const featureLabels = parsed.headers.filter((_, index) => index !== csv.targetColumn)
+    const count = parsed.targets.length
+    const dataset: ToyDataset = {
+      kind: 'custom-csv', label: `Custom CSV · ${csv.fileName}`, task: csv.task,
+      featureLabels, targetLabel: parsed.headers[csv.targetColumn],
+      featureValues: parsed.features.map(values => tensorValue([count], values)),
+      targetValue: tensorValue([count], parsed.targets), classLabels: parsed.classLabels,
+      description: `${count} rows · ${featureLabels.length} numeric ${featureLabels.length === 1 ? 'feature' : 'features'}. ${parsed.classLabels ? `Classes: ${parsed.classLabels.map((label, index) => `${label} = ${index}`).join(', ')}.` : 'Connect a column to a Target block to designate the target.'}`,
+    }
+    customDatasetCache.set(csv, dataset)
+    return dataset
+  }
   return DATASET_OPTIONS.find(dataset => dataset.kind === node.params.dataset) ?? DATASET_OPTIONS[0]
 }
 export function datasetExamples(dataset: ToyDataset): DatasetExample[] {
-  return dataset.examples ?? dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task === 'binary-classification' ? [1] : [], [target]) }))
+  return dataset.examples ?? dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task.includes('classification') ? [1] : [], [target]) }))
 }
 export function datasetExampleIndex(node: GraphNode): number {
   return Math.min(datasetExamples(datasetForNode(node)).length - 1, Math.max(0, node.params.datasetIndex ?? 0))
@@ -144,25 +172,39 @@ export function datasetMode(node: GraphNode): 'sample' | 'batch' {
 export function datasetOutputCountForNode(node: GraphNode): number {
   return datasetForNode(node).featureValues.length + 1
 }
+export function datasetTargetSlotForNode(node: GraphNode): number {
+  return node.params.dataset === 'custom-csv' && node.params.customCsv
+    ? node.params.customCsv.targetColumn : datasetForNode(node).featureValues.length
+}
 export function datasetOutputLabelForSlot(node: GraphNode, slot: number): string {
   const dataset = datasetForNode(node)
+  if (node.params.dataset === 'custom-csv' && node.params.customCsv) {
+    const csv = node.params.customCsv
+    return csv.hasHeader ? csv.rows[0][slot]?.trim() || `Column ${slot + 1}` : `Column ${slot + 1}`
+  }
   return dataset.featureLabels[slot] ?? dataset.targetLabel
 }
 export function datasetOutputValueForSlot(node: GraphNode, slot: number): TensorValue {
   if (node.params.datasetValues?.[slot]) return node.params.datasetValues[slot]
   const dataset = datasetForNode(node), examples = datasetExamples(dataset)
+  const targetSlot = datasetTargetSlotForNode(node)
+  const featureSlot = slot < targetSlot ? slot : slot - 1
+  const fromExample = (example: DatasetExample) => slot === targetSlot ? example.target : example.features[featureSlot] ?? example.target
   if (datasetMode(node) === 'sample') {
     const example = examples[datasetExampleIndex(node)]
-    return example.features[slot] ?? example.target
+    return fromExample(example)
   }
   const selected = examples.filter(example => !node.params.datasetSplit || node.params.datasetSplit === 'all' || example.split === node.params.datasetSplit)
-  return tensorValue([selected.length], selected.map(example => (example.features[slot] ?? example.target).data[0]))
+  return tensorValue([selected.length], selected.map(example => fromExample(example).data[0]))
 }
 export function remapDatasetOutputSlot(fromNode: GraphNode, toNode: GraphNode, fromSlot: number): number | undefined {
   const from = datasetForNode(fromNode), to = datasetForNode(toNode)
-  if (fromSlot === from.featureValues.length) return to.featureValues.length
-  return fromSlot >= 0 && fromSlot < Math.min(from.featureValues.length, to.featureValues.length) ? fromSlot : undefined
+  const fromTarget = datasetTargetSlotForNode(fromNode), toTarget = datasetTargetSlotForNode(toNode)
+  if (fromSlot === fromTarget) return toTarget
+  const featureIndex = fromSlot < fromTarget ? fromSlot : fromSlot - 1
+  if (featureIndex < 0 || featureIndex >= Math.min(from.featureValues.length, to.featureValues.length)) return undefined
+  return featureIndex < toTarget ? featureIndex : featureIndex + 1
 }
 export function isDatasetKind(value: string): value is DatasetKind {
-  return DATASET_OPTIONS.some(dataset => dataset.kind === value)
+  return value === 'custom-csv' || DATASET_OPTIONS.some(dataset => dataset.kind === value)
 }

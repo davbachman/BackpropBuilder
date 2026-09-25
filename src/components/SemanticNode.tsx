@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Sigma, SlidersHorizontal, Sparkles, ArrowRight, CirclePlus, X, Grid2X2, Database } from 'lucide-react'
 import { Fragment, type ReactElement } from 'react'
 import { inputArityForNode, outputArityForNode } from '../domain/engine'
-import { DATASET_OPTIONS, datasetForNode, datasetExamples, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
+import { DATASET_MENU_OPTIONS, datasetForNode, datasetExamples, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import type { DatasetKind, LossKind } from '../domain/types'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type { BuilderNodeData } from './BuilderNode'
@@ -30,7 +30,7 @@ export function SemanticNode(props: NodeProps): ReactElement {
     {imageInput ? <div className="semantic-image-thumbnail" aria-label="Handwritten digit input">{value.data.map((pixel,index)=><span key={index} style={{background:`rgba(53,78,112,${.06+Math.max(0,Math.min(1,pixel))*.94})`}}/>)}</div> : null}
     {dataset ? <>
       <select aria-label={`Dataset for ${node.label}`} title={dataset.label} className="semantic-dataset-select nodrag nowheel" value={dataset.kind} onChange={event => data.onDatasetChange(node.id, event.target.value as DatasetKind)}>
-        {DATASET_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
+        {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
       </select>
       <span className="semantic-dataset-summary">{datasetExamples(dataset).length} examples · {dataset.featureLabels.length} {dataset.featureLabels.length === 1 ? 'feature' : 'features'}</span>
     </> : <>
@@ -43,9 +43,9 @@ export function SemanticNode(props: NodeProps): ReactElement {
       <span className="semantic-shape">{data.showGradient ? '∂L / ∂x · ' : ''}{shape}</span>
     </>}
     {Array.from({ length: outputs }, (_, index) => {
-      const target = dataset && index === dataset.featureLabels.length
+      const target = dataset && node.params.dataset !== 'custom-csv' && index === datasetTargetSlotForNode(node)
       const label = dataset ? datasetOutputLabelForSlot(node, index) : undefined
-      const description = dataset ? `${target ? 'Target' : 'Feature'} ${label}` : undefined
+      const description = dataset ? node.params.dataset === 'custom-csv' ? label : `${target ? 'Target' : 'Feature'} ${label}` : undefined
       return <Fragment key={`out-${index}`}>
         <Handle id={outputs > 1 ? `out-${index}` : 'out'} type="source" position={vertical ? Position.Bottom : Position.Right} style={vertical ? { left: `${(index + 1) * 100 / (outputs + 1)}%` } : { top: `${(index + 1) * 100 / (outputs + 1)}%` }} className={`node-handle source-handle${target ? ' dataset-target-handle' : ''}`} aria-label={description ? `${description} output` : undefined} title={description} />
         {dataset && <span className={`semantic-dataset-port${target ? ' is-target' : ''}`} style={vertical ? { left: `${(index + 1) * 100 / (outputs + 1)}%` } : { top: `${(index + 1) * 100 / (outputs + 1)}%` }} title={`${description}: ${formatFullTensor(datasetOutputValueForSlot(node, index))}`}>{label}</span>}

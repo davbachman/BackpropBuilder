@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { DATASET_OPTIONS } from './domain/datasets'
+import { DATASET_MENU_OPTIONS, DATASET_OPTIONS } from './domain/datasets'
 import { createNode, createSingleNeuronGraph } from './domain/examples'
 import { formatFullTensor } from './domain/tensor'
 
@@ -18,12 +18,34 @@ function datasetModel(semanticZoom: boolean) {
 }
 
 describe.each([true, false])('Dataset controls with continuous zoom %s', semanticZoom => {
+  it('opens a CSV picker from the Dataset block and installs editable feature and target ports', async () => {
+    const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
+    const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
+    fireEvent.click(card)
+    const selector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
+    const input = screen.getByLabelText('Choose custom CSV file') as HTMLInputElement
+    const picker = vi.spyOn(input, 'click').mockImplementation(() => {})
+    fireEvent.change(selector, { target: { value: 'custom-csv' } })
+    expect(picker).toHaveBeenCalledOnce()
+    const text = 'height,width,y\n1,2,3\n2,3,5\n3,4,7\n4,5,9\n'
+    const file = Object.assign(new File([text], 'measurements.csv', { type: 'text/csv' }), { text: async () => text })
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() => expect(selector).toHaveValue('custom-csv'))
+    expect(within(card).getByLabelText('height output')).toHaveAttribute('data-handleid', 'out-0')
+    expect(within(card).getByLabelText('width output')).toHaveAttribute('data-handleid', 'out-1')
+    expect(within(card).getByLabelText('y output')).toHaveAttribute('data-handleid', 'out-2')
+    expect(screen.queryByRole('combobox', { name: 'CSV target column' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Connect a column to a Target block/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('combobox', { name: 'CSV task' })).toHaveValue('regression')
+    expect(screen.getByRole('button', { name: 'Replace CSV file' })).toBeInTheDocument()
+  })
+
   it('restores every dataset choice and labels the actual feature and target handles', () => {
     const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
     const selector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
     expect(selector).toHaveClass('nodrag', 'nowheel')
-    expect(within(selector).getAllByRole('option').map(option => option.textContent)).toEqual(DATASET_OPTIONS.map(option => option.label))
+    expect(within(selector).getAllByRole('option').map(option => option.textContent)).toEqual(DATASET_MENU_OPTIONS.map(option => option.label))
     for (const dataset of DATASET_OPTIONS) {
       fireEvent.change(selector, { target: { value: dataset.kind } })
       expect(selector).toHaveValue(dataset.kind)

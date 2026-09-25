@@ -8,7 +8,6 @@ import { Box, CircleDot, Crosshair, Database, Plus, Sigma } from 'lucide-react'
 import { useEffect, useState, type ReactElement } from 'react'
 import {
   FLEX_INPUT_HEIGHT_STEP,
-  DATASET_OPTIONS,
   LOSS_OPTIONS,
   MAX_FLEX_INPUT_COUNT,
   datasetForNode,
@@ -20,6 +19,7 @@ import {
   lossKindForNode,
   outputArityForNode,
 } from '../domain/engine'
+import { DATASET_MENU_OPTIONS, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
 import type { DatasetKind, GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
 
@@ -177,7 +177,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
             value={selectedDataset.kind}
             onChange={(event) => data.onDatasetChange(node.id, event.target.value as DatasetKind)}
           >
-            {DATASET_OPTIONS.map((option) => (
+            {DATASET_MENU_OPTIONS.map((option) => (
               <option key={option.kind} value={option.kind}>
                 {option.label}
               </option>
@@ -224,7 +224,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
             id={sourceHandleId(index, outputCount)}
             type="source"
             position={Position.Right}
-            className="node-handle source-handle"
+            className={`node-handle source-handle${node.type === 'dataset' && node.params.dataset !== 'custom-csv' && index === datasetTargetSlotForNode(node) ? ' dataset-target-handle' : ''}`}
             style={outputCount > 1 ? { top: `${outputHandleTop(index)}px` } : undefined}
           />
         ))

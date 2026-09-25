@@ -1,5 +1,6 @@
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetForNode } from './domain/datasets'
+import { parseCustomCsv } from './domain/customCsv'
 import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
 import {
@@ -96,6 +97,7 @@ import {
 } from './domain/traceVisibility'
 import type {
   ActivationKind,
+  CustomCsvData,
   DatasetKind,
   EvaluationTraceStep,
   GraphModel,
@@ -199,6 +201,8 @@ function App({
   const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
   const [importError, setImportError] = useState<string | undefined>()
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const customCsvInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingCustomCsvNodeId = useRef<string | undefined>(undefined)
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = validationIssues.filter(
@@ -487,12 +491,13 @@ function App({
           grad: zeroLike(toTensor(node.value ?? node.params.value)),
         })),
       })
-      setTraceSteps(updated.steps)
+      const updateSummary = summarizeUpdateSteps(updated.steps)
+      setTraceSteps([updateSummary])
       setTraceIndex(0)
       setPhase('update')
       setEpoch((value) => value + 1)
       setCurrentLoss(refreshed.loss ?? null)
-      selectSingleNode(updated.steps[0]?.nodeId)
+      selectSingleNode(updateSummary.nodeId)
     }
   }, [
     blockingIssues.length,
@@ -520,15 +525,15 @@ function App({
     if (heldOutSample) return
     pushHistory()
     const result = runTrainingStep(graph, graph.learningRate)
-    const updateSteps = result.steps.filter((step) => step.phase === 'update')
+    const updateSummary = summarizeUpdateSteps(result.steps.filter((step) => step.phase === 'update'))
     setGraph(result.graph)
     setVisualizationGraph(result.graph)
-    setTraceSteps(updateSteps)
+    setTraceSteps([updateSummary])
     setTraceIndex(0)
     setPhase('update')
     setEpoch((value) => value + 1)
     setCurrentLoss(result.loss ?? null)
-    selectSingleNode(updateSteps[0]?.nodeId)
+    selectSingleNode(updateSummary.nodeId)
   }, [
     blockingIssues.length,
     graph,
@@ -683,12 +688,12 @@ function App({
     [pushHistory],
   )
 
-  const updateDataset = useCallback(
-    (nodeId: string, dataset: DatasetKind) => {
+  const applyDatasetSelection = useCallback(
+    (nodeId: string, dataset: DatasetKind, customCsv?: CustomCsvData) => {
       pushHistory()
       const updateNode = (node: GraphModel['nodes'][number]) => {
         if (node.id !== nodeId || node.type !== 'dataset') return node
-        const updated = { ...node, params: { ...node.params, dataset, datasetIndex: 0, datasetValues: undefined } }
+        const updated = { ...node, params: { ...node.params, dataset, customCsv, datasetIndex: dataset === 'custom-csv' ? 1 : 0, datasetMode: dataset === 'custom-csv' ? 'batch' as const : node.params.datasetMode, datasetSplit: dataset === 'custom-csv' ? 'train' as const : node.params.datasetSplit, datasetValues: undefined } }
         const value = datasetOutputValueForSlot(updated, 0)
         return { ...updated, value, grad: zeroLike(value) }
       }
@@ -696,13 +701,13 @@ function App({
         invalidateGraphResults({
           ...existing,
           nodes: existing.nodes.map(updateNode),
-          edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
+          edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv),
         }),
       )
       setVisualizationGraph((existing) => ({
         ...existing,
         nodes: existing.nodes.map(updateNode),
-        edges: remapDatasetOutgoingEdges(existing, nodeId, dataset),
+        edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv),
       }))
       setPhase('edit')
       setTraceSteps([])
@@ -712,6 +717,30 @@ function App({
     },
     [pushHistory],
   )
+
+  const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
+    if (dataset === 'custom-csv') {
+      pendingCustomCsvNodeId.current = nodeId
+      setImportError(undefined)
+      customCsvInputRef.current?.click()
+      return
+    }
+    applyDatasetSelection(nodeId, dataset)
+  }, [applyDatasetSelection])
+
+  const importCustomCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    const nodeId = pendingCustomCsvNodeId.current
+    pendingCustomCsvNodeId.current = undefined
+    if (!file || !nodeId) return
+    try {
+      applyDatasetSelection(nodeId, 'custom-csv', parseCustomCsv(await file.text(), file.name))
+      setImportError(undefined)
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not read the CSV file.')
+    }
+  }
 
   const updateLearningRate = (learningRate: number) => {
     pushHistory()
@@ -1093,6 +1122,7 @@ function App({
             style={{ display: 'none' }}
             onChange={importProjectState}
           />
+          <input ref={customCsvInputRef} type="file" accept=".csv,text/csv" aria-label="Choose custom CSV file" style={{ display: 'none' }} onChange={importCustomCsv} />
           {importError ? (
             <p className="import-error" role="alert">
               {importError}
@@ -1314,7 +1344,7 @@ function App({
               }}
             />
           )}
-        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onGraphChange={(next, epochs = 0) => {
+        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} onGraphChange={(next, epochs = 0) => {
           pushHistory(); setGraph(next); setVisualizationGraph(next); setPhase(epochs ? 'update' : 'forward'); setTraceSteps([]); setTraceIndex(0); setCurrentLoss(next.nodes.find(isLossNode)?.value?.data[0] ?? null); setEpoch(value => value + epochs); setIsPlaying(false)
         }}/>) }
         {(selectedNodeIds.length > 0 || selectedGroup) && <ModelInspector
@@ -1551,6 +1581,26 @@ function nextVisibleStepEnd(
   return index
 }
 
+/** Parameter updates are applied together. Present them as one visible step so
+ * the next press starts a fresh forward pass instead of replaying stale writes. */
+function summarizeUpdateSteps(steps: EvaluationTraceStep[]): EvaluationTraceStep {
+  const count = steps.length
+  const shown = steps.slice(0, 3).map(step => step.calculation)
+  return {
+    id: 'update-parameters',
+    phase: 'update',
+    nodeId: steps[0]?.nodeId,
+    edgeIds: [],
+    title: count === 0 ? 'No trainable parameters to update' : `Update ${count} ${count === 1 ? 'parameter' : 'parameters'}`,
+    explanation: count === 0
+      ? 'Add and connect a Weight or Bias block to make this model trainable.'
+      : 'Gradient descent updates all trainable parameters together. The next Step begins another forward pass.',
+    formula: 'parameter = parameter - learning_rate * gradient',
+    calculation: count === 0 ? 'No weights or biases are connected.' : `${shown.join(' · ')}${count > shown.length ? ` · ${count - shown.length} more` : ''}`,
+    pseudocode: ['for parameter in trainable_parameters:', '  parameter -= learning_rate * parameter.grad', '  parameter.grad = 0'],
+  }
+}
+
 function computationSignature(graph: GraphModel): string {
   return JSON.stringify({
     nodes: graph.nodes.map(({ id, type, params }) => ({ id, type, params })),
@@ -1599,6 +1649,7 @@ function remapDatasetOutgoingEdges(
   graph: GraphModel,
   nodeId: string,
   dataset: DatasetKind,
+  customCsv?: CustomCsvData,
 ): GraphModel['edges'] {
   const existingNode = graph.nodes.find(
     (node) => node.id === nodeId && node.type === 'dataset',
@@ -1607,7 +1658,7 @@ function remapDatasetOutgoingEdges(
 
   const updatedNode = {
     ...existingNode,
-    params: { ...existingNode.params, dataset },
+    params: { ...existingNode.params, dataset, customCsv },
   }
   return graph.edges.flatMap((edge) => {
     if (edge.source !== nodeId) return [edge]

@@ -3,7 +3,7 @@ import { initializeTensor, operationHelp, type Initializer } from '../domain/aut
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { TensorHeatmap } from './TensorHeatmap'
 import { formatNumber, formulaForNode, lossKindForNode, lossOptionsForNode } from '../domain/engine'
-import { DATASET_OPTIONS, datasetForNode, datasetOutputValueForSlot } from '../domain/datasets'
+import { DATASET_MENU_OPTIONS, datasetForNode, datasetOutputCountForNode, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, toTensor } from '../domain/tensor'
 import type { CoordinateBinding } from '../domain/neuronProjection'
 import type {
@@ -153,16 +153,16 @@ export function ModelInspector({
           {dataset && <>
             <label className="inspector-field">Dataset
               <select aria-label="Dataset selection" value={dataset.kind} onChange={event => onDataset(node.id, event.target.value as DatasetKind)}>
-                {DATASET_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
+                {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
               </select>
             </label>
             <div className="inspector-values" aria-label="Dataset outputs">
-              {[...dataset.featureLabels, dataset.targetLabel].map((label, slot) => <span key={slot}>
-                {slot === dataset.featureLabels.length ? 'Target' : 'Feature'} {label}
+              {Array.from({ length: datasetOutputCountForNode(node) }, (_, slot) => <span key={slot}>
+                {node.params.dataset === 'custom-csv' ? '' : slot === datasetTargetSlotForNode(node) ? 'Target ' : 'Feature '}{datasetOutputLabelForSlot(node, slot)}
                 <strong title={formatFullTensor(datasetOutputValueForSlot(node, slot))}>{formatCompactTensor(datasetOutputValueForSlot(node, slot))}</strong>
               </span>)}
             </div>
-            <p className="coordinate-note">Feature and target outputs always describe the same example or batch. Connect features to the model inputs and {dataset.targetLabel} to the target or loss.</p>
+            <p className="coordinate-note">Feature and target outputs always describe the same example or batch. {node.params.dataset === 'custom-csv' ? 'Connect a CSV column to a Target block to designate it as the target.' : `Connect features to the model inputs and ${dataset.targetLabel} to the target or loss.`}</p>
           </>}
           {operationHelp[node.type] && <p className="coordinate-note">{operationHelp[node.type]}</p>}
           {node.type === 'conv2d' && <ConvolutionInspector graph={graph} node={node} onValue={onValue}/>}

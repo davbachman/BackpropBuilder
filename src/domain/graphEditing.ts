@@ -1,4 +1,5 @@
 import { inputArityForNode, outputArityForNode } from './engine'
+import { analyzeCustomCsv } from './customCsv'
 import { preserveLayoutForWiring } from './layoutState'
 import type { GraphModel, GraphNode } from './types'
 
@@ -31,8 +32,21 @@ export function connectGraphNodes(
 
   if (createsCycle(graphWithSlotCleared, candidate.source.id, candidate.target.id)) return undefined
 
+  let nodes = graph.nodes
+  if (candidate.source.type === 'dataset' && candidate.source.params.dataset === 'custom-csv' &&
+      candidate.source.params.customCsv &&
+      (candidate.target.type === 'target' ||
+        ((candidate.target.type === 'loss' || candidate.target.type === 'cross-entropy') && candidate.inputSlot === 1))) {
+    const customCsv = { ...candidate.source.params.customCsv, targetColumn: candidate.sourceSlot }
+    try { analyzeCustomCsv(customCsv) } catch { return undefined }
+    nodes = nodes.map(node => node.id === candidate.source.id
+      ? { ...node, params: { ...node.params, customCsv, datasetValues: undefined } }
+      : node)
+  }
+
   return {
     ...preserveLayoutForWiring(graph),
+    nodes,
     edges: [
       ...graphWithSlotCleared.edges,
       {

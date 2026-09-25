@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { connectGraphNodes } from './graphEditing'
 import { createStarterGraph } from './examples'
+import { parseCustomCsv } from './customCsv'
+import { datasetForNode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from './datasets'
 import type { GraphModel } from './types'
 
 describe('graph edge editing', () => {
@@ -122,5 +124,24 @@ describe('graph edge editing', () => {
       expect.objectContaining({ id: 'dataset-x', source: 'dataset', target: 'x', inputSlot: 0 }),
       expect.objectContaining({ id: 'dataset-target', source: 'dataset', sourceSlot: 1, target: 'target', inputSlot: 0 }),
     ])
+  })
+
+  it('uses the CSV column wired to a Target block as the target without moving the columns', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'csv', type: 'dataset', label: 'data', position: { x: 0, y: 0 }, params: { dataset: 'custom-csv', customCsv: parseCustomCsv('height,width,score\n1,2,3\n4,5,6\n7,8,9\n', 'scores.csv') } },
+        { id: 'target', type: 'target', label: 'target', position: { x: 240, y: 0 }, params: {} },
+      ],
+      edges: [],
+    }
+    const result = connectGraphNodes(graph, { source: 'csv', sourceHandle: 'out-0', target: 'target', targetHandle: 'in-0' })!
+    const dataset = result.nodes[0]
+    expect(dataset.params.customCsv?.targetColumn).toBe(0)
+    expect(datasetForNode(dataset).targetLabel).toBe('height')
+    expect([0, 1, 2].map(slot => datasetOutputLabelForSlot(dataset, slot))).toEqual(['height', 'width', 'score'])
+    expect(datasetOutputValueForSlot(dataset, 0).data).toEqual([1, 4, 7])
+    expect(datasetOutputValueForSlot(dataset, 1).data).toEqual([2, 5, 8])
+    expect(datasetOutputValueForSlot(dataset, 2).data).toEqual([3, 6, 9])
   })
 })
