@@ -4,7 +4,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphCanvas } from './GraphCanvas'
 import { createModelPreset } from '../domain/modelPresets'
-import { setVisualGroupExpanded } from '../domain/grouping'
+import { setVisualGroupExpanded, visualGroupInterface } from '../domain/grouping'
 import { projectDenseNeurons } from '../domain/neuronProjection'
 import { compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene } from '../domain/continuousScene'
 import type { GraphModel } from '../domain/types'
@@ -181,6 +181,23 @@ describe('canvas movement gestures', () => {
     // Undo restores both the wiring and its saved arrangement.
     rerenderGraph(graph)
     expect(geometry()).toEqual(before)
+  })
+
+  it('fans out a group output without removing its existing wire', () => {
+    const graph = createModelPreset('linear')
+    const group = graph.groups!.find(candidate => candidate.kind === 'neuron')!
+    const output = visualGroupInterface(graph, group).outputs[0]
+    const existingEdgeId = output.edgeId!
+    const nextNode = createNode('activation', 9)
+    graph.nodes.push(nextNode)
+    const { onGraphChange } = mountCanvas(graph)
+
+    act(() => flow.props!.onConnect!({ source: `visual-group:${group.id}`, sourceHandle: output.handleId, target: nextNode.id, targetHandle: 'in-0' }))
+
+    const changed = onGraphChange.mock.lastCall![0] as GraphModel
+    expect(changed.edges.find(edge => edge.id === existingEdgeId)).toEqual(graph.edges.find(edge => edge.id === existingEdgeId))
+    expect(changed.edges.some(edge => edge.source === output.source && edge.target === nextNode.id)).toBe(true)
+    expect(changed.edges).toHaveLength(graph.edges.length + 1)
   })
 
   it('reveals nested contents during zoom without rebuilding geometry or refitting the camera', () => {

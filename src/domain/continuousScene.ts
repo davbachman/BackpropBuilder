@@ -1,5 +1,5 @@
 import { inputArityForNode, outputArityForNode } from './engine'
-import { customCsvCardHeight, customCsvCardWidth } from './datasets'
+import { customCsvCardHeight, customCsvCardWidth, customCsvOutputTop } from './datasets'
 import { visualGroupInterface } from './grouping'
 import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
@@ -189,7 +189,10 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const ports = group ? interfaces.get(group.id)![output ? 'outputs' : 'inputs'] : undefined
     const index = ports ? ports.findIndex(port => port.edgeId === edge.id || 'edgeIds' in port && port.edgeIds?.includes(edge.id)) : output ? edge.sourceSlot ?? 0 : edge.inputSlot ?? 0
     const count = ports?.length ?? (output ? outputArityForNode(nodes.get(id)!) : Math.max(inputArityForNode(nodes.get(id)!), ...graph.edges.filter(item => item.target === id).map(item => (item.inputSlot ?? 0) + 1)))
-    const fraction = (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
+    const node = nodes.get(id)
+    const fraction = output && node?.type === 'dataset' && node.params.dataset === 'custom-csv'
+      ? customCsvOutputTop(Math.max(0, index)) / customCsvCardHeight(node)
+      : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
     return stage(id) ? { x: rect.x + rect.width * fraction, y: rect.y + (output ? rect.height : 0), side: output ? 'bottom' : 'top' }
       : { x: rect.x + (output ? rect.width : 0), y: rect.y + rect.height * fraction, side: output ? 'right' : 'left' }
   }

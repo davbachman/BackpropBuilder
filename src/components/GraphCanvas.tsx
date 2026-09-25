@@ -45,6 +45,7 @@ import {
   moveVisualGroup,
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
+import { customCsvCardHeight, customCsvOutputTop } from '../domain/datasets'
 import { blockPalette } from '../domain/blockPalette'
 import { codeForGroup } from '../domain/codeOutline'
 import type {
@@ -524,6 +525,9 @@ function GraphCanvasInner({
         expanded: group?.expanded ?? false, vertical: Boolean(group ? group.modelStage : node.data.vertical),
         inputs: group?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0)),
         outputs: group?.outputCount ?? outputArityForNode(operation!),
+        csvOutputFractions: operation?.type === 'dataset' && operation.params.dataset === 'custom-csv'
+          ? Array.from({ length: outputArityForNode(operation) }, (_, index) => customCsvOutputTop(index, !semantic) / customCsvCardHeight(operation, !semantic))
+          : undefined,
       }
     }),
     wires: edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle })),
@@ -1064,10 +1068,12 @@ function GraphCanvasInner({
   )
 }
 
-interface RoutingBlock extends WireObstacle { expanded: boolean; vertical: boolean; inputs: number; outputs: number }
+interface RoutingBlock extends WireObstacle { expanded: boolean; vertical: boolean; inputs: number; outputs: number; csvOutputFractions?: number[] }
 function routingEndpoint(block: RoutingBlock, handle: string | null | undefined, source: boolean): WireEndpoint {
   const slot = Number(handle?.match(/-(\d+)$/)?.[1] ?? 0)
-  const fraction = (slot + 1) / (Math.max(1, source ? block.outputs : block.inputs) + 1)
+  const fraction = source && block.csvOutputFractions?.[slot] !== undefined
+    ? block.csvOutputFractions[slot]
+    : (slot + 1) / (Math.max(1, source ? block.outputs : block.inputs) + 1)
   return block.vertical
     ? { x: block.x + block.width * fraction, y: block.y + (source ? block.height : 0), side: source ? 'bottom' : 'top' }
     : { x: block.x + (source ? block.width : 0), y: block.y + block.height * fraction, side: source ? 'right' : 'left' }
@@ -1119,7 +1125,6 @@ function normalizeCanvasConnection(
         ...normalizedConnection,
         source: resolvedSource.source,
         sourceHandle: resolvedSource.sourceHandle,
-        replaceEdgeId: resolvedSource.edgeId,
       }
     }
   }

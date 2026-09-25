@@ -4,6 +4,10 @@ import { createModelPreset } from './modelPresets'
 import { LESSONS } from '../learning/presets'
 import { segmentCrossesRect } from './wireRouting'
 import { projectDenseNeurons } from './neuronProjection'
+import { parseCustomCsv } from './customCsv'
+import { customCsvCardHeight, customCsvOutputTop } from './datasets'
+import { createNode } from './examples'
+import type { GraphModel } from './types'
 
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-7
 
@@ -176,6 +180,36 @@ describe('one continuous nested scene', () => {
       }
     }
     expect(collisions).toEqual([])
+  })
+
+  it('routes distinct custom CSV columns into the correct ports of user-created groups', () => {
+    const dataset = createNode('dataset', 1)
+    dataset.params = { dataset: 'custom-csv', customCsv: parseCustomCsv('a,b,c,d,target\n1,2,3,4,0\n2,3,4,5,1\n', 'columns.csv') }
+    const first = [createNode('input', 1), createNode('weight', 1), createNode('arithmetic', 1)]
+    const second = [createNode('input', 2), createNode('weight', 2), createNode('arithmetic', 2)]
+    const graph: GraphModel = {
+      nodes: [dataset, ...first, ...second],
+      edges: [
+        { id: 'column-b', source: dataset.id, sourceSlot: 1, target: first[0].id, inputSlot: 0 },
+        { id: 'column-d', source: dataset.id, sourceSlot: 3, target: second[0].id, inputSlot: 0 },
+        { id: 'first-value', source: first[0].id, target: first[2].id, inputSlot: 0 },
+        { id: 'first-weight', source: first[1].id, target: first[2].id, inputSlot: 1 },
+        { id: 'second-value', source: second[0].id, target: second[2].id, inputSlot: 0 },
+        { id: 'second-weight', source: second[1].id, target: second[2].id, inputSlot: 1 },
+      ],
+      groups: [first, second].map((members, index) => ({ id: `group-${index + 1}`, label: `Group ${index + 1}`, kind: 'module', nodeIds: members.map(node => node.id), position: { x: 0, y: 0 }, dimensions: { width: 176, height: 112 } })),
+      learningRate: .1,
+    }
+    const scene = layoutContinuousScene(graph)
+    const wires = routeContinuousScene(graph, scene)
+    const datasetRect = scene.nodes.get(dataset.id)!
+    for (const [edgeId, slot, groupId] of [['column-b', 1, 'group-1'], ['column-d', 3, 'group-2']] as const) {
+      const outside = wires.find(wire => wire.edgeId === edgeId && !wire.parentId)!
+      const inside = wires.find(wire => wire.edgeId === edgeId && wire.parentId === groupId)!
+      expect(outside.route[0].x).toBeCloseTo(datasetRect.x + datasetRect.width)
+      expect(outside.route[0].y).toBeCloseTo(datasetRect.y + datasetRect.height * customCsvOutputTop(slot) / customCsvCardHeight(dataset))
+      expect(close(outside.route.at(-1)!, inside.route[0])).toBe(true)
+    }
   })
 
   it('moves a group and all of its nested contents by the same world-space displacement', () => {
