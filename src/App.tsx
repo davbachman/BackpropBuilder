@@ -1651,7 +1651,7 @@ function App({
           onGroup={mergeSelectedNodes}
           selectionCount={selectedNodeIds.length}
         />}
-        {(activeStep || inspectedNode?.type !== 'dataset') && <section className="inspector-card">
+        {(activeStep || (!selectedNodeId && !selectedGroupId && !selectedEdgeId)) && <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>
           {activeStep && <div className="formula-box">

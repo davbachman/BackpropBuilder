@@ -882,7 +882,7 @@ describe('Backprop Builder app', () => {
     fireEvent.keyDown(document, { key: 'z', metaKey: true })
 
     expect(screen.getByText('Epoch 0')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Ready to evaluate' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ready to evaluate' })).not.toBeInTheDocument()
   })
 
   it('numbers palette-created node names independently by node type', async () => {

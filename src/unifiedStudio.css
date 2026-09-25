@@ -135,12 +135,6 @@
   letter-spacing: -0.4px;
   margin: 0 0 12px;
 }
-.inspector-intro {
-  color: #93889e;
-  font-size: 12px;
-  line-height: 1.8;
-  margin-bottom: 18px;
-}
 .inspector-wide {
   width: 100%;
   padding: 9px;
@@ -192,16 +186,6 @@
 .inspector-field textarea {
   resize: vertical;
 }
-.inspector-formula {
-  padding: 13px;
-  background: #f7f3fb;
-  border-radius: 9px;
-  font:
-    12px/1.7 ui-monospace,
-    monospace;
-  overflow-wrap: anywhere;
-  color: #725393;
-}
 .inspector-values {
   display: grid;
   gap: 12px;
@@ -225,6 +209,10 @@
   margin-top: 5px;
   text-transform: none;
 }
+.inspector-disclosure { margin: 14px 0; color: #786397; font-size: 11px; }
+.inspector-disclosure summary { cursor: pointer; }
+.inspector-disclosure > .inspector-field,
+.inspector-disclosure > form { margin-top: 12px; }
 .coordinate-note {
   font-size: 10px;
   color: #a294ad;

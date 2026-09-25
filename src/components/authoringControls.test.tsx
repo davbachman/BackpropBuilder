@@ -67,7 +67,7 @@ describe('scratch model authoring controls',()=>{
     expect(onParams).toHaveBeenLastCalledWith('mean-1',{axis:undefined,keepDims:true})
   })
 
-  it('edits the selected operation inside a Tensor transform block',()=>{
+  it('edits tensor transform parameters from Details at any zoom level',()=>{
     const node=createNode('tensor-transform',1), onParams=vi.fn()
     const props={...callbacks,onParams,graph:{nodes:[node],edges:[],learningRate:.01}}
     const view=render(<ModelInspector {...props} node={node}/>)
@@ -82,7 +82,7 @@ describe('scratch model authoring controls',()=>{
     expect(onParams).toHaveBeenLastCalledWith(node.id,{axis:undefined,keepDims:true})
   })
 
-  it('shows the loss function the engine will actually use for tensor inputs',()=>{
+  it('keeps loss editing visible and exact numbers available on demand',()=>{
     const prediction={...createNode('input',1),params:{value:tensorValue([2],[.2,.8])}}
     const target={...createNode('target',1),params:{value:tensorValue([2],[0,1])}}
     const loss=createNode('loss',1)
@@ -90,10 +90,14 @@ describe('scratch model authoring controls',()=>{
       {id:'prediction-loss',source:prediction.id,target:loss.id,inputSlot:0},
       {id:'target-loss',source:target.id,target:loss.id,inputSlot:1},
     ],learningRate:.01}
-    render(<ModelInspector {...callbacks} graph={graph} node={loss}/>)
+    const evaluated=forwardPass(graph).graph
+    render(<ModelInspector {...callbacks} graph={evaluated} node={evaluated.nodes.find(node=>node.id===loss.id)}/>)
     expect(screen.getByLabelText('Loss function')).toHaveValue('mse')
-    expect(screen.getByRole('option',{name:'Squared error'})).toBeInTheDocument()
-    expect(screen.getByRole('option',{name:'Cross entropy (logits)'})).toBeInTheDocument()
+    const disclosure=screen.getByText('Exact values and gradients').closest('details')!
+    expect(disclosure).not.toHaveAttribute('open')
+    fireEvent.click(screen.getByText('Exact values and gradients'))
+    expect(disclosure).toHaveAttribute('open')
+    expect(disclosure).toHaveTextContent('Value')
   })
 
   it('generates on a transformer whose nodes have only palette IDs',()=>{

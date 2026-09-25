@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { initializeTensor, operationHelp, type Initializer } from '../domain/authoring'
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { TensorHeatmap } from './TensorHeatmap'
-import { formatNumber, formulaForNode, lossKindForNode, lossOptionsForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
+import { lossKindForNode, lossOptionsForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
 import { formatFullTensor, toTensor } from '../domain/tensor'
 import type { CoordinateBinding } from '../domain/neuronProjection'
 import type {
@@ -60,21 +60,17 @@ export function ModelInspector({
         {group
           ? (group.kind ?? 'Building block')
           : node
-            ? 'Inside the calculation'
+            ? 'Selected block'
             : 'Selection'}
       </p>
       <h2>{group?.label ?? node?.label ?? `${selectionCount} blocks selected`}</h2>
       {group && (
         <>
-          {onGroupChange && <form key={group.id} onSubmit={event => {
+          {onGroupChange && <details className="inspector-disclosure"><summary>Group settings</summary><form key={group.id} onSubmit={event => {
             event.preventDefault()
             const form = new FormData(event.currentTarget)
             onGroupChange(group.id, {label:String(form.get('name')).trim() || group.label,kind:String(form.get('kind'))})
-          }}><label className="inspector-field">Block name<input name="name" aria-label="Block name" defaultValue={group.label}/></label><label className="inspector-field">Block kind<select name="kind" aria-label="Block kind" defaultValue={group.kind ?? 'module'}>{['module','neuron','layer','mlp','head','attention','transformer-block','cnn','convolution','network','embedding','normalization','projection'].map(kind=><option key={kind}>{kind}</option>)}</select></label><button className="inspector-wide">Apply block details</button></form>}
-          <p className="inspector-intro">
-            {group.nodeIds.length} connected calculations. Opening this block
-            keeps the same weights and values.
-          </p>
+          }}><label className="inspector-field">Block name<input name="name" aria-label="Block name" defaultValue={group.label}/></label><label className="inspector-field">Block kind<select name="kind" aria-label="Block kind" defaultValue={group.kind ?? 'module'}>{['module','neuron','layer','mlp','head','attention','transformer-block','cnn','convolution','network','embedding','normalization','projection'].map(kind=><option key={kind}>{kind}</option>)}</select></label><button className="inspector-wide">Apply block details</button></form></details>}
           <button className="inspector-wide" onClick={() => onOpen(group.id)}>
             Zoom into {group.kind ?? 'block'} ↗
           </button>
@@ -140,42 +136,10 @@ export function ModelInspector({
       )}
       {node && (
         <>
-          {onRename && !binding && <label className="inspector-field">Name<input key={node.id} aria-label="Node name" defaultValue={node.label} onBlur={event => { if (event.target.value.trim() && event.target.value !== node.label) onRename(node.id,event.target.value.trim()) }}/></label>}
-          <div className="inspector-formula">{formulaForNode(node, graph)}</div>
           {operationHelp[node.type] && <p className="coordinate-note">{operationHelp[node.type]}</p>}
           {node.type === 'conv2d' && <ConvolutionInspector graph={graph} node={node} onValue={onValue}/>}
           {node.type === 'loss' && <label className="inspector-field">Loss<select aria-label="Loss function" value={lossKindForNode(node, graph)} onChange={event => onParams(node.id,{loss:event.target.value as NodeParams['loss']})}>{lossOptionsForNode(node, graph).map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></label>}
           {node.type === 'tensor-transform' && <label className="inspector-field">Transform<select aria-label="Tensor transform operation" value={node.params.transform ?? 'reshape'} onChange={event => onParams(node.id, { transform: event.target.value as TensorTransformKind })}>{TENSOR_TRANSFORM_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></label>}
-          {node.value && node.value.data.length > 1 && (
-            <TensorHeatmap
-              key={`${node.id}:${node.value.shape.join(',')}`}
-              value={node.value}
-              onEdit={
-                canonical &&
-                !binding &&
-                !graph.edges.some(edge => edge.target === canonical.id) &&
-                ['weight', 'bias', 'input', 'target'].includes(canonical.type)
-                  ? (index, next) => {
-                      const value = toTensor(canonical.params.value)
-                      onValue(canonical.id, {
-                        ...value,
-                        data: value.data.map((item, i) =>
-                          i === index ? next : item,
-                        ),
-                      })
-                    }
-                  : undefined
-              }
-            />
-          )}
-          <div className="inspector-values">
-            <span>
-              Value<strong>{formatFullTensor(node.value)}</strong>
-            </span>
-            <span>
-              Gradient<strong>{formatFullTensor(node.grad)}</strong>
-            </span>
-          </div>
           {binding && canonical && (
             <p className="coordinate-note">
               Coordinate {binding.index + 1} of {canonical.label}. This is the
@@ -223,8 +187,7 @@ export function ModelInspector({
                   value={node.params.activation ?? 'identity'}
                   onChange={(event) =>
                     onParams(node.id, {
-                      activation: event.target
-                        .value as NodeParams['activation'],
+                      activation: event.target.value as NodeParams['activation'],
                     })
                   }
                 >
@@ -251,6 +214,37 @@ export function ModelInspector({
                 onParams={onParams}
               />
             )}
+          {node.value && node.value.data.length > 1 && (
+            <TensorHeatmap
+              key={`${node.id}:${node.value.shape.join(',')}`}
+              value={node.value}
+              onEdit={
+                canonical &&
+                !binding &&
+                !graph.edges.some(edge => edge.target === canonical.id) &&
+                ['weight', 'bias', 'input', 'target'].includes(canonical.type)
+                  ? (index, next) => {
+                      const value = toTensor(canonical.params.value)
+                      onValue(canonical.id, {
+                        ...value,
+                        data: value.data.map((item, i) =>
+                          i === index ? next : item,
+                        ),
+                      })
+                    }
+                  : undefined
+              }
+            />
+          )}
+          {(node.value || node.grad) && <details className="inspector-disclosure"><summary>Exact values and gradients</summary><div className="inspector-values">
+            <span>
+              Value<strong>{formatFullTensor(node.value)}</strong>
+            </span>
+            <span>
+              Gradient<strong>{formatFullTensor(node.grad)}</strong>
+            </span>
+          </div></details>}
+          {onRename && !binding && <details className="inspector-disclosure"><summary>Rename block</summary><label className="inspector-field">Name<input key={node.id} aria-label="Node name" defaultValue={node.label} onBlur={event => { if (event.target.value.trim() && event.target.value !== node.label) onRename(node.id,event.target.value.trim()) }}/></label></details>}
         </>
       )}
       {selectionCount > 1 && (
@@ -443,9 +437,6 @@ function OperationEditor({
       {operation === 'mean' && <label className="inspector-field"><span><input type="checkbox" checked={keepDims} onChange={event => setKeepDims(event.target.checked)}/> Keep dimensions</span></label>}
       {error && <p role="alert">{error}</p>}
       <button className="inspector-wide">Apply operation</button>
-      <p className="coordinate-note">
-        {formatNumber(node.value?.data[0])} at the current execution step.
-      </p>
     </form>
   )
 }
