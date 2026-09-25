@@ -54,6 +54,28 @@ describe('tensor primitives in the editable graph', () => {
     expectNumericalGradients(operationGraph('mean', [matrix]))
   })
 
+  it('explains that vector concatenation on axis 1 needs a reshape first', () => {
+    const vectors = Array.from({ length: 4 }, (_, index) => t([112], Array.from({ length: 112 }, (_, row) => row + index)))
+    const graph: GraphModel = {
+      learningRate: 0.01,
+      nodes: [
+        ...vectors.map((value, index): GraphNode => ({ id: `x${index}`, label: `x${index}`, type: 'input', params: { value }, position: { x: 0, y: index * 100 } })),
+        { id: 'concat', label: 'Concatenate', type: 'concat', params: { axis: 1, inputCount: 4 }, position: { x: 300, y: 0 } },
+      ],
+      edges: vectors.map((_, index) => ({ id: `e${index}`, source: `x${index}`, target: 'concat', inputSlot: index })),
+    }
+    expect(validateGraph(graph).find(issue => issue.code === 'shape-mismatch')?.message)
+      .toContain('Reshape each [112] input to [112, 1], then concatenate on axis 1 to get [112, 4]')
+
+    graph.nodes.splice(4, 0, ...vectors.map((_, index): GraphNode => ({ id: `reshape${index}`, label: `reshape${index}`, type: 'reshape', params: { shape: [112, 1] }, position: { x: 150, y: index * 100 } })))
+    graph.edges = vectors.flatMap((_, index) => [
+      { id: `input-reshape${index}`, source: `x${index}`, target: `reshape${index}`, inputSlot: 0 },
+      { id: `reshape-concat${index}`, source: `reshape${index}`, target: 'concat', inputSlot: index },
+    ])
+    expect(validateGraph(graph)).toEqual([])
+    expect(forwardPass(graph).graph.nodes.find(node => node.id === 'concat')?.value?.shape).toEqual([112, 4])
+  })
+
   it('differentiates softmax, layer norm and cross entropy', () => {
     const matrix = t([2, 3], [0.2, 0.4, 0.6, 0.8, 1.4, 1.2])
     expectNumericalGradients(operationGraph('softmax', [matrix]))

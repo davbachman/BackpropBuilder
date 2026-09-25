@@ -44,6 +44,16 @@ describe('scratch model authoring controls',()=>{
     expect(screen.getByRole('alert')).toHaveTextContent('positive dimensions')
   })
 
+  it('accepts parenthesized parameter shapes and initializes every entry on Enter',()=>{
+    render(<InspectorHarness initial={createNode('weight',1)}/>)
+    const shape = screen.getByLabelText('Tensor shape')
+    fireEvent.change(shape,{target:{value:'(3,1)'}})
+    fireEvent.keyDown(shape,{key:'Enter'})
+    expect(shape).toHaveValue('3, 1')
+    expect((screen.getByLabelText('Tensor values') as HTMLTextAreaElement).value.split(',')).toHaveLength(3)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('supports default transpose axes and a whole-tensor mean with keepDims',()=>{
     const node = createNode('transpose',1), onParams=vi.fn()
     const props={...callbacks,onParams,graph:{nodes:[node],edges:[],learningRate:.01}}

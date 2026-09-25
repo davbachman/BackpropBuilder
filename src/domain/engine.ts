@@ -582,10 +582,16 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
       continue
     }
 
+    const axis = node.params.axis ?? 1
+    const concatHint = node.type === 'concat' && inputShapes[0]?.length === 1 && axis === 1
+      ? ` Axis 1 does not exist in a vector. Reshape each ${formatShape(inputShapes[0])} input to [${inputShapes[0][0]}, 1], then concatenate on axis 1 to get [${inputShapes[0][0]}, ${incoming.length}].`
+      : node.type === 'concat'
+        ? ` Concatenation on axis ${axis} requires equal ranks and matching sizes on every other axis.`
+        : ' Use matching shapes or scalars.'
     issues.push({
       code: 'shape-mismatch',
       nodeId: node.id,
-      message: `${node.label} received incompatible tensor shapes ${inputShapes.map((shape) => formatShape(shape ?? [])).join(', ')}. Use matching shapes or scalars.`,
+      message: `${node.label} received incompatible tensor shapes ${inputShapes.map((shape) => formatShape(shape ?? [])).join(', ')}.${concatHint}`,
     })
   }
 

@@ -311,17 +311,26 @@ function TensorEditor({
     setShape(value.shape.join(', '))
     setData(value.data.map(String).join(', '))
   }
+  const initializeShape = () => {
+    try {
+      onValue(node.id, initializeTensor(parseTensorShape(shape), initializer, seed))
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Invalid shape.')
+    }
+  }
   return (
     <form
       className="tensor-editor"
       onSubmit={(event) => {
         event.preventDefault()
-        const dimensions = shape.trim()
-          ? shape
-              .split(/[\s,×x]+/)
-              .filter(Boolean)
-              .map(Number)
-          : []
+        let dimensions: number[]
+        try {
+          dimensions = parseTensorShape(shape)
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : 'Invalid shape.')
+          return
+        }
         const numbers = data
           .split(/[\s,]+/)
           .filter(Boolean)
@@ -341,19 +350,16 @@ function TensorEditor({
       }}
     >
       <label className="inspector-field">
-        Shape <span>empty = scalar</span>
+        Shape <span>e.g. 3, 1 or (3, 1); empty = scalar</span>
         <input
           aria-label="Tensor shape"
           value={shape}
           onChange={(event) => setShape(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); initializeShape() } }}
         />
       </label>
-      <div className="tensor-initializer"><label className="inspector-field">Initialize<select aria-label="Tensor initializer" value={initializer} onChange={event => setInitializer(event.target.value as Initializer)}>{(['xavier','he','zeros','ones','uniform'] as const).map(kind => <option key={kind} value={kind}>{kind === 'xavier' ? 'Xavier · matrices' : kind === 'he' ? 'He · ReLU / filters' : kind}</option>)}</select></label><button type="button" onClick={() => {
-        try {
-          const dimensions = shape.trim() ? shape.split(/[\s,×x]+/).filter(Boolean).map(Number) : []
-          onValue(node.id, initializeTensor(dimensions,initializer,seed)); setError('')
-        } catch (error) { setError(error instanceof Error ? error.message : 'Invalid shape.') }
-      }}>Initialize tensor</button></div>
+      <p className="coordinate-note">Enter a shape, then initialize its values or enter all values below and apply them.</p>
+      <div className="tensor-initializer"><label className="inspector-field">Initialize<select aria-label="Tensor initializer" value={initializer} onChange={event => setInitializer(event.target.value as Initializer)}>{(['xavier','he','zeros','ones','uniform'] as const).map(kind => <option key={kind} value={kind}>{kind === 'xavier' ? 'Xavier · matrices' : kind === 'he' ? 'He · ReLU / filters' : kind}</option>)}</select></label><button type="button" onClick={initializeShape}>Initialize tensor</button></div>
       <label className="inspector-field">Random seed<input aria-label="Initializer seed" type="number" value={seed} onChange={event => setSeed(Number(event.target.value))}/></label>
       <label className="inspector-field">
         Values
@@ -370,6 +376,17 @@ function TensorEditor({
       </button>
     </form>
   )
+}
+
+function parseTensorShape(text: string): number[] {
+  const trimmed = text.trim()
+  const unwrapped = trimmed.startsWith('(') && trimmed.endsWith(')') || trimmed.startsWith('[') && trimmed.endsWith(']')
+    ? trimmed.slice(1, -1).trim()
+    : trimmed
+  if (/[()[\]]/.test(unwrapped)) throw new Error('Use dimensions such as 3, 1 or (3, 1).')
+  const dimensions = unwrapped ? unwrapped.split(/[\s,×x]+/).filter(Boolean).map(Number) : []
+  if (dimensions.some(size => !Number.isInteger(size) || size <= 0)) throw new Error('Use positive dimensions (whole numbers) such as 3, 1.')
+  return dimensions
 }
 
 function OperationEditor({

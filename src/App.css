@@ -485,6 +485,11 @@
   font: 11px var(--font-mono);
 }
 
+.node-tensor-shape {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .node-handle {
   width: 10px;
   height: 10px;

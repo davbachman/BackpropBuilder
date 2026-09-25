@@ -249,7 +249,8 @@ function App({
     : selectedCodeGroupId ? { kind: 'group', id: selectedCodeGroupId } : undefined
   const inspectedEdge = displayGraph.edges.find(
     (edge) => edge.id === selectedEdgeId,
-  )
+  ) ?? graph.edges.find((edge) => edge.id === selectedEdgeId)
+  const numericalEdge = graph.edges.find((edge) => edge.id === selectedEdgeId) ?? inspectedEdge
   const canvasStep = activeStep
     ? {
         ...activeStep,
@@ -1214,6 +1215,8 @@ function App({
           setSelectedNodeIds([])
           setSelectedGroupId(undefined)
           setInspectorOpen(true)
+          setRightOpen(true)
+          setRightTab('details')
           setPaletteOpen(false)
         }}
         showMath={SHOW_MATH_LAYER}
@@ -1325,11 +1328,11 @@ function App({
             <div className="inspector-values">
               <span>
                 Forward value →
-                <strong>{formatFullTensor(inspectedEdge.value)}</strong>
+                <strong>{formatFullTensor(numericalEdge?.value)}</strong>
               </span>
               <span>
                 ← Gradient contribution
-                <strong>{formatFullTensor(inspectedEdge.grad)}</strong>
+                <strong>{formatFullTensor(numericalEdge?.grad)}</strong>
               </span>
             </div>
             <p className="coordinate-note">
