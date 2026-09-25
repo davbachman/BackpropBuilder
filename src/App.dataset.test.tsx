@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import App from './App'
 import { DATASET_MENU_OPTIONS, DATASET_OPTIONS } from './domain/datasets'
 import { createNode, createSingleNeuronGraph } from './domain/examples'
@@ -23,14 +23,17 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
     fireEvent.click(card)
     const selector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
-    const input = screen.getByLabelText('Choose custom CSV file') as HTMLInputElement
-    const picker = vi.spyOn(input, 'click').mockImplementation(() => {})
     fireEvent.change(selector, { target: { value: 'custom-csv' } })
-    expect(picker).toHaveBeenCalledOnce()
+    const chooser = screen.getByRole('dialog', { name: 'Choose a CSV file' })
+    const input = within(chooser).getByLabelText('Choose custom CSV file') as HTMLInputElement
+    expect(input).toBeVisible()
     const text = 'height,width,y\n1,2,3\n2,3,5\n3,4,7\n4,5,9\n'
     const file = Object.assign(new File([text], 'measurements.csv', { type: 'text/csv' }), { text: async () => text })
     fireEvent.change(input, { target: { files: [file] } })
     await waitFor(() => expect(selector).toHaveValue('custom-csv'))
+    expect(screen.queryByRole('dialog', { name: 'Choose a CSV file' })).not.toBeInTheDocument()
+    expect(card.querySelector('.semantic-operation, .builder-node')).toHaveStyle({ width: '280px' })
+    if (semanticZoom) expect(card).toHaveStyle({ width: '280px' })
     expect(within(card).getByLabelText('height output')).toHaveAttribute('data-handleid', 'out-0')
     expect(within(card).getByLabelText('width output')).toHaveAttribute('data-handleid', 'out-1')
     expect(within(card).getByLabelText('y output')).toHaveAttribute('data-handleid', 'out-2')

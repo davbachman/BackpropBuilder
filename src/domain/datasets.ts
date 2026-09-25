@@ -138,6 +138,20 @@ export const DATASET_MENU_OPTIONS: { kind: DatasetKind; label: string }[] = [
   { kind: 'custom-csv', label: 'Custom CSV…' },
 ]
 
+export function customCsvCardWidth(node: GraphNode): number {
+  const longest = Math.max(0, ...Array.from({ length: datasetOutputCountForNode(node) }, (_, slot) => datasetOutputLabelForSlot(node, slot).length))
+  return Math.min(420, Math.max(280, 194 + longest * 6))
+}
+export function customCsvLabelWidth(node: GraphNode): number {
+  return customCsvCardWidth(node) - 176
+}
+export function customCsvOutputTop(index: number, detailed = false): number {
+  return (detailed ? 165 : 110) + index * 30
+}
+export function customCsvCardHeight(node: GraphNode, detailed = false): number {
+  return customCsvOutputTop(datasetOutputCountForNode(node), detailed)
+}
+
 const customDatasetCache = new WeakMap<CustomCsvData, ToyDataset>()
 
 export function datasetForNode(node: GraphNode): ToyDataset {

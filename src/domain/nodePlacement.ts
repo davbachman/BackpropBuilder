@@ -1,5 +1,6 @@
 import { compactVisualHierarchy, layoutContinuousScene, sceneContentBounds, sceneGroupId } from './continuousScene'
 import { layoutSemanticGraph } from './semanticLayout'
+import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 import type { GraphModel, GraphNode, Position } from './types'
 
 /** Place a new calculation in the clicked visual level. Existing blocks keep
@@ -19,8 +20,8 @@ export function placeCanvasNode(graph: GraphModel, node: GraphNode, displayGraph
     const bounds = sceneContentBounds(scene, parentGroupId)
     const scale = scene.levels.find(level => level.parentId === parentGroupId)?.scale ?? 1
     const position = {
-      x: Math.max(bounds.x, Math.min(node.position.x, bounds.x + bounds.width - 176 * scale)),
-      y: Math.max(bounds.y, Math.min(node.position.y, bounds.y + bounds.height - (node.type === 'loss' ? 176 : 112) * scale)),
+      x: Math.max(bounds.x, Math.min(node.position.x, bounds.x + bounds.width - (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : 176) * scale)),
+      y: Math.max(bounds.y, Math.min(node.position.y, bounds.y + bounds.height - (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : 112) * scale)),
     }
     const ancestors = new Set<string>()
     let current = graph.groups.find(group => group.id === parentGroupId)

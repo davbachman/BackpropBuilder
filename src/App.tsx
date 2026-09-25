@@ -32,6 +32,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from 'react'
+import { flushSync } from 'react-dom'
 import './App.css'
 import './unifiedStudio.css'
 import './workspacePanels.css'
@@ -200,6 +201,7 @@ function App({
   >()
   const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
   const [importError, setImportError] = useState<string | undefined>()
+  const [csvPickerOpen, setCsvPickerOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)
   const pendingCustomCsvNodeId = useRef<string | undefined>(undefined)
@@ -721,7 +723,11 @@ function App({
   const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
     if (dataset === 'custom-csv') {
       pendingCustomCsvNodeId.current = nodeId
-      setImportError(undefined)
+      flushSync(() => {
+        setImportError(undefined)
+        setCsvPickerOpen(true)
+      })
+      customCsvInputRef.current?.focus()
       customCsvInputRef.current?.click()
       return
     }
@@ -732,10 +738,11 @@ function App({
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     const nodeId = pendingCustomCsvNodeId.current
-    pendingCustomCsvNodeId.current = undefined
     if (!file || !nodeId) return
     try {
       applyDatasetSelection(nodeId, 'custom-csv', parseCustomCsv(await file.text(), file.name))
+      pendingCustomCsvNodeId.current = undefined
+      setCsvPickerOpen(false)
       setImportError(undefined)
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'Could not read the CSV file.')
@@ -1122,14 +1129,24 @@ function App({
             style={{ display: 'none' }}
             onChange={importProjectState}
           />
-          <input ref={customCsvInputRef} type="file" accept=".csv,text/csv" aria-label="Choose custom CSV file" style={{ display: 'none' }} onChange={importCustomCsv} />
-          {importError ? (
+          {importError && !csvPickerOpen ? (
             <p className="import-error" role="alert">
               {importError}
             </p>
           ) : null}
         </div>
       </header>
+
+      {csvPickerOpen && <div className="csv-picker-backdrop">
+        <section role="dialog" aria-modal="true" aria-labelledby="csv-picker-title" className="csv-picker-dialog" onKeyDown={event => { if (event.key === 'Escape') { pendingCustomCsvNodeId.current = undefined; setCsvPickerOpen(false) } }}>
+          <p className="eyebrow">Dataset source</p>
+          <h2 id="csv-picker-title">Choose a CSV file</h2>
+          <p>The CSV stays in this browser and becomes part of your saved project.</p>
+          <input ref={customCsvInputRef} type="file" accept=".csv,text/csv" aria-label="Choose custom CSV file" onChange={importCustomCsv} />
+          {importError && <p role="alert" className="csv-picker-error">{importError}</p>}
+          <button type="button" onClick={() => { pendingCustomCsvNodeId.current = undefined; setCsvPickerOpen(false); setImportError(undefined) }}>Cancel</button>
+        </section>
+      </div>}
 
       <aside className="left-panel" aria-label="Build blocks">
         <div className="sidebar-heading">

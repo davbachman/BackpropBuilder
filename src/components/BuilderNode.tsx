@@ -19,7 +19,7 @@ import {
   lossKindForNode,
   outputArityForNode,
 } from '../domain/engine'
-import { DATASET_MENU_OPTIONS, datasetTargetSlotForNode } from '../domain/datasets'
+import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
 import type { DatasetKind, GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
 
@@ -81,6 +81,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
     node.type === 'bias' ||
     ((node.type === 'input' || node.type === 'target') && !data.hasIncomingValue)
   const selectedDataset = node.type === 'dataset' ? datasetForNode(node) : undefined
+  const customCsv = node.type === 'dataset' && node.params.dataset === 'custom-csv'
   const lossKind = data.lossKind ?? lossKindForNode(node)
   const lossOptions = data.lossOptions ?? LOSS_OPTIONS
   const showTypeBadge = node.label.trim().toLowerCase() !== node.type
@@ -96,8 +97,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
 
   return (
     <div
-      className={`builder-node node-${node.type} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
-      style={{ ...(isFlexibleInputNode ? { height: nodeHeight } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
+      className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
+      style={{ ...(isFlexibleInputNode ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
       {Array.from({ length: inputCount }).map((_, index) => (
         <Handle
@@ -209,13 +210,14 @@ export function BuilderNode(props: NodeProps): ReactElement {
               key={index}
               label={datasetOutputLabelForSlot(node, index)}
               value={datasetOutputValueForSlot(node, index)}
+              valueOnly={customCsv}
             />
           ))
         ) : (
           <TensorMetric label="out" value={node.value} />
         )}
         {node.localDerivative !== undefined ? <TensorMetric label="d local" value={node.localDerivative} /> : null}
-        {data.showGradient ? <TensorMetric label="grad" value={node.grad} /> : null}
+        {data.showGradient && !customCsv ? <TensorMetric label="grad" value={node.grad} /> : null}
       </div>
       {isSource ? (
         Array.from({ length: outputCount }).map((_, index) => (
@@ -225,14 +227,14 @@ export function BuilderNode(props: NodeProps): ReactElement {
             type="source"
             position={Position.Right}
             className={`node-handle source-handle${node.type === 'dataset' && node.params.dataset !== 'custom-csv' && index === datasetTargetSlotForNode(node) ? ' dataset-target-handle' : ''}`}
-            style={outputCount > 1 ? { top: `${outputHandleTop(index)}px` } : undefined}
+            style={customCsv ? { top: `${customCsvOutputTop(index, true)}px` } : outputCount > 1 ? { top: `${outputHandleTop(index)}px` } : undefined}
           />
         ))
       ) : null}
       {outputCount > 1 ? (
-        <div className="node-output-labels" aria-hidden="true">
+        <div className="node-output-labels" aria-hidden="true" style={customCsv ? { width: customCsvLabelWidth(node) } : undefined}>
           {Array.from({ length: outputCount }).map((_, index) => (
-            <span key={index} style={{ top: `${outputHandleTop(index)}px` }}>
+            <span key={index} style={{ top: `${customCsv ? customCsvOutputTop(index, true) : outputHandleTop(index)}px` }} title={datasetOutputLabelForSlot(node, index)}>
               {datasetOutputLabelForSlot(node, index)}
             </span>
           ))}
@@ -250,10 +252,10 @@ function outputHandleTop(index: number): number {
   return FLEX_INPUT_HEIGHT_STEP + index * 30
 }
 
-function TensorMetric({ label, value }: { label: string; value: TensorValue | undefined }): ReactElement {
+function TensorMetric({ label, value, valueOnly = false }: { label: string; value: TensorValue | undefined; valueOnly?: boolean }): ReactElement {
   return (
     <HoverText
-      text={`${label} ${formatCompactTensor(value)}`}
+      text={valueOnly ? formatCompactTensor(value) : `${label} ${formatCompactTensor(value)}`}
       tooltip={`${label} ${formatFullTensor(value)}`}
     />
   )

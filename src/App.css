@@ -529,6 +529,61 @@
   transform: translateY(-50%);
 }
 
+.builder-node.node-dataset.is-custom-csv .node-metrics {
+  position: absolute;
+  top: 156px;
+  left: 10px;
+  width: 136px;
+  max-width: 136px;
+  margin: 0;
+  gap: 17px;
+  overflow: hidden;
+}
+
+.builder-node.node-dataset.is-custom-csv .node-metrics > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-node.node-dataset.is-custom-csv .node-output-labels span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.csv-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(32, 28, 44, 0.24);
+  backdrop-filter: blur(3px);
+}
+
+.csv-picker-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 390px);
+  padding: 22px;
+  border: 1px solid #e7e1ee;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(32, 28, 44, 0.18);
+}
+
+.csv-picker-dialog .eyebrow,
+.csv-picker-dialog h2,
+.csv-picker-dialog p { margin: 0; }
+.csv-picker-dialog h2 { font-size: 18px; color: #40344f; }
+.csv-picker-dialog p { color: #756c80; font-size: 12px; line-height: 1.5; }
+.csv-picker-dialog input { width: 100%; min-width: 0; font-size: 12px; }
+.csv-picker-dialog button { justify-self: end; }
+.csv-picker-dialog .csv-picker-error { color: #a93434; }
+
 .builder-edge {
   stroke: var(--muted);
   stroke-width: 2.2;

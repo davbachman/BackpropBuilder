@@ -1,4 +1,5 @@
 import { denseGroupDetail } from './authoring'
+import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 import {
   MIN_NODE_HEIGHT,
   NODE_WIDTH,
@@ -328,8 +329,8 @@ function nodeRect(node: GraphNode): NodeRect {
   return {
     x: node.position.x,
     y: node.position.y,
-    width: node.dimensions?.width ?? NODE_WIDTH,
-    height: node.dimensions?.height ?? (isFlexibleInputNodeType(node.type) ? heightForInputCount(inputArityForNode(node)) : MIN_NODE_HEIGHT),
+    width: node.dimensions?.width ?? (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : NODE_WIDTH),
+    height: node.dimensions?.height ?? (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : isFlexibleInputNodeType(node.type) ? heightForInputCount(inputArityForNode(node)) : MIN_NODE_HEIGHT),
   }
 }
 

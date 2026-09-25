@@ -1,4 +1,5 @@
 import type { GraphGroup, GraphModel, GraphNode } from './types'
+import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 
 export interface SemanticRect { x: number; y: number; width: number; height: number }
 export interface SemanticLayout {
@@ -37,7 +38,7 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
       const height = Math.max(130, ...nested.map((item) => item.y + item.height)) + 94
       return { id: group.id, group, memberIds: group.nodeIds, nested, width, height, x: 0, y: 0 }
     })
-    items.push(...ownNodes.map((node) => ({ id: node.id, node, memberIds: [node.id], width: coordinates ? 112 : 176, height: node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112, x: 0, y: 0 })))
+    items.push(...ownNodes.map((node) => ({ id: node.id, node, memberIds: [node.id], width: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : coordinates ? 112 : 176, height: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112, x: 0, y: 0 })))
     const owner = new Map(items.flatMap((item) => item.memberIds.map((id) => [id, item.id] as const)))
     const incoming = new Map(items.map((item) => [item.id, new Set<string>()]))
     const outgoing = new Map(items.map((item) => [item.id, new Set<string>()]))

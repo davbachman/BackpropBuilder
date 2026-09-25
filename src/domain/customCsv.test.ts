@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeCustomCsv, parseCustomCsv } from './customCsv'
-import { datasetExamples, datasetForNode, datasetOutputValueForSlot } from './datasets'
+import { customCsvCardWidth, datasetExamples, datasetForNode, datasetOutputValueForSlot } from './datasets'
 import { forwardPass, parameterValues, runTrainingStep } from './engine'
 import { createStarterGraph } from './examples'
 import { createProjectStateFile, parseProjectStateFile } from './session'
+import { layoutSemanticGraph } from './semanticLayout'
 
 describe('custom CSV datasets', () => {
   it('reads quoted headers and numeric columns, keeps train/test rows aligned, and survives project save/import', () => {
@@ -49,5 +50,15 @@ describe('custom CSV datasets', () => {
     const initial = forwardPass(graph)
     expect(initial.loss).toBeGreaterThan(0)
     expect(runTrainingStep(initial.graph).loss).toBeLessThan(initial.loss!)
+  })
+
+  it('reserves canvas space for long column names', () => {
+    const csv = parseCustomCsv('very_long_feature_column_name,second_long_feature_column_name,target_label\n1,2,3\n2,3,5\n3,4,7\n', 'wide.csv')
+    const graph = createStarterGraph(true)
+    const source = graph.nodes.find(node => node.type === 'dataset')!
+    source.params = { dataset: 'custom-csv', customCsv: csv }
+    const width = customCsvCardWidth(source)
+    expect(width).toBeGreaterThan(350)
+    expect(layoutSemanticGraph(graph).nodes.get(source.id)?.width).toBe(width)
   })
 })

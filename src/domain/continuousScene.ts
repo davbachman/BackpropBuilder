@@ -1,4 +1,5 @@
 import { inputArityForNode, outputArityForNode } from './engine'
+import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 import { visualGroupInterface } from './grouping'
 import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
@@ -142,8 +143,8 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       scene.nodes.set(node.id, {
         x: (frame?.x ?? 0) + placement.offset.x + (offset?.x ?? 0),
         y: (frame?.y ?? 0) + placement.offset.y + (offset?.y ?? 0),
-        width: 176 * nodeScale,
-        height: (node.type === 'loss' ? 176 : 112) * nodeScale,
+        width: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : 176) * nodeScale,
+        height: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : 112) * nodeScale,
       })
       scene.scales.set(node.id, nodeScale)
       scene.parents.set(node.id, parent?.id)

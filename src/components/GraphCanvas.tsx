@@ -50,6 +50,7 @@ import { blockPalette } from '../domain/blockPalette'
 import { codeForGroup } from '../domain/codeOutline'
 import type {
   ActivationKind,
+  CustomCsvData,
   DatasetKind,
   EvaluationTraceStep,
   GraphModel,
@@ -159,7 +160,7 @@ function GraphCanvasInner({
   const continuous = semantic && sourceGraph.view?.semanticZoom !== false
   const renderedGraph = useMemo(() => continuous ? compactVisualHierarchy(sourceGraph) : sourceGraph, [sourceGraph, continuous])
   const geometryKey = JSON.stringify({
-    nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, dataset: params.dataset } })),
+    nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, dataset: params.dataset, customCsv: params.customCsv ? csvGeometrySample(params.customCsv) : undefined } })),
     edges: renderedGraph.edges.map(({ id, source, target, inputSlot, sourceSlot }) => ({ id, source, target, inputSlot, sourceSlot })),
     groups: renderedGraph.groups,
     view: { expandedGroupIds: [], layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges, manualNodePlacements: renderedGraph.view?.manualNodePlacements },
@@ -413,8 +414,8 @@ function GraphCanvasInner({
             sceneScale: scene?.scales.get(node.id),
             displayInputCount: Math.max(0, ...renderedGraph.edges.filter(edge => edge.target === node.id).map(edge => (edge.inputSlot ?? 0) + 1)),
             coordinate: node.id.startsWith('inspect:'),
-            vertical: node.type !== 'loss' && semantic && renderedGraph.groups?.some((group) => group.kind === 'transformer-block' || group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
-            compactStage: semantic && renderedGraph.groups?.some((group) => group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
+            vertical: node.type !== 'loss' && node.params.dataset !== 'custom-csv' && semantic && renderedGraph.groups?.some((group) => group.kind === 'transformer-block' || group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
+            compactStage: node.params.dataset !== 'custom-csv' && semantic && renderedGraph.groups?.some((group) => group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
             showMath,
             showGradient: semantic ? showGradient && phase === 'backward' : showGradient,
             formula: formulaForNode(node, renderedGraph, formatCompactTensor),
@@ -1133,4 +1134,14 @@ function groupIdFromNodeId(nodeId: string): string | undefined {
 
 function isGroupNodeId(nodeId: string): boolean {
   return nodeId.startsWith(GROUP_NODE_ID_PREFIX)
+}
+
+/** Layout needs CSV column names and count, but never the full table. Keep the
+ * geometry dependency small even when the imported CSV has thousands of rows. */
+function csvGeometrySample(csv: CustomCsvData): CustomCsvData {
+  const width = csv.rows[0].length
+  const first = Array.from({ length: width }, () => '0')
+  const second = [...first]
+  second[csv.targetColumn] = '1'
+  return { ...csv, rows: csv.hasHeader ? [csv.rows[0], first, second] : [first, second] }
 }

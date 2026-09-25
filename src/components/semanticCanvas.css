@@ -112,6 +112,7 @@
 .semantic-operation-select:focus-visible { outline: 2px solid #728bc5; outline-offset: 2px; }
 .semantic-dataset-summary { display: block; margin-top: 9px; color: #8a9eac; font-size: 8px; }
 .semantic-dataset-port { position: absolute; right: 8px; transform: translateY(-50%); color: #567a90; font: 9px/1 ui-monospace, monospace; }
+.semantic-operation.is-custom-csv .semantic-dataset-port { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .semantic-dataset-port.is-target { color: #ad765c; }
 .semantic-operation .dataset-target-handle { background: #bc8b70; }
 .operation-dataset.is-model-stage .semantic-dataset-port { right: auto; top: auto; bottom: 6px; transform: translateX(-50%); }
