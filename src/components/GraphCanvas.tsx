@@ -2,7 +2,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
@@ -60,6 +59,7 @@ import type {
   NodeType,
   Position as GraphPosition,
   TensorValue,
+  TensorTransformKind,
 } from '../domain/types'
 import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { BuilderNode, type BuilderNodeData } from './BuilderNode'
@@ -108,6 +108,7 @@ interface GraphCanvasProps {
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
   onExpressionChange?: (nodeId: string, expression: string) => void
+  onTransformChange?: (nodeId: string, transform: TensorTransformKind) => void
   onLossChange?: (nodeId: string, loss: LossKind) => void
   onDatasetChange?: (nodeId: string, dataset: DatasetKind) => void
   onGroupCreate: () => void
@@ -146,6 +147,7 @@ function GraphCanvasInner({
   onNodeValueChange,
   onActivationChange,
   onExpressionChange,
+  onTransformChange,
   onLossChange,
   onDatasetChange,
   onGroupCreate,
@@ -430,6 +432,7 @@ function GraphCanvasInner({
             onValueChange: onNodeValueChange,
             onActivationChange: (nodeId: string, value: string) => onActivationChange(nodeId, value as ActivationKind),
             onExpressionChange: onExpressionChange ?? (() => undefined),
+            onTransformChange: onTransformChange ?? (() => undefined),
             onLossChange: onLossChange ?? (() => undefined),
             onDatasetChange: onDatasetChange ?? (() => undefined),
           },
@@ -441,6 +444,7 @@ function GraphCanvasInner({
       activeStep?.nodeId,
       onActivationChange,
       onExpressionChange,
+      onTransformChange,
       onLossChange,
       onDatasetChange,
       addFlexibleInput,
@@ -1028,7 +1032,6 @@ function GraphCanvasInner({
           className={pendingNodeType ? 'placement-mode' : undefined}
         >
           <Background color="var(--grid-dot)" gap={continuous ? 24 / cameraZoom : 24} size={continuous ? 1 / cameraZoom : 1} variant={BackgroundVariant.Dots} />
-          <MiniMap pannable zoomable nodeStrokeWidth={3} />
           <Controls showInteractive={false} />
         </ReactFlow>
         {addMenu ? <div className="canvas-add-menu" role="dialog" aria-label="Add a block" style={{ left: addMenu.x, top: addMenu.y }} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>

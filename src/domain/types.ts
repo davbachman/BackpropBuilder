@@ -18,13 +18,15 @@ export type NodeType =
   | 'causal-mask'
   | 'layer-norm'
   | 'reshape'
+  | 'tensor-transform'
   | 'mean'
   | 'cross-entropy'
   | 'conv2d'
   | 'avgpool2d'
 
 export type ActivationKind = 'identity' | 'relu' | 'sigmoid' | 'tanh'
-export type LossKind = 'squared-error' | 'mse' | 'mae' | 'binary-cross-entropy'
+export type LossKind = 'squared-error' | 'mse' | 'mae' | 'binary-cross-entropy' | 'cross-entropy'
+export type TensorTransformKind = 'reshape' | 'transpose' | 'slice' | 'mean'
 export type DatasetKind =
   | 'line-1d'
   | 'cubic-1d'
@@ -71,6 +73,7 @@ export interface NodeParams {
   datasetValues?: TensorValue[]
   inputCount?: number
   expression?: string
+  transform?: TensorTransformKind
   axis?: number
   start?: number
   end?: number

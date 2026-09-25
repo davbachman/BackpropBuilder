@@ -11,6 +11,7 @@ import type {
   GraphNode,
   LossKind,
   NodeType,
+  TensorTransformKind,
   ParameterUpdate,
   TensorValue,
   UpdateResult,
@@ -59,7 +60,7 @@ export {
 const SOURCE_TYPES = new Set<NodeType>(['dataset', 'input', 'weight', 'bias', 'target'])
 const OPTIONAL_PASSTHROUGH_TYPES = new Set<NodeType>(['input', 'target'])
 const FLEXIBLE_INPUT_TYPES = new Set<NodeType>(['multiply', 'add', 'concat'])
-const TENSOR_OPERATION_TYPES = new Set<NodeType>(['conv2d', 'avgpool2d', 'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy'])
+const TENSOR_OPERATION_TYPES = new Set<NodeType>(['conv2d', 'avgpool2d', 'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy', 'tensor-transform'])
 
 export function isLossNode(node: GraphNode): boolean { return node.type === 'loss' || node.type === 'cross-entropy' }
 
@@ -76,8 +77,19 @@ export const LOSS_OPTIONS: Array<{ kind: LossKind; label: string }> = [
   { kind: 'mse', label: 'Mean squared error' },
   { kind: 'mae', label: 'Mean absolute error' },
   { kind: 'binary-cross-entropy', label: 'Binary cross entropy' },
+  { kind: 'cross-entropy', label: 'Cross entropy (logits)' },
 ]
-const TENSOR_LOSS_OPTIONS = LOSS_OPTIONS.filter((option) => option.kind !== 'squared-error')
+
+export const TENSOR_TRANSFORM_OPTIONS: Array<{ kind: TensorTransformKind; label: string }> = [
+  { kind: 'reshape', label: 'Reshape' },
+  { kind: 'transpose', label: 'Transpose' },
+  { kind: 'slice', label: 'Slice' },
+  { kind: 'mean', label: 'Mean' },
+]
+
+function selectedTensorTransform(node: GraphNode): TensorTransformKind {
+  return node.params.transform ?? 'reshape'
+}
 
 export const inputArityByType: Record<NodeType, number> = {
   dataset: 0,
@@ -99,6 +111,7 @@ export const inputArityByType: Record<NodeType, number> = {
   'causal-mask': 1,
   'layer-norm': 3,
   reshape: 1,
+  'tensor-transform': 1,
   mean: 1,
   'cross-entropy': 2,
   conv2d: 3,
@@ -191,6 +204,7 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
     case 'layer-norm': return `${outputLabel} = γ · (${inputLabels[0]} − mean) / √(variance + ε) + β`
     case 'reshape': return `${outputLabel} = reshape(${inputLabels[0]}, [${node.params.shape ?? []}])`
     case 'mean': return `${outputLabel} = mean(${inputLabels[0]}${node.params.axis === undefined ? '' : `, axis=${node.params.axis}`})`
+    case 'tensor-transform': return formulaForNode({ ...node, type: selectedTensorTransform(node) }, graph, valueFormatter)
     case 'cross-entropy': return `L = mean(−log softmax(${inputLabels[0]})[${inputLabels[1]}])`
     case 'loss':
       return lossFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
@@ -198,22 +212,18 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
 }
 
 export function lossOptionsForNode(node: GraphNode, graph?: GraphModel): Array<{ kind: LossKind; label: string }> {
-  if (node.type === 'loss' && graph && hasNonScalarIncomingValue(node, graph)) return TENSOR_LOSS_OPTIONS
+  void node; void graph
   return LOSS_OPTIONS
 }
 
 export function lossKindForNode(node: GraphNode, graph?: GraphModel): LossKind {
-  return lossKindForOptions(node, lossOptionsForNode(node, graph))
+  if (node.type === 'cross-entropy') return 'cross-entropy'
+  return node.params.loss ?? (graph && hasNonScalarIncomingValue(node, graph) ? 'mse' : 'squared-error')
 }
 
 function lossKindForInputs(node: GraphNode, inputs: TensorValue[]): LossKind {
-  return lossKindForOptions(node, inputs.some((input) => !isScalarTensor(input)) ? TENSOR_LOSS_OPTIONS : LOSS_OPTIONS)
-}
-
-function lossKindForOptions(node: GraphNode, options: Array<{ kind: LossKind; label: string }>): LossKind {
-  const selected = node.params.loss
-  if (selected && options.some((option) => option.kind === selected)) return selected
-  return options[0]?.kind ?? 'squared-error'
+  if (node.type === 'cross-entropy') return 'cross-entropy'
+  return node.params.loss ?? (inputs.some((input) => !isScalarTensor(input)) ? 'mse' : 'squared-error')
 }
 
 function lossLabel(kind: LossKind): string {
@@ -223,6 +233,7 @@ function lossLabel(kind: LossKind): string {
 function lossFormula(kind: LossKind, inputLabels: string[], isTensor: boolean): string {
   const prediction = inputLabels[0] ?? 'prediction'
   const target = inputLabels[1] ?? 'target'
+  if (kind === 'cross-entropy') return `L = mean(-log softmax(${prediction})[${target}])`
 
   if (!isTensor) {
     if (kind === 'mse') return `L = (${prediction} - ${target})^2`
@@ -529,12 +540,12 @@ function validateDiscreteInputs(graph: GraphModel): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const shapes = inferredOutputShapes(graph)
   for (const node of graph.nodes) {
-    if (node.type !== 'embedding' && node.type !== 'cross-entropy') continue
+    if (node.type !== 'embedding' && node.type !== 'cross-entropy' && !(node.type === 'loss' && node.params.loss === 'cross-entropy')) continue
     const incoming = incomingEdges(graph, node.id)
     const ids = graph.nodes.find(candidate => candidate.id === incoming[1]?.source)
     if (!ids || !['input', 'target', 'weight', 'bias'].includes(ids.type) || incomingEdges(graph, ids.id).length) continue
     const firstShape = shapes.get(incoming[0]?.source)
-    const limit = firstShape?.[node.type === 'embedding' ? 0 : 1]
+    const limit = firstShape?.[node.type === 'embedding' ? 0 : firstShape.length === 1 ? 0 : 1]
     if (toTensor(ids.params.value).data.some(id => !Number.isInteger(id) || id < 0 || (limit !== undefined && id >= limit))) {
       issues.push({ code: 'invalid-value', nodeId: node.id, message: `${node.label} needs integer token IDs ${limit === undefined ? 'greater than or equal to 0' : `from 0 to ${limit - 1}`}. Edit ${ids.label} to use valid IDs.` })
     }
@@ -582,6 +593,7 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
 }
 
 function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] | undefined {
+  const operation = node.type === 'tensor-transform' ? selectedTensorTransform(node) : node.type
   if (node.type === 'matmul') {
     const [a, b] = inputShapes
     return a.length === 2 && b.length === 2 && a[1] === b[0] ? [a[0], b[1]] : undefined
@@ -591,11 +603,11 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   if (node.type === 'conv2d') return first.length === 3 && second.length === 4 && third.length === 1 && first[2] === second[3] && second[0] === third[0] && first[0] >= second[1] && first[1] >= second[2] ? [first[0] - second[1] + 1, first[1] - second[2] + 1, second[0]] : undefined
   if (node.type === 'avgpool2d') return first.length === 3 && first[0] >= 2 && first[1] >= 2 ? [Math.floor(first[0] / 2), Math.floor(first[1] / 2), first[2]] : undefined
   if (node.type === 'embedding') return first.length === 2 && second.length === 1 ? [second[0], first[1]] : undefined
-  if (node.type === 'transpose') {
+  if (operation === 'transpose') {
     const axes = node.params.axes ?? first.map((_, index) => first.length - index - 1)
     return axes.length === first.length && new Set(axes).size === axes.length && axes.every((a) => Number.isInteger(a) && a >= 0 && a < first.length) ? axes.map((a) => first[a]) : undefined
   }
-  if (node.type === 'slice') {
+  if (operation === 'slice') {
     const start = node.params.start ?? 0, end = node.params.end ?? first[axis]
     if (![axis, start, end].every(Number.isInteger) || axis < 0 || axis >= first.length || start < 0 || end > first[axis] || end <= start) return undefined
     return first.map((dimension, index) => index === axis ? end - start : dimension)
@@ -607,11 +619,11 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   if (node.type === 'softmax') return first.length && first.at(-1)! > 0 ? [...first] : undefined
   if (node.type === 'causal-mask') return first.length === 2 && first[0] === first[1] ? [...first] : undefined
   if (node.type === 'layer-norm') return first.length > 0 && second.length === 1 && third.length === 1 && second[0] === first.at(-1) && third[0] === first.at(-1) && (node.params.epsilon === undefined || (Number.isFinite(node.params.epsilon) && node.params.epsilon > 0)) ? [...first] : undefined
-  if (node.type === 'reshape') {
+  if (operation === 'reshape') {
     const shape = node.params.shape ?? first
     try { return resolveReshape(shape,tensorSize(first)) } catch { return undefined }
   }
-  if (node.type === 'mean') {
+  if (operation === 'mean') {
     if (node.params.axis === undefined) return node.params.keepDims ? first.map(() => 1) : []
     if (!Number.isInteger(axis) || axis < 0 || axis >= first.length) return undefined
     return first.flatMap((d, index) => index === axis ? (node.params.keepDims ? [1] : []) : [d])
@@ -619,7 +631,14 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   if (node.type === 'cross-entropy') return first.length === 2 && second.length === 1 && second[0] === first[0] ? [] : undefined
   if (node.type === 'activation') return [...inputShapes[0]]
   if (node.type === 'add' || node.type === 'multiply' || node.type === 'arithmetic') return broadcastShapeForShapes(inputShapes)
-  if (node.type === 'loss') return broadcastShapeForShapes(inputShapes) ? [] : undefined
+  if (node.type === 'loss') {
+    if (node.params.loss === 'cross-entropy') {
+      return first.length === 2 && second.length === 1 && first[0] === second[0]
+        || first.length === 1 && second.length === 0
+        || first.length === 1 && second.length === 1 && second[0] === 1 ? [] : undefined
+    }
+    return broadcastShapeForShapes(inputShapes) ? [] : undefined
+  }
   return []
 }
 
@@ -821,7 +840,26 @@ function computeForward(
     return { value, localDerivative: derivative, localDerivatives: [derivative] }
   }
 
+  if (node.type === 'loss' && lossKindForInputs(node, inputs) === 'cross-entropy') {
+    const result = crossEntropyCalculation(node, inputs, scalarValue(1))
+    return { value: result.value, localDerivative: result.gradients[0], localDerivatives: result.gradients }
+  }
+
   return computeLossForward(lossKindForInputs(node, inputs), inputs[0], inputs[1])
+}
+
+function crossEntropyCalculation(node: GraphNode, inputs: TensorValue[], upstream?: TensorValue): { value: TensorValue; gradients: TensorValue[] } {
+  const [logits, target] = inputs
+  const singleExample = logits.shape.length === 1 && target.data.length === 1
+  const operands = singleExample
+    ? [tensorValue([1, logits.shape[0]], logits.data), tensorValue([1], target.data)]
+    : inputs
+  const calculation = tensorOperation({ ...node, type: 'cross-entropy' }, operands, Boolean(upstream))
+  if (upstream) calculation.output.backward(upstream.data)
+  return {
+    value: calculation.output.toValue(),
+    gradients: [tensorValue(logits.shape, calculation.operands[0].grad), zeroLike(target)],
+  }
 }
 
 function computeLossForward(
@@ -945,6 +983,11 @@ function computeBackward(
         gradient: reduceToShape(multiplyTensors(downstreamGrad, derivative), values[0].shape),
       },
     ]
+  }
+
+  if (node.type === 'loss' && lossKindForInputs(node, values) === 'cross-entropy') {
+    const gradients = crossEntropyCalculation(node, values, downstreamGrad).gradients
+    return incoming.map((edge, index) => ({ edgeId: edge.id, sourceId: edge.source, gradient: gradients[index] }))
   }
 
   const prediction = values[0]
@@ -1195,12 +1238,13 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   if (node.type === 'activation') {
     return `${node.params.activation ?? 'identity'}(${formatNumber(inputs[0])}) = ${formatNumber(node.value)}`
   }
-  if (TENSOR_OPERATION_TYPES.has(node.type)) return `${node.type}(${inputs.map((input) => formatShape(input.shape)).join(', ')}) = ${formatNumber(node.value)}`
+  if (TENSOR_OPERATION_TYPES.has(node.type)) return `${node.type === 'tensor-transform' ? selectedTensorTransform(node) : node.type}(${inputs.map((input) => formatShape(input.shape)).join(', ')}) = ${formatNumber(node.value)}`
   return lossCalculationForForward(node, inputs)
 }
 
 function lossCalculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   const kind = lossKindForInputs(node, inputs)
+  if (kind === 'cross-entropy') return `mean negative log likelihood = ${formatNumber(node.value)}; logits ${formatNumber(inputs[0])}, target IDs ${formatNumber(inputs[1])}`
   const error = node.cache?.error ?? subtractTensors(inputs[0], inputs[1])
   const denominator = meanDenominator(error)
   if (kind === 'mse') {
@@ -1218,7 +1262,7 @@ function lossCalculationForForward(node: GraphNode, inputs: TensorValue[]): stri
 function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
   const inputLabels = inputLabelsForFormula(node, graph)
   if (isOptionalPassThroughNode(node)) return 'dInput = gradient (identity connection)'
-  if (TENSOR_OPERATION_TYPES.has(node.type)) return TENSOR_DERIVATIVE_FORMULAS[node.type] ?? 'Accumulate the vector–Jacobian product into each input.'
+  if (TENSOR_OPERATION_TYPES.has(node.type)) return TENSOR_DERIVATIVE_FORMULAS[node.type === 'tensor-transform' ? selectedTensorTransform(node) : node.type] ?? 'Accumulate the vector–Jacobian product into each input.'
   if (node.type === 'matmul') return 'dA = gradient @ B.T; dB = A.T @ gradient'
   if (node.type === 'multiply') {
     return inputLabels
@@ -1234,6 +1278,7 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
     if (activation === 'tanh') return `dz/d${inputLabels[0]} = 1 - tanh(${inputLabels[0]})^2`
     return `dz/d${inputLabels[0]} = 1`
   }
+  if (node.type === 'loss' && lossKindForNode(node, graph) === 'cross-entropy') return 'dLogits = (softmax(logits) − one_hot(target)) / number of examples'
   if (node.type === 'loss') return lossDerivativeFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
   return 'Gradient accumulates here.'
 }
@@ -1263,6 +1308,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'arithmetic') return [formulaForNode(node, graph).replaceAll('^', '**')]
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
   const lossKind = lossKindForNode(node, graph)
+  if (lossKind === 'cross-entropy') return ['loss = mean(cross_entropy_from_logits(logits, target_ids))']
   if (lossKind === 'mse') return ['loss = mean((prediction - target) ** 2)']
   if (lossKind === 'mae') return ['loss = mean(abs(prediction - target))']
   if (lossKind === 'binary-cross-entropy') {
@@ -1284,6 +1330,7 @@ function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
 }
 
 function lossBackwardPseudocode(kind: LossKind): string[] {
+  if (kind === 'cross-entropy') return ['logits.grad += (softmax(logits) - one_hot(target_ids)) / n']
   if (kind === 'mse') return ['prediction.grad += 2 * (prediction - target) / n']
   if (kind === 'mae') return ['prediction.grad += sign(prediction - target) / n']
   if (kind === 'binary-cross-entropy') {
@@ -1304,7 +1351,7 @@ function tensorOperation(node: GraphNode, values: TensorValue[], requiresGrad = 
   })
   const [first, second, third] = operands
   let output: autograd.Tensor
-  switch (node.type) {
+  switch (node.type === 'tensor-transform' ? selectedTensorTransform(node) : node.type) {
     case 'conv2d': {
       const value = conv2d(first, second, third)
       output = autograd.tensor(value.shape, value.data, requiresGrad)

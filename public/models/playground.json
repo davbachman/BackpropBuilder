@@ -5219,13 +5219,15 @@
         },
         {
           "id": "loss",
-          "type": "cross-entropy",
+          "type": "loss",
           "label": "Classification loss",
           "position": {
             "x": 4310,
             "y": 220
           },
-          "params": {},
+          "params": {
+            "loss": "cross-entropy"
+          },
           "cache": {
             "inputValues": [
               {
@@ -5253,7 +5255,26 @@
                 0.5150618946359036
               ]
             },
-            "localDerivatives": []
+            "localDerivatives": [
+              {
+                "shape": [
+                  1,
+                  2
+                ],
+                "data": [
+                  -0.402536386319046,
+                  0.40253638631904587
+                ]
+              },
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ]
           },
           "value": {
             "shape": [],
@@ -5265,6 +5286,16 @@
             "shape": [],
             "data": [
               0
+            ]
+          },
+          "localDerivative": {
+            "shape": [
+              1,
+              2
+            ],
+            "data": [
+              -0.402536386319046,
+              0.40253638631904587
             ]
           }
         }
@@ -12455,13 +12486,15 @@
         },
         {
           "id": "loss",
-          "type": "cross-entropy",
+          "type": "loss",
           "label": "Classification loss",
           "position": {
             "x": 4310,
             "y": 220
           },
-          "params": {},
+          "params": {
+            "loss": "cross-entropy"
+          },
           "cache": {
             "inputValues": [
               {
@@ -12489,7 +12522,26 @@
                 0.5150618946359036
               ]
             },
-            "localDerivatives": []
+            "localDerivatives": [
+              {
+                "shape": [
+                  1,
+                  2
+                ],
+                "data": [
+                  -0.402536386319046,
+                  0.40253638631904587
+                ]
+              },
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ]
           },
           "value": {
             "shape": [],
@@ -12501,6 +12553,16 @@
             "shape": [],
             "data": [
               0
+            ]
+          },
+          "localDerivative": {
+            "shape": [
+              1,
+              2
+            ],
+            "data": [
+              -0.402536386319046,
+              0.40253638631904587
             ]
           }
         }

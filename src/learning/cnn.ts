@@ -31,7 +31,7 @@ export function createCnnPreset(): GraphModel {
   node('cnn-logits','activation','Class scores · 10 digits',['class-sums'],2200,0,{activation:'identity'})
   node('cnn-probabilities','softmax','Digit probabilities',['cnn-logits'],2250,-90)
   node('digit-target','target','Correct digit',[],1990,300,{value:{shape:[1],data:[sample.label]}})
-  node('cnn-loss','cross-entropy','Classification loss',['cnn-logits','digit-target'],2250,220)
+  node('cnn-loss','loss','Classification loss',['cnn-logits','digit-target'],2250,220,{loss:'cross-entropy'})
   graph.edges.push({id:'digit-data→digit-target',source:'digit-data',sourceSlot:1,target:'digit-target',inputSlot:0})
   graph.groups = [
     { id:'features',kind:'cnn',label:'See strokes → build features',nodeIds:['conv-weights','conv-bias','conv-output','conv-relu','pool-output','flat-features'],position:{x:300,y:0},dimensions:{width:240,height:170},detail:{sampleId:sample.id,inputNodeId:'image-input',outputNodeId:'flat-features'} },

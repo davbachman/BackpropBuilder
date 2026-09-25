@@ -2,9 +2,9 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Sigma, SlidersHorizontal, Sparkles, ArrowRight, CirclePlus, X, Grid2X2, Database } from 'lucide-react'
 import { Fragment, useState, type ReactElement } from 'react'
 import { parseArithmetic } from '../domain/arithmetic'
-import { inputArityForNode, outputArityForNode } from '../domain/engine'
+import { inputArityForNode, outputArityForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetForNode, datasetExamples, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
-import type { DatasetKind, LossKind } from '../domain/types'
+import type { DatasetKind, LossKind, TensorTransformKind } from '../domain/types'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type { BuilderNodeData } from './BuilderNode'
 
@@ -44,6 +44,8 @@ export function SemanticNode(props: NodeProps): ReactElement {
         {data.lossOptions?.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
       </select> : node.type === 'activation' ? <select aria-label="activation" className="semantic-operation-select nodrag nowheel" value={node.params.activation ?? 'identity'} onChange={event => data.onActivationChange(node.id, event.target.value)}>
         <option value="identity">identity</option><option value="relu">ReLU</option><option value="sigmoid">sigmoid</option><option value="tanh">tanh</option>
+      </select> : node.type === 'tensor-transform' ? <select aria-label="Tensor transform" className="semantic-operation-select nodrag nowheel" value={node.params.transform ?? 'reshape'} onChange={event => data.onTransformChange(node.id, event.target.value as TensorTransformKind)}>
+        {TENSOR_TRANSFORM_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
       </select> : node.type === 'arithmetic' ? <label className="semantic-arithmetic-field"><span>{data.fullFormula.split(' = ')[0]} =</span><input aria-label="Arithmetic expression" className={`nodrag nowheel ${expressionValid ? '' : 'is-invalid'}`} value={expressionText} spellCheck={false} onChange={event => {
         const text = event.target.value
         let valid = true

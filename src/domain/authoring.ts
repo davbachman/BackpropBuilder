@@ -16,6 +16,7 @@ export const operationHelp: Partial<Record<NodeType, string>> = {
   matmul: 'Left [rows, inner] × right [inner, columns] → [rows, columns]. Use a Param for the right matrix.',
   weight: 'A trainable scalar or tensor. Use its value as a weight, bias, or other learned quantity.',
   arithmetic: 'Type an expression with x1, x2, and so on. Supports +, -, *, /, numeric powers, and parentheses. Inputs are elementwise and can broadcast.',
+  'tensor-transform': 'Choose Reshape, Transpose, Slice, or Mean. Set shape, axes, or slice bounds below; gradients follow the selected transform.',
   embedding: 'Port 1: table [vocabulary, width]. Port 2: integer IDs [tokens]. Output: [tokens, width].',
   transpose: 'Empty axes reverses the axes. For a matrix, 1, 0 swaps rows and columns.',
   slice: 'Choose an axis and a start-inclusive, end-exclusive range. Slice Q, K and V on axis 1 to build attention heads.',

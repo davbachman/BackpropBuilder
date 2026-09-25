@@ -181,6 +181,8 @@ function App({
     } catch (error) {
       setIsPlaying(false)
       setInspectorOpen(true)
+      setRightOpen(true)
+      setRightTab('details')
       setExecutionError(
         error instanceof Error
           ? error.message
@@ -495,7 +497,7 @@ function App({
         })),
       })
       const updateSummary = summarizeUpdateSteps(updated.steps)
-      setTraceSteps([updateSummary])
+      setTraceSteps([updateSummary, ...(refreshed.steps ?? [])])
       setTraceIndex(0)
       setPhase('update')
       setEpoch((value) => value + 1)
@@ -529,9 +531,10 @@ function App({
     pushHistory()
     const result = runTrainingStep(graph, graph.learningRate)
     const updateSummary = summarizeUpdateSteps(result.steps.filter((step) => step.phase === 'update'))
+    const nextForward = forwardPass(result.graph)
     setGraph(result.graph)
     setVisualizationGraph(result.graph)
-    setTraceSteps([updateSummary])
+    setTraceSteps([updateSummary, ...nextForward.steps])
     setTraceIndex(0)
     setPhase('update')
     setEpoch((value) => value + 1)
@@ -561,7 +564,7 @@ function App({
     const summaryStep: EvaluationTraceStep = {
       id: `update-batch-${Date.now()}`,
       phase: 'update',
-      nodeId: nextGraph.nodes.find((node) => node.type === 'loss')?.id,
+      nodeId: nextGraph.nodes.find(isLossNode)?.id,
       edgeIds: [],
       title: 'Ran 10 gradient descent steps',
       explanation:
@@ -575,9 +578,10 @@ function App({
         '  update_parameters()',
       ],
     }
+    const nextForward = forwardPass(nextGraph)
     setGraph(nextGraph)
     setVisualizationGraph(nextGraph)
-    setTraceSteps([summaryStep])
+    setTraceSteps([summaryStep, ...nextForward.steps])
     setTraceIndex(0)
     setPhase('update')
     setEpoch((value) => value + 10)
@@ -1251,6 +1255,7 @@ function App({
         onNodeValueChange={updateNodeValue}
         onActivationChange={updateActivation}
         onExpressionChange={updateExpression}
+        onTransformChange={(nodeId, transform) => updateNodeParams(nodeId, { transform })}
         onLossChange={updateLoss}
         onDatasetChange={updateDataset}
         onGroupCreate={mergeSelectedNodes}
@@ -1621,7 +1626,7 @@ function summarizeUpdateSteps(steps: EvaluationTraceStep[]): EvaluationTraceStep
     edgeIds: [],
     title: count === 0 ? 'No trainable parameters to update' : `Update ${count} ${count === 1 ? 'parameter' : 'parameters'}`,
     explanation: count === 0
-      ? 'Add and connect a Weight or Bias block to make this model trainable.'
+      ? 'Add and connect a Param block to make this model trainable.'
       : 'Gradient descent updates all trainable parameters together. The next Step begins another forward pass.',
     formula: 'parameter = parameter - learning_rate * gradient',
     calculation: count === 0 ? 'No weights or biases are connected.' : `${shown.join(' · ')}${count > shown.length ? ` · ${count - shown.length} more` : ''}`,
@@ -1664,13 +1669,13 @@ function invalidateGraphResults(graph: GraphModel): GraphModel {
   }
 }
 
-function safeForward(graph: GraphModel): { graph: GraphModel; loss?: number } {
+function safeForward(graph: GraphModel): { graph: GraphModel; loss?: number; steps?: EvaluationTraceStep[] } {
   const issues = validateGraph(graph).filter(
     (issue) => issue.code !== 'disconnected',
   )
   if (issues.length > 0) return { graph: cloneGraph(graph) }
   const result = forwardPass(graph)
-  return { graph: result.graph, loss: result.loss }
+  return { graph: result.graph, loss: result.loss, steps: result.steps }
 }
 
 function remapDatasetOutgoingEdges(

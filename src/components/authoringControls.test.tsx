@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { scratchModel } from '../test/scratchModels'
 import { createNode } from '../domain/examples'
+import { blockPalette } from '../domain/blockPalette'
 import { forwardPass } from '../domain/engine'
 import { datasetOutputValueForSlot } from '../domain/datasets'
 import { tensorValue } from '../domain/tensor'
@@ -20,6 +21,14 @@ function InspectorHarness({initial}: {initial:GraphNode}) {
 }
 
 describe('scratch model authoring controls',()=>{
+  it('builds both scratch architectures using only blocks in the current palette',()=>{
+    const available = new Set(blockPalette.map(item => item.type))
+    for (const kind of ['cnn', 'transformer'] as const) {
+      const { graph } = scratchModel(kind)
+      expect(graph.nodes.every(node => available.has(node.type))).toBe(true)
+      expect(forwardPass(graph).loss).toBeGreaterThan(0)
+    }
+  })
   it('creates an entire filter tensor and retains the selected initializer',()=>{
     render(<InspectorHarness initial={createNode('weight',1)}/>)
     fireEvent.change(screen.getByLabelText('Tensor shape'),{target:{value:'4,3,3,1'}})
@@ -48,6 +57,21 @@ describe('scratch model authoring controls',()=>{
     expect(onParams).toHaveBeenLastCalledWith('mean-1',{axis:undefined,keepDims:true})
   })
 
+  it('edits the selected operation inside a Tensor transform block',()=>{
+    const node=createNode('tensor-transform',1), onParams=vi.fn()
+    const props={...callbacks,onParams,graph:{nodes:[node],edges:[],learningRate:.01}}
+    const view=render(<ModelInspector {...props} node={node}/>)
+    expect(screen.getByLabelText('Tensor transform operation')).toHaveValue('reshape')
+    fireEvent.change(screen.getByLabelText('Tensor transform operation'),{target:{value:'mean'}})
+    expect(onParams).toHaveBeenCalledWith(node.id,{transform:'mean'})
+    const changed={...node,params:{...node.params,transform:'mean' as const}}
+    view.rerender(<ModelInspector {...props} graph={{...props.graph,nodes:[changed]}} node={changed}/>)
+    expect(screen.getByLabelText('Operation axis')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Keep dimensions'))
+    fireEvent.click(screen.getByRole('button',{name:'Apply operation'}))
+    expect(onParams).toHaveBeenLastCalledWith(node.id,{axis:undefined,keepDims:true})
+  })
+
   it('shows the loss function the engine will actually use for tensor inputs',()=>{
     const prediction={...createNode('input',1),params:{value:tensorValue([2],[.2,.8])}}
     const target={...createNode('target',1),params:{value:tensorValue([2],[0,1])}}
@@ -58,7 +82,8 @@ describe('scratch model authoring controls',()=>{
     ],learningRate:.01}
     render(<ModelInspector {...callbacks} graph={graph} node={loss}/>)
     expect(screen.getByLabelText('Loss function')).toHaveValue('mse')
-    expect(screen.queryByRole('option',{name:'Squared error'})).not.toBeInTheDocument()
+    expect(screen.getByRole('option',{name:'Squared error'})).toBeInTheDocument()
+    expect(screen.getByRole('option',{name:'Cross entropy (logits)'})).toBeInTheDocument()
   })
 
   it('generates on a transformer whose nodes have only palette IDs',()=>{

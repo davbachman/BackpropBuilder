@@ -38,7 +38,7 @@ export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 
     const targetEdge = result.graph.edges.find(edge => edge.target === lossNode.id && edge.inputSlot === 1)
     const targetNode = result.graph.nodes.find(node => node.id === targetEdge?.source)
     const target = targetNode?.type === 'dataset' ? datasetOutputValueForSlot(targetNode, targetEdge?.sourceSlot ?? 0) : targetNode?.value
-    if (output && target && lossNode.type === 'cross-entropy') {
+    if (output && target && (lossNode.type === 'cross-entropy' || (lossNode.type === 'loss' && lossNode.params.loss === 'cross-entropy'))) {
       const width = output.shape.at(-1)!
       target.data.forEach((label, row) => {
         const scores = output.data.slice(row * width, (row + 1) * width)

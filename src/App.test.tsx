@@ -8,13 +8,30 @@ import { BuilderEdge } from './components/BuilderEdge'
 import { GraphCanvas } from './components/GraphCanvas'
 import { MIN_NODE_HEIGHT, NODE_WIDTH, forwardPass, heightForInputCount, parameterValues } from './domain/engine'
 import { DATASET_MENU_OPTIONS } from './domain/datasets'
-import { createStarterGraph } from './domain/examples'
+import { createNode, createStarterGraph } from './domain/examples'
 import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
 import { scalarValue, tensorValue } from './domain/tensor'
 import './index.css'
 import App from './App'
 import type { GraphModel } from './domain/types'
+
+function handBuiltLinearGraph(): GraphModel {
+  const dataset = createNode('dataset', 1)
+  dataset.params = { dataset: 'line-1d', datasetMode: 'batch', datasetSplit: 'train' }
+  const param = createNode('weight', 1)
+  const arithmetic = createNode('arithmetic', 1)
+  const target = createNode('target', 1)
+  const loss = createNode('loss', 1)
+  loss.params.loss = 'mse'
+  return { nodes: [dataset, param, arithmetic, target, loss], learningRate: 0.001, edges: [
+    { id: 'feature', source: dataset.id, sourceSlot: 0, target: arithmetic.id, inputSlot: 0 },
+    { id: 'parameter', source: param.id, target: arithmetic.id, inputSlot: 1 },
+    { id: 'dataset-target', source: dataset.id, sourceSlot: 1, target: target.id, inputSlot: 0 },
+    { id: 'prediction', source: arithmetic.id, target: loss.id, inputSlot: 0 },
+    { id: 'target', source: target.id, target: loss.id, inputSlot: 1 },
+  ] }
+}
 
 describe('Backprop Builder app', () => {
   it('renders the teaching workspace controls', () => {
@@ -309,7 +326,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('L = (pred - y)^2')).toBeInTheDocument()
   })
 
-  it('limits tensor-valued loss dropdowns to batch losses and defaults to mean squared error', () => {
+  it('keeps every loss selectable for tensor inputs and defaults to mean squared error', () => {
     const graph: GraphModel = {
       learningRate: 0.1,
       nodes: [
@@ -349,9 +366,11 @@ describe('Backprop Builder app', () => {
     expect(lossSelect).toBeDefined()
     expect(lossSelect).toHaveValue('mse')
     expect(Array.from(lossSelect!.querySelectorAll('option')).map((option) => option.value)).toEqual([
+      'squared-error',
       'mse',
       'mae',
       'binary-cross-entropy',
+      'cross-entropy',
     ])
     expect(screen.getByText('L = (1/n) * Σ_i (pred_i - y_i)^2')).toBeInTheDocument()
   })
@@ -619,6 +638,26 @@ describe('Backprop Builder app', () => {
 
     expect(screen.getByText('Epoch 2')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps stepping and playing past epoch one on a hand-built arithmetic model', async () => {
+    vi.useFakeTimers()
+    try {
+      render(<App initialGraph={handBuiltLinearGraph()} />)
+      const step = () => fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
+      for (let index = 0; index < 30 && !screen.queryByText('Epoch 1'); index++) step()
+      expect(screen.getByText('Epoch 1')).toBeInTheDocument()
+      step()
+      expect(screen.getByRole('heading', { name: /^Evaluate / })).toBeInTheDocument()
+      for (let index = 0; index < 30 && !screen.queryByText('Epoch 2'); index++) step()
+      expect(screen.getByText('Epoch 2')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+      for (let index = 0; index < 30 && !screen.queryByText('Epoch 3'); index++) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+      }
+      expect(screen.getByText('Epoch 3')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    } finally { vi.useRealTimers() }
   })
 
   it('uses palette selection as a one-shot canvas placement tool', async () => {

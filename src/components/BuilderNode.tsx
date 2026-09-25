@@ -9,6 +9,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import {
   FLEX_INPUT_HEIGHT_STEP,
   LOSS_OPTIONS,
+  TENSOR_TRANSFORM_OPTIONS,
   MAX_FLEX_INPUT_COUNT,
   datasetForNode,
   datasetOutputLabelForSlot,
@@ -22,7 +23,7 @@ import {
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
 import { parseArithmetic } from '../domain/arithmetic'
-import type { DatasetKind, GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
+import type { DatasetKind, GraphNode, LossKind, NodeType, TensorTransformKind, TensorValue } from '../domain/types'
 
 export interface BuilderNodeData extends Record<string, unknown> {
   graphNode: GraphNode
@@ -38,6 +39,7 @@ export interface BuilderNodeData extends Record<string, unknown> {
   onValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, value: string) => void
   onExpressionChange: (nodeId: string, expression: string) => void
+  onTransformChange: (nodeId: string, transform: TensorTransformKind) => void
   onLossChange: (nodeId: string, value: LossKind) => void
   onDatasetChange: (nodeId: string, value: DatasetKind) => void
 }
@@ -62,6 +64,7 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   'causal-mask': Box,
   'layer-norm': Sigma,
   reshape: Box,
+  'tensor-transform': Box,
   mean: Sigma,
   'cross-entropy': Sigma,
   conv2d: Crosshair,
@@ -182,6 +185,14 @@ export function BuilderNode(props: NodeProps): ReactElement {
             onBlur={commitExpression}
             onKeyDown={(event) => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}
           />
+        </label>
+      ) : null}
+      {node.type === 'tensor-transform' ? (
+        <label className="node-field">
+          transform
+          <select aria-label="Tensor transform" className="nodrag nowheel" value={node.params.transform ?? 'reshape'} onChange={(event) => data.onTransformChange(node.id, event.target.value as TensorTransformKind)}>
+            {TENSOR_TRANSFORM_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
+          </select>
         </label>
       ) : null}
       {node.type === 'loss' ? (

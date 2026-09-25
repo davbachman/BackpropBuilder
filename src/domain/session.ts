@@ -32,6 +32,7 @@ const NODE_TYPES = new Set([
   'matmul',
   'add',
   'arithmetic',
+  'tensor-transform',
   'activation',
   'target',
   'loss',
@@ -39,7 +40,7 @@ const NODE_TYPES = new Set([
   'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
 ])
 const ACTIVATION_KINDS = new Set<ActivationKind>(['identity', 'relu', 'sigmoid', 'tanh'])
-const LOSS_KINDS = new Set<LossKind>(['squared-error', 'mse', 'mae', 'binary-cross-entropy'])
+const LOSS_KINDS = new Set<LossKind>(['squared-error', 'mse', 'mae', 'binary-cross-entropy', 'cross-entropy'])
 const GRAPH_PHASES = new Set<GraphPhase>(['edit', 'forward', 'loss', 'backward', 'update'])
 
 export function createProjectStateFile(state: ProjectStateSnapshot): ProjectStateFile {
@@ -226,6 +227,7 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.datasetValues === undefined || (Array.isArray(value.datasetValues) && value.datasetValues.every(isTensorValue))) &&
     isOptionalNonNegativeInteger(value.inputCount) &&
     (value.expression === undefined || typeof value.expression === 'string') &&
+    (value.transform === undefined || ['reshape', 'transpose', 'slice', 'mean'].includes(String(value.transform))) &&
     isOptionalNonNegativeInteger(value.axis) &&
     isOptionalNonNegativeInteger(value.start) &&
     isOptionalNonNegativeInteger(value.end) &&

@@ -9,7 +9,6 @@
 .semantic-flow .builder-edge.is-residual { stroke: #c59a59; stroke-width: 2.3; stroke-dasharray: 7 4; }
 .semantic-flow .react-flow__controls { border: 1px solid #dce3ed; border-radius: 12px; box-shadow: 0 5px 18px #27364d0a; overflow: hidden; }
 .semantic-flow .react-flow__controls button { background: #fff; border-color: #edf1f6; }
-.semantic-flow .react-flow__minimap { border-radius: 12px; border: 1px solid #dce3ed; background: #fff; box-shadow: 0 5px 18px #27364d0a; height: 85px; width: 130px; }
 .semantic-zoom-switch { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: #67758c; font-size: 11px; white-space: nowrap; }
 .semantic-zoom-switch input { accent-color: #6478cb; width: 13px; height: 13px; }
 .semantic-canvas-hint { position: absolute; z-index: 4; pointer-events: none; bottom: 16px; left: 50%; transform: translateX(-50%); background: #ffffffed; border: 1px solid #e0e5ed; box-shadow: 0 4px 20px #29385506; border-radius: 24px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 11px; color: #6b7890; width: max-content; max-width: calc(100% - 90px); text-align: center; }
@@ -126,7 +125,7 @@
 .semantic-operation.is-coordinate .semantic-operation-heading svg { width: 12px; height: 12px; }
 .semantic-operation.is-coordinate .semantic-operation-formula, .semantic-operation.is-coordinate .semantic-shape { display: none; }
 .semantic-operation.is-coordinate .semantic-operation-value { margin-top: 9px; font-size: 14px; }
-@media (max-width: 850px) { .semantic-canvas-hint { font-size: 9px; padding: 7px 9px; bottom: 10px; } .semantic-flow .react-flow__minimap { display: none; } .semantic-zoom-switch { margin-left: 0; } }
+@media (max-width: 850px) { .semantic-canvas-hint { font-size: 9px; padding: 7px 9px; bottom: 10px; } .semantic-zoom-switch { margin-left: 0; } }
 
 /* Cards and their real contents occupy the same permanent canvas space. Only
    the cover fades; ancestor fills never accumulate over a deeply zoomed view. */

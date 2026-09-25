@@ -20,40 +20,40 @@ export function scratchModel(kind: 'cnn' | 'transformer'): { graph: GraphModel; 
     return created.id
   }
   const weight = (shape: number[], mode: Initializer = 'xavier') => node('weight',{value:initializeTensor(shape,mode,serial+100)})
-  const bias = (width: number) => node('bias',{value:initializeTensor([width],'zeros')})
-  const dense = (input: string, from: number, to: number) => node('add',{},[node('matmul',{},[input,weight([from,to])]),bias(to)])
+  const bias = (width: number) => node('weight',{value:initializeTensor([width],'zeros')})
+  const dense = (input: string, from: number, to: number) => node('arithmetic',{expression:'x1 + x2'},[node('matmul',{},[input,weight([from,to])]),bias(to)])
   const data = node('dataset',{dataset:kind === 'cnn' ? 'digits-8x8' : 'color-cycle',datasetMode:'sample',datasetIndex:0})
   let logits: string
   if (kind === 'cnn') {
     const conv = node('conv2d',{},[data,weight([2,3,3,1],'he'),bias(2)])
     const relu = node('activation',{activation:'relu'},[conv])
     const pool = node('avgpool2d',{},[relu])
-    const flat = node('reshape',{shape:[1,18]},[pool])
+    const flat = node('tensor-transform',{transform:'reshape',shape:[1,18]},[pool])
     logits = dense(flat,18,10)
   } else {
     const token = node('embedding',{},[weight([5,4]),data])
     const position = node('embedding',{},[weight([12,4]),[data,1]])
-    const input = node('add',{},[token,position])
+    const input = node('arithmetic',{expression:'x1 + x2'},[token,position])
     const norm = (input: string) => node('layer-norm',{},[input,weight([4],'ones'),bias(4)])
     const normalized = norm(input)
     const projections = Array.from({length:3},()=>node('matmul',{},[normalized,weight([4,4])]))
     const heads = [0,1].map(head => {
-      const [q,k,v] = projections.map(projection=>node('slice',{axis:1,start:head*2,end:head*2+2},[projection]))
-      const kt = node('transpose',{axes:[1,0]},[k])
+      const [q,k,v] = projections.map(projection=>node('tensor-transform',{transform:'slice',axis:1,start:head*2,end:head*2+2},[projection]))
+      const kt = node('tensor-transform',{transform:'transpose',axes:[1,0]},[k])
       const dot = node('matmul',{},[q,kt])
       const scale = node('input',{value:1/Math.sqrt(2)})
-      const scaled = node('multiply',{},[dot,scale])
+      const scaled = node('arithmetic',{expression:'x1 * x2'},[dot,scale])
       const mask = node('causal-mask',{},[scaled])
       const probabilities = node('softmax',{},[mask])
       return node('matmul',{},[probabilities,v])
     })
     const attention = node('matmul',{},[node('concat',{axis:1,inputCount:2},heads),weight([4,4])])
-    const residual = node('add',{},[input,attention])
+    const residual = node('arithmetic',{expression:'x1 + x2'},[input,attention])
     const hidden = node('activation',{activation:'relu'},[dense(norm(residual),4,8)])
-    const block = node('add',{},[residual,dense(hidden,8,4)])
+    const block = node('arithmetic',{expression:'x1 + x2'},[residual,dense(hidden,8,4)])
     logits = dense(norm(block),4,5)
   }
   node('softmax',{},[logits])
-  node('cross-entropy',{},[logits,[data,kind === 'cnn' ? 1 : 2]])
+  node('loss',{loss:'cross-entropy'},[logits,[data,kind === 'cnn' ? 1 : 2]])
   return {graph,datasetId:data}
 }

@@ -46,7 +46,6 @@ body:has(.app-shell) { min-width: 360px; }
   .app-shell .right-panel { grid-row: 4; grid-template-columns: minmax(0, 1fr); }
   .app-shell .control-bar { grid-row: 5; }
   .app-shell .brand-mark { width: 34px; height: 34px; }
-  .app-shell .react-flow__minimap { display: none; }
   .app-shell .module-navigation { padding: 8px; font-size: 11px; }
 }
 @media (pointer: coarse) {

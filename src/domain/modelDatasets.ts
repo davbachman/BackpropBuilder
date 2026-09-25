@@ -15,7 +15,7 @@ export function modelDataset(kind: ModelDatasetKind): ModelDataset {
 
 export function datasetsForModel(graph: GraphModel): ModelDataset[] {
   const twoInputs = graph.nodes.some(node => node.id === 'input-1')
-  const classification = graph.nodes.some(node => node.id === 'loss' && node.type === 'cross-entropy')
+  const classification = graph.nodes.some(node => node.id === 'loss' && (node.type === 'cross-entropy' || (node.type === 'loss' && node.params.loss === 'cross-entropy')))
   const kinds: ModelDatasetKind[] = !twoInputs ? ['line-1d', 'cubic-1d'] : classification ? ['xor', 'circle-center', 'parabola-boundary'] : ['plane-2d']
   const source = graph.nodes.find(node => node.type === 'dataset')
   const actual = source && datasetForNode(source)
@@ -28,7 +28,7 @@ export function datasetsForModel(graph: GraphModel): ModelDataset[] {
  * remains the original scalar and receives its complete batch gradient. */
 function batchGraph(graph: GraphModel, samples: ModelSample[]): GraphModel {
   if (!samples.length) throw new Error('Choose at least one example.')
-  const count = samples.length, classification = graph.nodes.some(node => node.id === 'loss' && node.type === 'cross-entropy')
+  const count = samples.length, classification = graph.nodes.some(node => node.id === 'loss' && (node.type === 'cross-entropy' || (node.type === 'loss' && node.params.loss === 'cross-entropy')))
   return { ...graph, nodes: graph.nodes.map(node => {
     const params = { ...node.params }
     if (node.type === 'dataset') params.datasetValues = [...samples[0].x.map((_, axis) => ({shape:[count],data:samples.map(sample=>sample.x[axis])})), {shape:[count],data:samples.map(sample=>sample.y)}]

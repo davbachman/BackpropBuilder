@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { initializeTensor, operationHelp, type Initializer } from '../domain/authoring'
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { TensorHeatmap } from './TensorHeatmap'
-import { formatNumber, formulaForNode, lossKindForNode, lossOptionsForNode } from '../domain/engine'
+import { formatNumber, formulaForNode, lossKindForNode, lossOptionsForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
 import { DATASET_MENU_OPTIONS, datasetForNode, datasetOutputCountForNode, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, toTensor } from '../domain/tensor'
 import type { CoordinateBinding } from '../domain/neuronProjection'
@@ -13,6 +13,7 @@ import type {
   DatasetKind,
   NodeParams,
   TensorValue,
+  TensorTransformKind,
 } from '../domain/types'
 
 interface Props {
@@ -167,6 +168,7 @@ export function ModelInspector({
           {operationHelp[node.type] && <p className="coordinate-note">{operationHelp[node.type]}</p>}
           {node.type === 'conv2d' && <ConvolutionInspector graph={graph} node={node} onValue={onValue}/>}
           {node.type === 'loss' && <label className="inspector-field">Loss<select aria-label="Loss function" value={lossKindForNode(node, graph)} onChange={event => onParams(node.id,{loss:event.target.value as NodeParams['loss']})}>{lossOptionsForNode(node, graph).map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></label>}
+          {node.type === 'tensor-transform' && <label className="inspector-field">Transform<select aria-label="Tensor transform operation" value={node.params.transform ?? 'reshape'} onChange={event => onParams(node.id, { transform: event.target.value as TensorTransformKind })}>{TENSOR_TRANSFORM_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></label>}
           {!dataset && node.value && node.value.data.length > 1 && (
             <TensorHeatmap
               key={`${node.id}:${node.value.shape.join(',')}`}
@@ -263,6 +265,7 @@ export function ModelInspector({
             'mean',
             'layer-norm',
             'add',
+            'tensor-transform',
           ].includes(node.type) &&
             !node.id.startsWith('inspect:') && (
               <OperationEditor
@@ -376,18 +379,19 @@ function OperationEditor({
   node: GraphNode
   onParams: Props['onParams']
 }) {
+  const operation = node.type === 'tensor-transform' ? node.params.transform ?? 'reshape' : node.type
   const fields =
-    node.type === 'slice'
+    operation === 'slice'
       ? ['axis', 'start', 'end']
-      : node.type === 'transpose'
+      : operation === 'transpose'
         ? ['axes']
-        : node.type === 'reshape'
+        : operation === 'reshape'
           ? ['shape']
-          : node.type === 'layer-norm'
+          : operation === 'layer-norm'
             ? ['epsilon']
-            : node.type === 'mean'
+            : operation === 'mean'
               ? ['axis']
-              : node.type === 'concat'
+              : operation === 'concat'
                 ? ['axis', 'inputCount']
                 : ['inputCount']
   const [draft, setDraft] = useState<Record<string, string>>(
@@ -402,7 +406,7 @@ function OperationEditor({
                   ? 2
                   : field === 'epsilon'
                     ? 0.00001
-                    : ['axis', 'start'].includes(field) && node.type !== 'mean' ? (field === 'axis' && node.type === 'concat' ? 1 : 0) : ''),
+                    : ['axis', 'start'].includes(field) && operation !== 'mean' ? (field === 'axis' && operation === 'concat' ? 1 : 0) : ''),
             ),
       ]),
     ),
@@ -416,7 +420,7 @@ function OperationEditor({
         const params = Object.fromEntries(
           fields.map((field) => [
             field,
-            draft[field].trim() === '' && field !== 'shape' ? undefined : ['axes', 'shape'].includes(field)
+            draft[field].trim() === '' && (field !== 'shape' || node.type === 'tensor-transform') ? undefined : ['axes', 'shape'].includes(field)
               ? draft[field]
                   .split(/[\s,]+/)
                   .filter(Boolean)
@@ -425,10 +429,10 @@ function OperationEditor({
           ]),
         )
         const numbers = Object.values(params).flat().filter(value => value !== undefined) as number[]
-        if (numbers.some(value => !Number.isFinite(value) || (value < 0 && !(node.type === 'reshape' && value === -1))) || (params.epsilon !== undefined && Number(params.epsilon) <= 0) || (params.inputCount !== undefined && (!Number.isInteger(params.inputCount) || Number(params.inputCount) < 2 || Number(params.inputCount) > 16)) || fields.some(field => field !== 'epsilon' && params[field] !== undefined && (Array.isArray(params[field]) ? params[field] as number[] : [params[field] as number]).some(n => !Number.isInteger(n))) || (Array.isArray(params.shape) && (params.shape.some(n => n < 1 && n !== -1) || params.shape.filter(n => n === -1).length > 1))) {
+        if (numbers.some(value => !Number.isFinite(value) || (value < 0 && !(operation === 'reshape' && value === -1))) || (params.epsilon !== undefined && Number(params.epsilon) <= 0) || (params.inputCount !== undefined && (!Number.isInteger(params.inputCount) || Number(params.inputCount) < 2 || Number(params.inputCount) > 16)) || fields.some(field => field !== 'epsilon' && params[field] !== undefined && (Array.isArray(params[field]) ? params[field] as number[] : [params[field] as number]).some(n => !Number.isInteger(n))) || (Array.isArray(params.shape) && (params.shape.some(n => n < 1 && n !== -1) || params.shape.filter(n => n === -1).length > 1))) {
           setError('Use whole nonnegative indices, positive dimensions, 2–16 inputs, and a positive epsilon.'); return
         }
-        onParams(node.id, {...params, ...(node.type === 'mean' ? {keepDims} : {})})
+        onParams(node.id, {...params, ...(operation === 'mean' ? {keepDims} : {})})
         setError('')
       }}
     >
@@ -446,7 +450,7 @@ function OperationEditor({
           </label>
         ))}
       </div>
-      {node.type === 'mean' && <label className="inspector-field"><span><input type="checkbox" checked={keepDims} onChange={event => setKeepDims(event.target.checked)}/> Keep dimensions</span></label>}
+      {operation === 'mean' && <label className="inspector-field"><span><input type="checkbox" checked={keepDims} onChange={event => setKeepDims(event.target.checked)}/> Keep dimensions</span></label>}
       {error && <p role="alert">{error}</p>}
       <button className="inspector-wide">Apply operation</button>
       <p className="coordinate-note">

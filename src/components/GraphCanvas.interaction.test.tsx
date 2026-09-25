@@ -140,10 +140,10 @@ describe('canvas movement gestures', () => {
     pane.className = 'react-flow__pane'
     container.querySelector('.flow-shell')!.append(pane)
     fireEvent.doubleClick(pane, { clientX: 450, clientY: 300 })
-    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'mean' } })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'tensor transform' } })
     fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
     expect(onCreateNode).toHaveBeenCalledOnce()
-    expect(onCreateNode.mock.calls[0][0]).toBe('mean')
+    expect(onCreateNode.mock.calls[0][0]).toBe('tensor-transform')
     expect(onCreateNode.mock.calls[0][1]).toEqual(position)
     expect(onCreateNode.mock.calls[0][2]).toBeUndefined()
     expect(onCreateNode.mock.calls[0][3]).toBeGreaterThan(0)

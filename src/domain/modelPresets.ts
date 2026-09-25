@@ -231,11 +231,12 @@ function scalarNetworkPreset(kind: NetworkKind): GraphModel {
     )
     builder.node(
       'loss',
-      'cross-entropy',
+      'loss',
       'Classification loss',
       [logits, 'target'],
       4310,
       220,
+      { loss: 'cross-entropy' },
     )
   }
   graph.view = {
@@ -263,11 +264,12 @@ function probabilitiesPreset(): GraphModel {
   b.source('target', 'target', 'Target class', value([1], [0]), 380, 350)
   b.node(
     'loss',
-    'cross-entropy',
+    'loss',
     'Cross-entropy',
     ['scores', 'target'],
     710,
     200,
+    { loss: 'cross-entropy' },
   )
   return b.graph
 }
@@ -818,11 +820,12 @@ function decoderPreset(
   )
   b.node(
     'decoder-loss',
-    'cross-entropy',
+    'loss',
     'Next-token cross-entropy',
     [logits, 'decoder-targets'],
     outputX + 1300,
     420,
+    { loss: 'cross-entropy' },
   )
   b.graph.view!.expandedGroupIds = []
   return b.graph
