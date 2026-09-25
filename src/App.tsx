@@ -1634,8 +1634,8 @@ function App({
               }}
             />
           )}
-        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} />) }
-        {(selectedNodeIds.length > 0 || selectedGroup) && <ModelInspector
+        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onDataset={updateDataset} onRename={selectedNodeId === node.id ? (id,label) => applyGraphChange({...graph,nodes:graph.nodes.map(candidate => candidate.id === id ? {...candidate,label} : candidate)}) : undefined} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} />) }
+        {(selectedGroup || (selectedNodeIds.length > 0 && inspectedNode?.type !== 'dataset')) && <ModelInspector
           graph={graph}
           node={inspectedNode}
           binding={
@@ -1646,13 +1646,12 @@ function App({
           onRename={(id,label) => applyGraphChange({...graph,nodes:graph.nodes.map(node => node.id === id ? {...node,label} : node)})}
           onGroupChange={(id,changes) => applyGraphChange({...graph,groups:graph.groups?.map(group => group.id === id ? {...group,...changes,detail:denseGroupDetail(graph,group)} : group)})}
           onValue={updateNodeValue}
-          onDataset={updateDataset}
           onOpen={openGroup}
           onInspectNeuron={inspectNeuron}
           onGroup={mergeSelectedNodes}
           selectionCount={selectedNodeIds.length}
         />}
-        <section className="inspector-card">
+        {(activeStep || inspectedNode?.type !== 'dataset') && <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>
           {activeStep && <div className="formula-box">
@@ -1662,7 +1661,7 @@ function App({
             </>}
             <span>{activeStep.calculation}</span>
           </div>}
-        </section>
+        </section>}
         </div>
         <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}

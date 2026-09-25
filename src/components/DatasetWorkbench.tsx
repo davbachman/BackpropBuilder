@@ -1,17 +1,19 @@
 import { useState } from 'react'
-import { datasetExampleIndex, datasetExamples, datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
+import { DATASET_MENU_OPTIONS, datasetExampleIndex, datasetExamples, datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
 import { analyzeCustomCsv } from '../domain/customCsv'
-import type { CustomCsvData, GraphModel, GraphNode, NodeParams } from '../domain/types'
+import type { CustomCsvData, DatasetKind, GraphModel, GraphNode, NodeParams } from '../domain/types'
 import './datasetWorkbench.css'
 
 interface Props {
   graph: GraphModel
   node: GraphNode
   onParams: (id: string, params: NodeParams) => void
+  onDataset: (id: string, dataset: DatasetKind) => void
+  onRename?: (id: string, label: string) => void
   onChooseCustomCsv?: (nodeId: string) => void
 }
 
-export function DatasetWorkbench({ graph, node, onParams, onChooseCustomCsv }: Props) {
+export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, onChooseCustomCsv }: Props) {
   const dataset = datasetForNode(node), examples = datasetExamplesForNode(node)
   const index = datasetExampleIndex(node), mode = datasetMode(node)
   const [split, setSplit] = useState<'all' | 'train' | 'test'>('all')
@@ -29,9 +31,11 @@ export function DatasetWorkbench({ graph, node, onParams, onChooseCustomCsv }: P
   }
   const image = dataset.kind === 'digits-8x8' ? datasetOutputValueForSlot(node, 0) : undefined
   return <section className="dataset-workbench" aria-label="Dataset configuration">
-    <div className="dataset-workbench-heading"><p className="eyebrow">Dataset</p><span>{counts.train} train · {counts.test} test</span></div>
-    <h3>{dataset.label}</h3>
-    <p className="coordinate-note">{dataset.description ?? 'Features and targets stay synchronized. Inspect one example or feed a full numeric batch through the graph.'}</p>
+    <div className="dataset-workbench-heading"><p className="eyebrow">Dataset</p></div>
+    <label className="inspector-field">Source<select aria-label="Dataset selection" value={dataset.kind} onChange={event => onDataset(node.id, event.target.value as DatasetKind)}>
+      {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
+    </select></label>
+    {dataset.description && <p className="coordinate-note">{dataset.description}</p>}
     <label className="inspector-field">Train / test split<select aria-label="Train/test split" value={node.params.trainPercent ?? 'default'} onChange={event => {
       const trainPercent = event.target.value === 'default' ? undefined : Number(event.target.value)
       const nextExamples = datasetExamplesForNode({ ...node, params: { ...node.params, trainPercent } })
@@ -63,7 +67,7 @@ export function DatasetWorkbench({ graph, node, onParams, onChooseCustomCsv }: P
     </select></label>}
     {image && <div className="dataset-image-preview"><div role="img" aria-label={`Handwritten digit ${datasetOutputValueForSlot(node, 1).data[0]}`} style={{display:'grid',gridTemplateColumns:'repeat(8, 1fr)'}}>{image.data.map((pixel, i) => <i key={i} style={{background:`rgba(77,67,128,${pixel})`}} />)}</div><span>Label<strong>{datasetOutputValueForSlot(node, 1).data[0]}</strong><small>8 × 8 × 1 · normalized pixels</small></span></div>}
     {node.params.datasetValues && <p className="coordinate-note">Showing a custom experiment. Choose an example to return to the included data.</p>}
-    <p className="coordinate-note">Use Train and Test in the left sidebar to run the model.</p>
+    {onRename && <details className="dataset-name-editor"><summary>Block name</summary><label className="inspector-field">Name<input key={node.id} aria-label="Node name" defaultValue={node.label} onBlur={event => { if (event.target.value.trim() && event.target.value !== node.label) onRename(node.id, event.target.value.trim()) }}/></label></details>}
     {dataset.source && <a href={dataset.source} target="_blank" rel="noreferrer">Dataset source · UCI · CC BY 4.0 ↗</a>}
   </section>
 }

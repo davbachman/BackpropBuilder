@@ -122,7 +122,7 @@ describe('scratch model authoring controls',()=>{
   it('keeps dataset details for configuration, including a selectable train/test split',()=>{
     const {graph,datasetId}=scratchModel('transformer'), onParams=vi.fn()
     const node=graph.nodes.find(candidate=>candidate.id === datasetId)!
-    render(<DatasetWorkbench graph={graph} node={node} onParams={onParams}/>)
+    render(<DatasetWorkbench graph={graph} node={node} onParams={onParams} onDataset={vi.fn()}/>)
     fireEvent.change(screen.getByLabelText('Train/test split'),{target:{value:'80'}})
     expect(onParams).toHaveBeenCalledWith(datasetId,expect.objectContaining({trainPercent:80,datasetSplit:'train'}))
     expect(screen.queryByRole('button',{name:/Train 1 epoch|Run inference|Evaluate training/i})).not.toBeInTheDocument()

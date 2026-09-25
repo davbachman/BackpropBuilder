@@ -1,8 +1,6 @@
 .dataset-workbench { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #e9e5f0; }
-.dataset-workbench h3 { margin: 8px 0; color: #40344f; font-size: 17px; }
 .dataset-workbench-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .dataset-workbench-heading .eyebrow { margin: 0; }
-.dataset-workbench-heading > span { color: #91879c; font-size: 10px; }
 .dataset-image-preview { display: flex; align-items: center; gap: 18px; margin: 16px 0; }
 .dataset-image-preview > div { width: 96px; height: 96px; background: #f5f3fa; border: 1px solid #e0d9eb; border-radius: 8px; overflow: hidden; }
 .dataset-image-preview > span { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #8f849b; }
@@ -12,5 +10,7 @@
 .csv-settings .coordinate-note { margin: 0; }
 .csv-settings .coordinate-note strong { color: #4f3d69; }
 .csv-header-check { display: flex; align-items: center; gap: 8px; color: #665b73; font-size: 11px; }
+.dataset-name-editor { margin-top: 15px; color: #786397; font-size: 11px; }
+.dataset-name-editor summary { cursor: pointer; }
 .tensor-initializer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin: 10px 0; }
 .tensor-initializer button { padding: 9px; margin-bottom: 12px; }

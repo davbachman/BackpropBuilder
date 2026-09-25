@@ -67,12 +67,13 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
     fireEvent.click(card)
     const nodeSelector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
-    const inspectorSelector = screen.getByRole('combobox', { name: 'Dataset selection' })
+    const inspectorSelector = () => screen.getByRole('combobox', { name: 'Dataset selection' })
     await user.selectOptions(nodeSelector, 'circle-center')
-    expect(inspectorSelector).toHaveValue('circle-center')
-    expect(screen.getByLabelText('Dataset outputs')).toHaveTextContent('Feature x1')
-    expect(screen.getByLabelText('Dataset outputs')).toHaveTextContent('Feature x2')
-    expect(screen.getByLabelText('Dataset outputs')).toHaveTextContent('Target y')
+    expect(inspectorSelector()).toHaveValue('circle-center')
+    expect(screen.queryByText('Inside the calculation')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Dataset outputs')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Dataset configuration')).toBeInTheDocument()
+    expect(screen.queryByText('Ready to evaluate')).not.toBeInTheDocument()
     const expectResults = (kind: string) => {
       const dataset = DATASET_OPTIONS.find(option => option.kind === kind)!
       expect(container.querySelector('[data-id="x"] .semantic-operation-value')).toHaveAttribute('title', formatFullTensor(dataset.featureValues[0]))
@@ -94,5 +95,15 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     expect(within(card).getByLabelText('Target y output')).toHaveAttribute('data-handleid', 'out-2')
     await user.click(screen.getByRole('button', { name: 'Run forward' }))
     expectResults('circle-center')
+  })
+
+  it('keeps dataset renaming in a collapsed option', () => {
+    const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
+    fireEvent.click(container.querySelector('[data-id="dataset-1"]')!)
+    fireEvent.click(screen.getByText('Block name'))
+    const name = screen.getByRole('textbox', { name: 'Node name' })
+    fireEvent.change(name, { target: { value: 'Training data' } })
+    fireEvent.blur(name)
+    expect(container.querySelector('[data-id="dataset-1"]')).toHaveTextContent('Training data')
   })
 })
