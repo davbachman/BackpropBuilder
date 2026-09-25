@@ -124,9 +124,9 @@ describe('canvas movement gestures', () => {
     pane.className = 'react-flow__pane'
     container.querySelector('.flow-shell')!.append(pane)
     fireEvent.doubleClick(pane, { clientX: 450, clientY: 300 })
-    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'add' } })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'arithmetic' } })
     fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
-    expect(onCreateNode).toHaveBeenCalledExactlyOnceWith('add', position, 'blocks.0.norm1')
+    expect(onCreateNode).toHaveBeenCalledExactlyOnceWith('arithmetic', position, 'blocks.0.norm1')
   })
 
   it('uses a close-up scale when adding to empty canvas outside a module', () => {

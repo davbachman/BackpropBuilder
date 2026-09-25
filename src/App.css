@@ -471,6 +471,10 @@
   color: var(--loss);
 }
 
+.arithmetic-expression-field { display: flex; align-items: center; gap: 5px; color: var(--muted-strong); font: 12px var(--font-mono); }
+.arithmetic-expression-field span { flex: none; }
+.arithmetic-expression-field input { min-width: 0; font: 12px var(--font-mono); }
+
 .node-metrics {
   display: grid;
   gap: 4px;

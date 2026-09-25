@@ -69,12 +69,13 @@ export function createNode(type: NodeType, index: number): GraphNode {
   const baseY = 120 + Math.floor(index / 4) * 150
   if (type === 'input') return sourceNode(`input-${index}`, type, `x${index}`, 1, baseX, baseY)
   if (type === 'dataset') return datasetNode(`dataset-${index}`, 'dataset', baseX, baseY)
-  if (type === 'weight') return sourceNode(`weight-${index}`, type, `w${index}`, 0.5, baseX, baseY)
+  if (type === 'weight') return sourceNode(`weight-${index}`, type, `Param ${index}`, 0.5, baseX, baseY)
   if (type === 'bias') return sourceNode(`bias-${index}`, type, `b${index}`, 0, baseX, baseY)
   if (type === 'target') return sourceNode(`target-${index}`, type, `y${index}`, 1, baseX, baseY)
   if (type === 'activation') {
     return { ...opNode(`activation-${index}`, type, 'activation', baseX, baseY), params: { activation: 'sigmoid' } }
   }
+  if (type === 'arithmetic') return { ...opNode(`arithmetic-${index}`, type, 'Arithmetic', baseX, baseY), params: { expression: 'x1 * x2' } }
   return opNode(`${type}-${index}`, type, type, baseX, baseY)
 }
 

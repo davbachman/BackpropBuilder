@@ -43,6 +43,7 @@ import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
 import { placeCanvasNode } from './domain/nodePlacement'
 import { blockPalette } from './domain/blockPalette'
+import { arithmeticInputCount } from './domain/arithmetic'
 import { compactVisualHierarchy } from './domain/continuousScene'
 import {
   activeProjectionEdges,
@@ -805,6 +806,15 @@ function App({
     [graph, pushHistory, clearRecordedExecution],
   )
 
+  const updateExpression = useCallback((nodeId: string, expression: string) => {
+    const inputCount = arithmeticInputCount(expression)
+    applyGraphChange({
+      ...graph,
+      nodes: graph.nodes.map(node => node.id === nodeId ? { ...node, params: { ...node.params, expression } } : node),
+      edges: graph.edges.filter(edge => edge.target !== nodeId || (edge.inputSlot ?? 0) < inputCount),
+    })
+  }, [applyGraphChange, graph])
+
   const mergeSelectedNodes = useCallback(() => {
     const result = mergeNodesIntoVisualGroup(graph, selectedNodeIds)
     if (!result.group) return
@@ -1240,6 +1250,7 @@ function App({
         onCancelPendingPlacement={clearPendingPlacement}
         onNodeValueChange={updateNodeValue}
         onActivationChange={updateActivation}
+        onExpressionChange={updateExpression}
         onLossChange={updateLoss}
         onDatasetChange={updateDataset}
         onGroupCreate={mergeSelectedNodes}

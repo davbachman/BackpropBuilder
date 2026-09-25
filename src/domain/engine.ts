@@ -1,4 +1,5 @@
 import { resolveReshape } from './reshape'
+import { arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
 import { conv2d, conv2dBackward, avgpool2d, avgpool2dBackward } from '../learning/cnnMath'
 import * as autograd from '../learning/math'
 import type {
@@ -86,6 +87,7 @@ export const inputArityByType: Record<NodeType, number> = {
   multiply: 2,
   matmul: 2,
   add: 2,
+  arithmetic: 2,
   activation: 1,
   target: 1,
   loss: 2,
@@ -123,6 +125,10 @@ export function isFlexibleInputNodeType(type: NodeType): boolean {
 }
 
 export function inputArityForNode(node: GraphNode): number {
+  if (node.type === 'arithmetic') {
+    try { return arithmeticInputCount(node.params.expression ?? 'x1 * x2') }
+    catch { return 2 }
+  }
   if (!isFlexibleInputNodeType(node.type)) return inputArityByType[node.type]
   return normalizeFlexibleInputCount(node.params.inputCount)
 }
@@ -170,6 +176,8 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
       return `${outputLabel} = ${inputLabels.join(' * ')}`
     case 'add':
       return `${outputLabel} = ${inputLabels.join(' + ')}`
+    case 'arithmetic':
+      return `${outputLabel} = ${(node.params.expression ?? 'x1 * x2').replace(/x([1-9]\d*)\b/g, (_, index: string) => inputLabels[Number(index) - 1] ?? `x${index}`)}`
     case 'activation':
       return `${outputLabel} = ${node.params.activation ?? 'identity'}(${inputLabels[0]})`
     case 'conv2d': return `${outputLabel}[r,c,o] = Σ(kernel[o] · ${inputLabels[0]}[window r,c]) + bias[o]`
@@ -451,6 +459,10 @@ export function validateGraph(graph: GraphModel, options: { requireLoss?: boolea
   }
 
   for (const node of graph.nodes) {
+    if (node.type === 'arithmetic') {
+      try { parseArithmetic(node.params.expression ?? 'x1 * x2') }
+      catch (error) { issues.push({ code: 'invalid-value', nodeId: node.id, message: `${node.label}: ${error instanceof Error ? error.message : 'Invalid expression.'}` }) }
+    }
     const incoming = incomingEdges(graph, node.id)
     const expected = inputArityForNode(node)
     const hasValidInputCount = isOptionalPassThroughNode(node)
@@ -606,7 +618,7 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   }
   if (node.type === 'cross-entropy') return first.length === 2 && second.length === 1 && second[0] === first[0] ? [] : undefined
   if (node.type === 'activation') return [...inputShapes[0]]
-  if (node.type === 'add' || node.type === 'multiply') return broadcastShapeForShapes(inputShapes)
+  if (node.type === 'add' || node.type === 'multiply' || node.type === 'arithmetic') return broadcastShapeForShapes(inputShapes)
   if (node.type === 'loss') return broadcastShapeForShapes(inputShapes) ? [] : undefined
   return []
 }
@@ -796,6 +808,12 @@ function computeForward(
     }
   }
 
+  if (node.type === 'arithmetic') {
+    const result = evaluateArithmetic(node.params.expression ?? 'x1 * x2', inputs)
+    const derivatives = evaluateArithmetic(node.params.expression ?? 'x1 * x2', inputs, oneLike(result.value)).gradients
+    return { value: result.value, localDerivative: derivatives[0], localDerivatives: derivatives }
+  }
+
   if (node.type === 'activation') {
     const activation = node.params.activation ?? 'identity'
     const value = mapActivation(activation, inputs[0])
@@ -911,6 +929,11 @@ function computeBackward(
       sourceId: edge.source,
       gradient: reduceToShape(downstreamGrad, values[index].shape),
     }))
+  }
+
+  if (node.type === 'arithmetic') {
+    const gradients = evaluateArithmetic(node.params.expression ?? 'x1 * x2', values, downstreamGrad).gradients
+    return incoming.map((edge, index) => ({ edgeId: edge.id, sourceId: edge.source, gradient: gradients[index] }))
   }
 
   if (node.type === 'activation') {
@@ -1166,6 +1189,9 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   if (node.type === 'add') {
     return `${inputs.map((input) => formatNumber(input)).join(' + ')} = ${formatNumber(node.value)}`
   }
+  if (node.type === 'arithmetic') {
+    return `${(node.params.expression ?? 'x1 * x2').replace(/x([1-9]\d*)\b/g, (_, index: string) => formatNumber(inputs[Number(index) - 1]))} = ${formatNumber(node.value)}`
+  }
   if (node.type === 'activation') {
     return `${node.params.activation ?? 'identity'}(${formatNumber(inputs[0])}) = ${formatNumber(node.value)}`
   }
@@ -1200,6 +1226,7 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
       .join(', ')
   }
   if (node.type === 'add') return inputLabels.map((label) => `dz/d${label} = 1`).join(', ')
+  if (node.type === 'arithmetic') return `Apply the chain rule to ${node.params.expression ?? 'x1 * x2'} for each input.`
   if (node.type === 'activation') {
     const activation = node.params.activation ?? 'identity'
     if (activation === 'sigmoid') return `dz/d${inputLabels[0]} = sigmoid'(${inputLabels[0]})`
@@ -1233,6 +1260,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'matmul') return ['z = a @ b']
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
+  if (node.type === 'arithmetic') return [formulaForNode(node, graph).replaceAll('^', '**')]
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
   const lossKind = lossKindForNode(node, graph)
   if (lossKind === 'mse') return ['loss = mean((prediction - target) ** 2)']
@@ -1249,6 +1277,7 @@ function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'matmul') return ['a.grad += g @ b.T', 'b.grad += a.T @ g']
   if (node.type === 'multiply') return ['for each input i:', '  input_i.grad += g * product(other inputs)']
   if (node.type === 'add') return ['for each input:', '  input.grad += g']
+  if (node.type === 'arithmetic') return ['for each input i:', '  input_i.grad += g * ∂expression/∂input_i']
   if (node.type === 'activation') return ['u.grad += g * local_derivative']
   if (node.type === 'loss') return lossBackwardPseudocode(lossKindForNode(node, graph))
   return ['accumulate gradient']

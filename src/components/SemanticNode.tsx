@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Sigma, SlidersHorizontal, Sparkles, ArrowRight, CirclePlus, X, Grid2X2, Database } from 'lucide-react'
-import { Fragment, type ReactElement } from 'react'
+import { Fragment, useState, type ReactElement } from 'react'
+import { parseArithmetic } from '../domain/arithmetic'
 import { inputArityForNode, outputArityForNode } from '../domain/engine'
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetForNode, datasetExamples, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import type { DatasetKind, LossKind } from '../domain/types'
@@ -18,6 +19,10 @@ export function SemanticNode(props: NodeProps): ReactElement {
   const dataset = node.type === 'dataset' ? datasetForNode(node) : undefined
   const customCsv = node.type === 'dataset' && node.params.dataset === 'custom-csv'
   const parameter = node.type === 'weight' || node.type === 'bias'
+  const savedExpression = node.params.expression ?? 'x1 * x2'
+  const [expressionDraft, setExpressionDraft] = useState({ source: savedExpression, text: savedExpression, valid: true })
+  const expressionText = expressionDraft.source === savedExpression ? expressionDraft.text : savedExpression
+  const expressionValid = expressionDraft.source === savedExpression ? expressionDraft.valid : true
   const value = node.value ?? (typeof node.params.value === 'object' ? node.params.value : undefined)
   const imageInput = node.type === 'input' && value?.shape.join(',') === '8,8,1'
   const Icon = dataset ? Database : parameter ? SlidersHorizontal : node.type === 'add' ? CirclePlus : node.type === 'multiply' ? X : node.type === 'matmul' ? Grid2X2 : node.type === 'activation' ? Sparkles : node.type === 'loss' ? Sigma : ArrowRight
@@ -39,7 +44,12 @@ export function SemanticNode(props: NodeProps): ReactElement {
         {data.lossOptions?.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
       </select> : node.type === 'activation' ? <select aria-label="activation" className="semantic-operation-select nodrag nowheel" value={node.params.activation ?? 'identity'} onChange={event => data.onActivationChange(node.id, event.target.value)}>
         <option value="identity">identity</option><option value="relu">ReLU</option><option value="sigmoid">sigmoid</option><option value="tanh">tanh</option>
-      </select> : <div className="semantic-operation-formula">{data.showMath ? data.formula : parameter ? 'learned parameter' : node.type.replaceAll('-', ' ')}</div>}
+      </select> : node.type === 'arithmetic' ? <label className="semantic-arithmetic-field"><span>{data.fullFormula.split(' = ')[0]} =</span><input aria-label="Arithmetic expression" className={`nodrag nowheel ${expressionValid ? '' : 'is-invalid'}`} value={expressionText} spellCheck={false} onChange={event => {
+        const text = event.target.value
+        let valid = true
+        try { parseArithmetic(text) } catch { valid = false }
+        setExpressionDraft({ source: savedExpression, text, valid })
+      }} onBlur={() => { if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText) }} onKeyDown={event => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}/></label> : <div className="semantic-operation-formula">{data.showMath ? data.formula : parameter ? 'learned parameter' : node.type.replaceAll('-', ' ')}</div>}
       <div className="semantic-operation-value" title={formatFullTensor(data.showGradient ? node.grad : value)}>{displayValue}</div>
       <span className="semantic-shape">{data.showGradient ? '∂L / ∂x · ' : ''}{shape}</span>
     </>}

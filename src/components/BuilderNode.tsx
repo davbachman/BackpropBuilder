@@ -21,6 +21,7 @@ import {
 } from '../domain/engine'
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetTargetSlotForNode } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput } from '../domain/tensor'
+import { parseArithmetic } from '../domain/arithmetic'
 import type { DatasetKind, GraphNode, LossKind, NodeType, TensorValue } from '../domain/types'
 
 export interface BuilderNodeData extends Record<string, unknown> {
@@ -36,6 +37,7 @@ export interface BuilderNodeData extends Record<string, unknown> {
   onFlexibleInputAdd: (nodeId: string) => void
   onValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, value: string) => void
+  onExpressionChange: (nodeId: string, expression: string) => void
   onLossChange: (nodeId: string, value: LossKind) => void
   onDatasetChange: (nodeId: string, value: DatasetKind) => void
 }
@@ -48,6 +50,7 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   multiply: Crosshair,
   matmul: Crosshair,
   add: Crosshair,
+  arithmetic: Sigma,
   activation: Box,
   target: CircleDot,
   loss: Sigma,
@@ -73,6 +76,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const inputCount = inputArityForNode(node)
   const outputCount = outputArityForNode(node)
   const isFlexibleInputNode = isFlexibleInputNodeType(node.type)
+  const variableInputLayout = isFlexibleInputNode || node.type === 'arithmetic'
   const nodeHeight = node.dimensions?.height ?? heightForInputCount(inputCount)
   const canAddInput = isFlexibleInputNode && inputCount < MAX_FLEX_INPUT_COUNT
   const isSource = outputCount > 0
@@ -84,21 +88,28 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const customCsv = node.type === 'dataset' && node.params.dataset === 'custom-csv'
   const lossKind = data.lossKind ?? lossKindForNode(node)
   const lossOptions = data.lossOptions ?? LOSS_OPTIONS
-  const showTypeBadge = node.label.trim().toLowerCase() !== node.type
+  const showTypeBadge = node.label.trim().toLowerCase() !== node.type && !(node.type === 'weight' && /^param\s+\d+$/i.test(node.label))
   const valueText = formatTensorInput(node.params.value)
   const [valueDraft, setValueDraft] = useState({ source: valueText, text: valueText, valid: true })
   const draftValue = valueDraft.source === valueText ? valueDraft.text : valueText
   const valueIsValid = valueDraft.source === valueText ? valueDraft.valid : true
+  const savedExpression = node.params.expression ?? 'x1 * x2'
+  const [expressionDraft, setExpressionDraft] = useState({ source: savedExpression, text: savedExpression, valid: true })
+  const expressionText = expressionDraft.source === savedExpression ? expressionDraft.text : savedExpression
+  const expressionValid = expressionDraft.source === savedExpression ? expressionDraft.valid : true
+  const commitExpression = () => {
+    if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText)
+  }
 
   useEffect(() => {
-    if (!isFlexibleInputNode) return
+    if (!variableInputLayout) return
     updateNodeInternals(node.id)
-  }, [inputCount, isFlexibleInputNode, node.id, updateNodeInternals])
+  }, [inputCount, variableInputLayout, node.id, updateNodeInternals])
 
   return (
     <div
       className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
-      style={{ ...(isFlexibleInputNode ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
+      style={{ ...(variableInputLayout ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
       {Array.from({ length: inputCount }).map((_, index) => (
         <Handle
@@ -130,9 +141,9 @@ export function BuilderNode(props: NodeProps): ReactElement {
           <Icon size={14} />
         </span>
         <strong>{node.label}</strong>
-        {showTypeBadge ? <span className="node-kind">{node.type}</span> : null}
+        {showTypeBadge ? <span className="node-kind">{node.type === 'weight' || node.type === 'bias' ? 'Param' : node.type}</span> : null}
       </div>
-      {data.showMath ? (
+      {data.showMath && node.type !== 'arithmetic' ? (
         <div className="node-formula">
           <HoverText text={data.formula} tooltip={data.fullFormula} />
         </div>
@@ -150,6 +161,27 @@ export function BuilderNode(props: NodeProps): ReactElement {
             <option value="sigmoid">sigmoid</option>
             <option value="tanh">tanh</option>
           </select>
+        </label>
+      ) : null}
+      {node.type === 'arithmetic' ? (
+        <label className="node-field arithmetic-expression-field">
+          <span>{data.fullFormula.split(' = ')[0]} =</span>
+          <input
+            aria-label="Arithmetic expression"
+            className={`nodrag nowheel ${expressionValid ? '' : 'is-invalid'}`}
+            type="text"
+            spellCheck={false}
+            value={expressionText}
+            placeholder="x1 * x2"
+            onChange={(event) => {
+              const text = event.target.value
+              let valid = true
+              try { parseArithmetic(text) } catch { valid = false }
+              setExpressionDraft({ source: savedExpression, text, valid })
+            }}
+            onBlur={commitExpression}
+            onKeyDown={(event) => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}
+          />
         </label>
       ) : null}
       {node.type === 'loss' ? (

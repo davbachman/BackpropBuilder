@@ -107,6 +107,7 @@ interface GraphCanvasProps {
   onCancelPendingPlacement: () => void
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
+  onExpressionChange?: (nodeId: string, expression: string) => void
   onLossChange?: (nodeId: string, loss: LossKind) => void
   onDatasetChange?: (nodeId: string, dataset: DatasetKind) => void
   onGroupCreate: () => void
@@ -144,6 +145,7 @@ function GraphCanvasInner({
   onCancelPendingPlacement,
   onNodeValueChange,
   onActivationChange,
+  onExpressionChange,
   onLossChange,
   onDatasetChange,
   onGroupCreate,
@@ -160,7 +162,7 @@ function GraphCanvasInner({
   const continuous = semantic && sourceGraph.view?.semanticZoom !== false
   const renderedGraph = useMemo(() => continuous ? compactVisualHierarchy(sourceGraph) : sourceGraph, [sourceGraph, continuous])
   const geometryKey = JSON.stringify({
-    nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, dataset: params.dataset, customCsv: params.customCsv ? csvGeometrySample(params.customCsv) : undefined } })),
+    nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, expression: params.expression, dataset: params.dataset, customCsv: params.customCsv ? csvGeometrySample(params.customCsv) : undefined } })),
     edges: renderedGraph.edges.map(({ id, source, target, inputSlot, sourceSlot }) => ({ id, source, target, inputSlot, sourceSlot })),
     groups: renderedGraph.groups,
     view: { expandedGroupIds: [], layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges, manualNodePlacements: renderedGraph.view?.manualNodePlacements },
@@ -404,8 +406,8 @@ function GraphCanvasInner({
           type: node.type === 'loss' ? 'builderNode' : semantic ? 'semanticNode' : 'builderNode',
           position: layout?.nodes.get(node.id) ?? node.position,
           draggable: true,
-          width: semantic ? layout?.nodes.get(node.id)?.width ?? 176 : isFlexibleInputNodeType(node.type) ? NODE_WIDTH : undefined,
-          height: semantic ? layout?.nodes.get(node.id)?.height ?? 112 : isFlexibleInputNodeType(node.type)
+          width: semantic ? layout?.nodes.get(node.id)?.width ?? 176 : isFlexibleInputNodeType(node.type) || node.type === 'arithmetic' ? NODE_WIDTH : undefined,
+          height: semantic ? layout?.nodes.get(node.id)?.height ?? 112 : isFlexibleInputNodeType(node.type) || node.type === 'arithmetic'
             ? node.dimensions?.height ?? heightForInputCount(inputArityForNode(node))
             : undefined,
           selected: selectedNodeIdSet.has(node.id),
@@ -427,6 +429,7 @@ function GraphCanvasInner({
             onFlexibleInputAdd: addFlexibleInput,
             onValueChange: onNodeValueChange,
             onActivationChange: (nodeId: string, value: string) => onActivationChange(nodeId, value as ActivationKind),
+            onExpressionChange: onExpressionChange ?? (() => undefined),
             onLossChange: onLossChange ?? (() => undefined),
             onDatasetChange: onDatasetChange ?? (() => undefined),
           },
@@ -437,6 +440,7 @@ function GraphCanvasInner({
     [
       activeStep?.nodeId,
       onActivationChange,
+      onExpressionChange,
       onLossChange,
       onDatasetChange,
       addFlexibleInput,

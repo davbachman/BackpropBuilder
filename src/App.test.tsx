@@ -625,24 +625,24 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
-    expect(screen.getByText(/Click the graph canvas to place Weight/i)).toBeInTheDocument()
+    expect(screen.getByText(/Click the graph canvas to place Param/i)).toBeInTheDocument()
 
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
     fireEvent.click(pane!, { clientX: 480, clientY: 260 })
 
     expect(screen.getByText('1 nodes, 0 edges')).toBeInTheDocument()
-    expect(screen.queryByText(/Click the graph canvas to place Weight/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Click the graph canvas to place Param/i)).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /^Multiply$/i }))
+    await user.click(screen.getByRole('button', { name: /^Arithmetic$/i }))
     expect(screen.getByText('1 nodes, 0 edges')).toBeInTheDocument()
-    expect(screen.getByText(/Click the graph canvas to place Multiply/i)).toBeInTheDocument()
+    expect(screen.getByText(/Click the graph canvas to place Arithmetic/i)).toBeInTheDocument()
 
     fireEvent.click(pane!, { clientX: 620, clientY: 320 })
     expect(screen.getByText('2 nodes, 0 edges')).toBeInTheDocument()
-    expect(screen.queryByText(/Click the graph canvas to place Multiply/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Click the graph canvas to place Arithmetic/i)).not.toBeInTheDocument()
   })
 
   it('places a palette node without moving the preset and restores the view on undo', async () => {
@@ -650,7 +650,7 @@ describe('Backprop Builder app', () => {
     const { container } = render(<App initialGraph={createModelPreset('linear')} />)
     const positions = () => new Map(Array.from(container.querySelectorAll<HTMLElement>('.react-flow__node')).map(node => [node.dataset.id!, node.style.transform]))
     const before = positions()
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
     const viewport = container.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform
     fireEvent.click(container.querySelector('.react-flow__pane')!, { clientX: 580, clientY: 350 })
     const after = positions()
@@ -673,7 +673,7 @@ describe('Backprop Builder app', () => {
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
 
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
     fireEvent.click(pane!, { clientX: 480, clientY: 260 })
     await user.click(screen.getByRole('button', { name: /^Input$/i }))
     fireEvent.click(pane!, { clientX: 300, clientY: 260 })
@@ -742,7 +742,7 @@ describe('Backprop Builder app', () => {
     fireEvent.click(pane!, { clientX: 440, clientY: 220 })
     await user.click(screen.getByRole('button', { name: /^Input$/i }))
     fireEvent.click(pane!, { clientX: 620, clientY: 220 })
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
     fireEvent.click(pane!, { clientX: 440, clientY: 380 })
     await user.click(screen.getByRole('button', { name: /^Target$/i }))
     fireEvent.click(pane!, { clientX: 620, clientY: 380 })
@@ -751,15 +751,15 @@ describe('Backprop Builder app', () => {
       element.textContent?.trim(),
     )
 
-    expect(nodeTitles).toEqual(expect.arrayContaining(['x1', 'x2', 'w1', 'y1']))
-    expect(nodeTitles).not.toEqual(expect.arrayContaining(['w3', 'y4']))
+    expect(nodeTitles).toEqual(expect.arrayContaining(['x1', 'x2', 'Param 1', 'y1']))
+    expect(nodeTitles).not.toEqual(expect.arrayContaining(['Param 3', 'y4']))
   })
 
   it('clears selection and pending placement after deleting a newly placed palette node', async () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
     fireEvent.click(pane!, { clientX: 480, clientY: 260 })
@@ -771,7 +771,7 @@ describe('Backprop Builder app', () => {
 
     fireEvent.click(pane!, { clientX: 620, clientY: 320 })
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
-    expect(screen.queryByText(/Click the graph canvas to place Weight/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Click the graph canvas to place Param/i)).not.toBeInTheDocument()
   })
 
   it('cancels pending placement when the user interacts with an existing canvas element', async () => {
@@ -779,11 +779,11 @@ describe('Backprop Builder app', () => {
     const { container } = render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
-    await user.click(screen.getByRole('button', { name: /^Weight$/i }))
-    expect(screen.getByText(/Click the graph canvas to place Weight/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Param$/i }))
+    expect(screen.getByText(/Click the graph canvas to place Param/i)).toBeInTheDocument()
 
     fireEvent.pointerDown(container.querySelector('[data-id="x"]')!)
-    expect(screen.queryByText(/Click the graph canvas to place Weight/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Click the graph canvas to place Param/i)).not.toBeInTheDocument()
 
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
@@ -1128,7 +1128,7 @@ describe('Backprop Builder app', () => {
     const pane = container.querySelector('.react-flow__pane')
     expect(pane).toBeInstanceOf(HTMLElement)
 
-    await user.click(screen.getByRole('button', { name: /^Multiply$/i }))
+    await user.click(screen.getByRole('button', { name: /^Arithmetic$/i }))
     fireEvent.click(pane!, { clientX: 480, clientY: 260 })
     await user.click(screen.getByRole('button', { name: /^Activation$/i }))
     fireEvent.click(pane!, { clientX: 660, clientY: 260 })

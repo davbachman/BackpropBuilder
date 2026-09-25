@@ -31,6 +31,7 @@ const NODE_TYPES = new Set([
   'multiply',
   'matmul',
   'add',
+  'arithmetic',
   'activation',
   'target',
   'loss',
@@ -224,6 +225,7 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.datasetSplit === undefined || ['all', 'train', 'test'].includes(String(value.datasetSplit))) &&
     (value.datasetValues === undefined || (Array.isArray(value.datasetValues) && value.datasetValues.every(isTensorValue))) &&
     isOptionalNonNegativeInteger(value.inputCount) &&
+    (value.expression === undefined || typeof value.expression === 'string') &&
     isOptionalNonNegativeInteger(value.axis) &&
     isOptionalNonNegativeInteger(value.start) &&
     isOptionalNonNegativeInteger(value.end) &&

@@ -6,6 +6,7 @@ export type NodeType =
   | 'multiply'
   | 'matmul'
   | 'add'
+  | 'arithmetic'
   | 'activation'
   | 'target'
   | 'loss'
@@ -69,6 +70,7 @@ export interface NodeParams {
   /** An editable experiment supplied by the dataset, e.g. a token prompt. */
   datasetValues?: TensorValue[]
   inputCount?: number
+  expression?: string
   axis?: number
   start?: number
   end?: number

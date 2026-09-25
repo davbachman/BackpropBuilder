@@ -13,7 +13,9 @@ export function initializeTensor(shape: number[], mode: Initializer, seed = 42):
 }
 
 export const operationHelp: Partial<Record<NodeType, string>> = {
-  matmul: 'Left [rows, inner] × right [inner, columns] → [rows, columns]. Use a Weight for the right matrix.',
+  matmul: 'Left [rows, inner] × right [inner, columns] → [rows, columns]. Use a Param for the right matrix.',
+  weight: 'A trainable scalar or tensor. Use its value as a weight, bias, or other learned quantity.',
+  arithmetic: 'Type an expression with x1, x2, and so on. Supports +, -, *, /, numeric powers, and parentheses. Inputs are elementwise and can broadcast.',
   embedding: 'Port 1: table [vocabulary, width]. Port 2: integer IDs [tokens]. Output: [tokens, width].',
   transpose: 'Empty axes reverses the axes. For a matrix, 1, 0 swaps rows and columns.',
   slice: 'Choose an axis and a start-inclusive, end-exclusive range. Slice Q, K and V on axis 1 to build attention heads.',
@@ -37,9 +39,9 @@ export function denseGroupDetail(graph: GraphModel, group: GraphGroup): GraphGro
   const nodes = graph.nodes.filter(node => group.nodeIds.includes(node.id))
   for (const activation of nodes.filter(node => node.type === 'activation')) {
     const pre = graph.nodes.find(node => node.id === graph.edges.find(edge => edge.target === activation.id)?.source)
-    if (pre?.type !== 'add') continue
+    if (pre?.type !== 'add' && !(pre?.type === 'arithmetic' && (pre.params.expression ?? '').replace(/\s/g, '') === 'x1+x2')) continue
     const operands = graph.edges.filter(edge => edge.target === pre.id).map(edge => graph.nodes.find(node => node.id === edge.source))
-    const product = operands.find(node => node?.type === 'matmul'), bias = operands.find(node => node?.type === 'bias')
+    const product = operands.find(node => node?.type === 'matmul'), bias = operands.find(node => node?.type === 'bias' || node?.type === 'weight')
     if (!product || !bias) continue
     const input = graph.edges.find(edge => edge.target === product.id && (edge.inputSlot ?? 0) === 0)?.source
     const weight = graph.nodes.find(node => node.id === graph.edges.find(edge => edge.target === product.id && edge.inputSlot === 1)?.source)

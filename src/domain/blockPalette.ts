@@ -3,11 +3,9 @@ import type { NodeType } from './types'
 export const blockPalette: Array<{ type: NodeType; label: string }> = [
   { type: 'dataset', label: 'Dataset' },
   { type: 'input', label: 'Input' },
-  { type: 'weight', label: 'Weight' },
-  { type: 'bias', label: 'Bias' },
-  { type: 'multiply', label: 'Multiply' },
+  { type: 'weight', label: 'Param' },
+  { type: 'arithmetic', label: 'Arithmetic' },
   { type: 'matmul', label: 'Matrix product' },
-  { type: 'add', label: 'Add' },
   { type: 'activation', label: 'Activation' },
   { type: 'target', label: 'Target' },
   { type: 'loss', label: 'Loss' },
