@@ -1,5 +1,5 @@
 import { DatasetWorkbench } from './components/DatasetWorkbench'
-import { datasetForNode } from './domain/datasets'
+import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
 import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
@@ -55,6 +55,9 @@ import {
 } from './domain/neuronProjection'
 import { GraphCanvas } from './components/GraphCanvas'
 import { VisualizationPanel } from './components/VisualizationPanel'
+import { LossReportPanel, type LossReport } from './components/LossReportPanel'
+import { InferenceReportPanel } from './components/InferenceReportPanel'
+import { evaluateDataset, trainDataset } from './domain/datasetTraining'
 import {
   copyGraphSelection,
   pasteGraphClipboard,
@@ -137,6 +140,7 @@ interface HistorySnapshot {
   traceIndex: number
   epoch: number
   currentLoss: number | null
+  lossReports: LossReport[]
 }
 
 function speedSliderValueToDelay(value: number): number {
@@ -169,6 +173,10 @@ function App({
   const [leftWidth, setLeftWidth] = useState(220)
   const [rightWidth, setRightWidth] = useState(340)
   const [rightTab, setRightTab] = useState<'details' | 'code' | 'visualization'>('details')
+  const [leftTab, setLeftTab] = useState<'build' | 'train' | 'test'>('build')
+  const [inferenceSplit, setInferenceSplit] = useState<'train' | 'test'>('test')
+  const [inferenceResult, setInferenceResult] = useState<{ graph: GraphModel; split: 'train' | 'test'; metrics: ReturnType<typeof evaluateDataset> }>()
+  const [testStatus, setTestStatus] = useState('')
   const [codeFocus, setCodeFocus] = useState<{ kind: 'group' | 'node'; id: string; serial: number }>()
   const nextCodeFocus = useRef(0)
   const resizeDrag = useRef<{ side: 'left' | 'right'; x: number; width: number } | undefined>(undefined)
@@ -199,6 +207,13 @@ function App({
     DEFAULT_SPEED_SLIDER_VALUE,
   )
   const [epoch, setEpoch] = useState(0)
+  const [epochsPerRun, setEpochsPerRun] = useState('10')
+  const [reportEvery, setReportEvery] = useState('1')
+  const [lossReports, setLossReports] = useState<LossReport[]>([])
+  const [isTraining, setIsTraining] = useState(false)
+  const [trainingStatus, setTrainingStatus] = useState('')
+  const trainingController = useRef<AbortController | null>(null)
+  useEffect(() => () => trainingController.current?.abort(), [])
   const [currentLoss, setCurrentLoss] = useState<number | null>(() =>
     initialGraph ? (safeForward(initialGraph).loss ?? null) : null,
   )
@@ -294,9 +309,11 @@ function App({
       traceIndex,
       epoch,
       currentLoss,
+      lossReports: [...lossReports],
     }),
     [
       currentLoss,
+      lossReports,
       epoch,
       graph,
       initialParams,
@@ -325,6 +342,8 @@ function App({
     setTraceIndex(snapshot.traceIndex)
     setEpoch(snapshot.epoch)
     setCurrentLoss(snapshot.currentLoss)
+    setLossReports([...snapshot.lossReports])
+    setInferenceResult(undefined)
     setPendingNodeType(undefined)
     setIsPlaying(false)
   }, [])
@@ -450,6 +469,10 @@ function App({
       setTraceIndex(0)
       setEpoch(0)
       setCurrentLoss(evaluated.loss ?? null)
+      setLossReports([])
+      setTrainingStatus('')
+      setInferenceResult(undefined)
+      setTestStatus('')
       setPendingNodeType(undefined)
     },
     [pushHistory, selectSingleNode],
@@ -572,53 +595,147 @@ function App({
     selectSingleNode,
   ])
 
-  const runTenTrainingSteps = useCallback(() => {
-    if (blockingIssues.length > 0 || !hasLoss) return
-    if (heldOutSample) return
+  const epochCount = Number(epochsPerRun)
+  const reportInterval = Number(reportEvery)
+  const validRunSettings = Number.isInteger(epochCount) && epochCount >= 1 && epochCount <= 100000
+    && Number.isInteger(reportInterval) && reportInterval >= 1 && reportInterval <= 100000
+  const canRunEpochs = validRunSettings && blockingIssues.length === 0 && hasLoss && !isTraining
+    && (!heldOutSample || graph.nodes.some(node => node.type === 'dataset'))
+
+  const runEpochs = useCallback(async () => {
+    if (!canRunEpochs || trainingController.current) return
+    const controller = new AbortController()
+    trainingController.current = controller
+    setIsTraining(true)
+    setIsPlaying(false)
+    setTrainingStatus(`Training 0 / ${epochCount} epochs`)
     pushHistory()
-    let nextGraph = graph
-    const startingLoss = currentLoss
-    let loss = currentLoss
-    for (let index = 0; index < 10; index += 1) {
-      const result = runTrainingStep(nextGraph, nextGraph.learningRate)
-      nextGraph = result.graph
-      loss = result.loss ?? loss
+    let nextGraph = graph, completed = 0, lastReported = 0
+    const startEpoch = epoch
+    const dataset = graph.nodes.find(node => node.type === 'dataset')
+    let lastLoss = currentLoss
+    const publish = () => {
+      const loss = dataset ? evaluateDataset(nextGraph, dataset.id, 'train').loss : lastLoss
+      if (loss === null || loss === undefined || !Number.isFinite(loss)) throw new Error('Training diverged. Lower the learning rate and try again.')
+      setGraph(nextGraph)
+      setVisualizationGraph(nextGraph)
+      setInferenceResult(undefined)
+      setTraceSteps([])
+      setTraceIndex(0)
+      setPhase('update')
+      setEpoch(startEpoch + completed)
+      setCurrentLoss(loss)
+      setLossReports(reports => appendLossReport(reports, { epoch: startEpoch + completed, loss }))
+      lastReported = completed
     }
-    const summaryStep: EvaluationTraceStep = {
-      id: `update-batch-${Date.now()}`,
-      phase: 'update',
-      nodeId: nextGraph.nodes.find(isLossNode)?.id,
-      edgeIds: [],
-      title: 'Ran 10 gradient descent steps',
-      explanation:
-        'Each step recomputed the loss, backpropagated gradients, and updated the trainable parameters.',
-      formula: 'parameter = parameter - learning_rate * gradient',
-      calculation: `loss ${formatNumber(startingLoss ?? undefined)} -> ${formatNumber(loss ?? undefined)}`,
-      pseudocode: [
-        'for step in range(10):',
-        '  loss = forward()',
-        '  loss.backward()',
-        '  update_parameters()',
-      ],
+    try {
+      const initialLoss = dataset ? evaluateDataset(graph, dataset.id, 'train').loss : forwardPass(graph).loss
+      if (initialLoss !== undefined && Number.isFinite(initialLoss))
+        setLossReports(reports => appendLossReport(reports, { epoch: startEpoch, loss: initialLoss }))
+      for (let index = 0; index < epochCount; index++) {
+        if (controller.signal.aborted) break
+        if (dataset) {
+          nextGraph = await trainDataset(nextGraph, dataset.id, 1, { signal: controller.signal, epochOffset: startEpoch + index })
+        } else {
+          const result = runTrainingStep(nextGraph)
+          nextGraph = result.graph
+          lastLoss = result.loss ?? null
+          if (index % 8 === 7) await new Promise(resolve => setTimeout(resolve, 0))
+        }
+        completed++
+        setTrainingStatus(`Training ${completed} / ${epochCount} epochs`)
+        if (completed % reportInterval === 0 || completed === epochCount) publish()
+      }
+      if (completed > lastReported) publish()
+      setTrainingStatus(controller.signal.aborted ? `Stopped after ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.` : `Completed ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.`)
+    } catch (error) {
+      if (completed > lastReported) {
+        try { publish() } catch { /* retain the last finite report */ }
+      }
+      const message = controller.signal.aborted ? `Stopped after ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.` : error instanceof Error ? error.message : 'Training failed.'
+      setTrainingStatus(message)
+      if (!controller.signal.aborted) {
+        setExecutionError(message)
+        setRightOpen(true)
+        setRightTab('details')
+      }
+    } finally {
+      trainingController.current = null
+      setIsTraining(false)
     }
-    const nextForward = forwardPass(nextGraph)
-    setGraph(nextGraph)
-    setVisualizationGraph(nextGraph)
-    setTraceSteps([summaryStep, ...nextForward.steps])
+  }, [canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval])
+
+  const runInference = useCallback(() => {
+    const dataset = graph.nodes.find(node => node.type === 'dataset')
+    if (!dataset || blockingIssues.length > 0) return
+    const examples = datasetExamplesForNode(dataset)
+    const first = examples.findIndex(example => example.split === inferenceSplit)
+    if (first < 0) { setTestStatus(`This dataset has no ${inferenceSplit} examples.`); return }
+    const source = { ...dataset, params: { ...dataset.params, datasetSplit: inferenceSplit, datasetIndex: first, datasetValues: undefined } }
+    const testGraph = { ...graph, nodes: graph.nodes.map(node => node.id === dataset.id ? source : node) }
+    try {
+      const inferred = forwardPass(testGraph).graph
+      const metrics = evaluateDataset(inferred, dataset.id, inferenceSplit)
+      pushHistory()
+      setGraph(inferred)
+      setVisualizationGraph(inferred)
+      setCurrentLoss(metrics.loss)
+      setTraceSteps([])
+      setTraceIndex(0)
+      setPhase('forward')
+      setInferenceResult({ graph: inferred, split: inferenceSplit, metrics })
+      setTestStatus(`Evaluated ${metrics.examples} ${inferenceSplit === 'test' ? 'held-out' : 'training'} examples without updating parameters.`)
+      setExecutionError(undefined)
+      setRightOpen(true)
+      setRightTab('visualization')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Inference failed.'
+      setTestStatus(message)
+      setExecutionError(message)
+      setRightOpen(true)
+      setRightTab('details')
+    }
+  }, [blockingIssues.length, graph, inferenceSplit, pushHistory])
+
+  const openTrainTab = () => {
+    setLeftTab('train')
+    if (!heldOutSample) return
+    const dataset = graph.nodes.find(node => node.type === 'dataset')
+    if (!dataset) return
+    if (datasetMode(dataset) === 'batch' && dataset.params.datasetSplit !== 'test') return
+    const firstTrainingExample = datasetExamplesForNode(dataset).findIndex(example => example.split === 'train')
+    if (firstTrainingExample < 0) return
+    pushHistory()
+    const trainingGraph = {
+      ...graph,
+      nodes: graph.nodes.map(node => node.id === dataset.id
+        ? { ...node, params: { ...node.params, datasetSplit: 'train' as const, datasetIndex: firstTrainingExample, datasetValues: undefined } }
+        : node),
+    }
+    const evaluated = safeForward(trainingGraph)
+    setGraph(evaluated.graph)
+    setVisualizationGraph(evaluated.graph)
+    setTraceSteps([])
     setTraceIndex(0)
-    setPhase('update')
-    setEpoch((value) => value + 10)
-    setCurrentLoss(loss)
-    selectSingleNode(summaryStep.nodeId)
-  }, [
-    blockingIssues,
-    currentLoss,
-    graph,
-    hasLoss,
-    heldOutSample,
-    pushHistory,
-    selectSingleNode,
-  ])
+    setPhase('edit')
+    setCurrentLoss(evaluated.loss ?? null)
+    setIsPlaying(false)
+  }
+
+  useEffect(() => {
+    const handleRunShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !event.shiftKey || event.metaKey || event.ctrlKey || event.altKey || isEditableShortcutTarget(event.target)) return
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault()
+        if (blockingIssues.length === 0 && !isTraining) runCanvasAction(stepForward)
+      } else if (event.key === 'Enter') {
+        event.preventDefault()
+        void runEpochs()
+      }
+    }
+    document.addEventListener('keydown', handleRunShortcut)
+    return () => document.removeEventListener('keydown', handleRunShortcut)
+  }, [blockingIssues.length, isTraining, runCanvasAction, runEpochs, stepForward])
 
   const selectPaletteNode = (type: NodeType) => {
     setPendingNodeType(type)
@@ -788,6 +905,9 @@ function App({
     setTraceSteps([])
     setTraceIndex(0)
     setCurrentLoss(null)
+    setLossReports([])
+    setInferenceResult(undefined)
+    setTrainingStatus('')
     setIsPlaying(false)
     setGraph((existing) => {
       const next = {
@@ -816,6 +936,10 @@ function App({
     setTraceSteps([])
     setTraceIndex(0)
     setCurrentLoss(null)
+    setLossReports([])
+    setInferenceResult(undefined)
+    setTrainingStatus('')
+    setTestStatus('')
     setIsPlaying(false)
   }, [])
 
@@ -1050,6 +1174,10 @@ function App({
     setTraceIndex(nextState.traceIndex)
     setEpoch(nextState.epoch)
     setCurrentLoss(nextState.currentLoss)
+    setLossReports([])
+    setTrainingStatus('')
+    setInferenceResult(undefined)
+    setTestStatus('')
     setRightTab(nextState.display.showVisualization ? 'visualization' : 'details')
     setPendingNodeType(undefined)
     setIsPlaying(false)
@@ -1107,7 +1235,7 @@ function App({
                   setInspectorOpen(false)
                 }}
               >
-                Build
+                Controls
               </button>
               <button
                 type="button"
@@ -1237,14 +1365,18 @@ function App({
         </section>
       </div>}
 
-      <aside className="left-panel" aria-label="Build blocks">
+      <aside className="left-panel" aria-label="Build, train, and test sidebar">
         <div className="sidebar-heading">
-          {leftOpen ? <span>Blocks</span> : null}
-          <button type="button" aria-label={leftOpen ? 'Collapse left sidebar' : 'Expand left sidebar'} title={leftOpen ? 'Collapse blocks' : 'Expand blocks'} onClick={() => { if (leftOpen) setPaletteOpen(false); setLeftOpen(value => !value) }}>
+          {leftOpen ? <div className="left-sidebar-tabs" role="tablist" aria-label="Left sidebar views">
+            <button type="button" role="tab" aria-selected={leftTab === 'build'} onClick={() => setLeftTab('build')}>Build</button>
+            <button type="button" role="tab" aria-selected={leftTab === 'train'} onClick={openTrainTab}>Train</button>
+            <button type="button" role="tab" aria-selected={leftTab === 'test'} onClick={() => setLeftTab('test')}>Test</button>
+          </div> : null}
+          <button type="button" aria-label={leftOpen ? 'Collapse left sidebar' : 'Expand left sidebar'} title={leftOpen ? 'Collapse sidebar' : 'Expand sidebar'} onClick={() => { if (leftOpen) setPaletteOpen(false); setLeftOpen(value => !value) }}>
             {leftOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
         </div>
-        <section className="panel-section">
+        <section className="panel-section" role="tabpanel" aria-label="Build blocks" hidden={leftTab !== 'build'}>
           <p className="eyebrow">Build the model</p>
           <p className="palette-intro">
             Pick an operation. Place it. Connect it.
@@ -1268,6 +1400,44 @@ function App({
               Click the graph canvas to place {labelForType(pendingNodeType)}.
             </p>
           ) : null}
+        </section>
+        <section className="panel-section run-panel" role="tabpanel" aria-label="Train controls" hidden={leftTab !== 'train'}>
+          <p className="eyebrow">Trace the computation</p>
+          <div className="run-button-grid">
+            <button type="button" onClick={() => runCanvasAction(evaluateModel)} disabled={blockingIssues.length > 0 || isTraining}>Run forward</button>
+            <button type="button" className="primary-button" aria-keyshortcuts="Shift+Space" onClick={() => runCanvasAction(stepForward)} disabled={blockingIssues.length > 0 || isTraining}><StepForward size={15} /> Step <kbd aria-hidden="true">⇧ Space</kbd></button>
+            <button type="button" disabled={!activeStep || !collapsedGroupForNode(graph, activeStep.nodeId ?? '') || isTraining} onClick={() => {
+              const group = collapsedGroupForNode(graph, activeStep?.nodeId ?? '')
+              if (group) setGraph(setVisualGroupExpanded(graph, group.id, true))
+            }}>Step inside</button>
+            <button type="button" disabled={!activeStep || isTraining} onClick={() => {
+              let end = traceIndex
+              while (end + 1 < traceSteps.length && traceSteps[end + 1].phase === phase) end += 1
+              setTraceIndex(end)
+              selectSingleNode(traceSteps[end]?.nodeId)
+            }}>Finish phase</button>
+            <button type="button" onClick={() => setIsPlaying(playing => !playing)} disabled={blockingIssues.length > 0 || isTraining}>{isPlaying ? <Pause size={15} /> : <Play size={15} />}{isPlaying ? 'Pause' : 'Play'}</button>
+          </div>
+          <label className="run-field">Playback speed<input type="range" min={MIN_PLAY_DELAY_MS} max={MAX_PLAY_DELAY_MS} step="50" value={speedSliderValue} onChange={event => setSpeedSliderValue(Number(event.target.value))} /></label>
+          <div className="run-section-divider" />
+          <p className="eyebrow">Train the model</p>
+          <button type="button" className="run-full-step" onClick={() => runCanvasAction(runOneTrainingStep)} disabled={blockingIssues.length > 0 || !hasLoss || heldOutSample || isTraining}><FastForward size={15} /> Run one full training step</button>
+          <div className="run-number-grid">
+            <label className="run-field">Epochs per run<input type="number" min="1" max="100000" step="1" value={epochsPerRun} onChange={event => setEpochsPerRun(event.target.value)} /></label>
+            <label className="run-field">Report loss every<input type="number" min="1" max="100000" step="1" value={reportEvery} onChange={event => setReportEvery(event.target.value)} /><span>epochs</span></label>
+          </div>
+          {isTraining ? <button type="button" className="run-epochs-button" onClick={() => trainingController.current?.abort()}>Stop training</button>
+            : <button type="button" className="run-epochs-button primary-button" aria-keyshortcuts="Shift+Enter" onClick={() => void runEpochs()} disabled={!canRunEpochs}>Run {validRunSettings ? epochCount : '—'} {epochCount === 1 ? 'epoch' : 'epochs'} <kbd aria-hidden="true">⇧ Return</kbd></button>}
+          <label className="run-field">Learning rate · η = {graph.learningRate.toFixed(graph.learningRate < 0.01 ? 3 : 2)}<input type="range" min="0.001" max="0.5" step="0.001" value={graph.learningRate} onChange={event => updateLearningRate(Number(event.target.value))} disabled={isTraining} /></label>
+          <div className="run-metrics"><span>Epoch {epoch}</span><span>Current loss {formatNumber(currentLoss ?? undefined)}</span></div>
+          {trainingStatus && <p className="run-status" role="status">{trainingStatus}</p>}
+        </section>
+        <section className="panel-section run-panel test-panel" role="tabpanel" aria-label="Test controls" hidden={leftTab !== 'test'}>
+          <p className="eyebrow">Inference</p>
+          <p className="run-intro">Run the trained model on examples without changing its parameters. Predictions and accuracy appear in Reporting.</p>
+          <label className="run-field">Examples to evaluate<select aria-label="Inference examples" value={inferenceSplit} onChange={event => setInferenceSplit(event.target.value as 'train' | 'test')}><option value="test">Held-out test set</option><option value="train">Training set</option></select></label>
+          <button type="button" className="run-epochs-button primary-button" onClick={runInference} disabled={blockingIssues.length > 0 || isTraining || !graph.nodes.some(node => node.type === 'dataset')}>Run inference</button>
+          {testStatus && <p className="run-status" role="status">{testStatus}</p>}
         </section>
       </aside>
 
@@ -1352,7 +1522,7 @@ function App({
           {rightOpen ? <div className="right-sidebar-tabs" role="tablist" aria-label="Right sidebar views">
             <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
             <button type="button" role="tab" aria-selected={rightTab === 'code'} onClick={() => { setRightTab('code'); setRightWidth(width => Math.max(width, 390)) }}>Code</button>
-            <button type="button" role="tab" aria-selected={rightTab === 'visualization'} onClick={() => { setRightTab('visualization'); setRightWidth(width => Math.max(width, 390)) }}>Visualization</button>
+            <button type="button" role="tab" aria-selected={rightTab === 'visualization'} onClick={() => { setRightTab('visualization'); setRightWidth(width => Math.max(width, 390)) }}>Reporting</button>
           </div> : null}
           <button type="button" aria-label={rightOpen ? 'Collapse right sidebar' : 'Expand right sidebar'} title={rightOpen ? 'Collapse sidebar' : 'Expand sidebar'} onClick={() => { if (rightOpen) setInspectorOpen(false); setRightOpen(value => !value) }}>
             {rightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
@@ -1464,9 +1634,7 @@ function App({
               }}
             />
           )}
-        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} onGraphChange={(next, epochs = 0) => {
-          pushHistory(); setGraph(next); setVisualizationGraph(next); setPhase(epochs ? 'update' : 'forward'); setTraceSteps([]); setTraceIndex(0); setCurrentLoss(next.nodes.find(isLossNode)?.value?.data[0] ?? null); setEpoch(value => value + epochs); setIsPlaying(false)
-        }}/>) }
+        {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} />) }
         {(selectedNodeIds.length > 0 || selectedGroup) && <ModelInspector
           graph={graph}
           node={inspectedNode}
@@ -1499,110 +1667,10 @@ function App({
         <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}
         </div>
-        <div className="right-panel-scroll right-visualization-scroll" hidden={rightTab !== 'visualization'} role="tabpanel" aria-label="Model visualization">
-          {rightTab === 'visualization' ? <VisualizationPanel graph={visualizationGraph} /> : null}
+        <div className="right-panel-scroll right-visualization-scroll" hidden={rightTab !== 'visualization'} role="tabpanel" aria-label="Model reporting">
+          {rightTab === 'visualization' ? <><VisualizationPanel graph={visualizationGraph} /><LossReportPanel reports={lossReports} />{inferenceResult && <InferenceReportPanel metrics={inferenceResult.metrics} split={inferenceResult.split} task={graph.nodes.find(node => node.type === 'dataset') ? datasetForNode(graph.nodes.find(node => node.type === 'dataset')!).task : undefined} />}</> : null}
         </div>
       </aside>
-
-      <footer className="control-bar">
-        <button
-          type="button"
-          onClick={() => runCanvasAction(evaluateModel)}
-          disabled={blockingIssues.length > 0}
-        >
-          Run forward
-        </button>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() => runCanvasAction(stepForward)}
-          disabled={blockingIssues.length > 0}
-        >
-          <StepForward size={16} />
-          Step
-        </button>
-        <button
-          type="button"
-          disabled={
-            !activeStep ||
-            !collapsedGroupForNode(graph, activeStep.nodeId ?? '')
-          }
-          onClick={() => {
-            const group = collapsedGroupForNode(graph, activeStep?.nodeId ?? '')
-            if (group) setGraph(setVisualGroupExpanded(graph, group.id, true))
-          }}
-        >
-          Step inside
-        </button>
-        <button
-          type="button"
-          disabled={!activeStep}
-          onClick={() => {
-            let end = traceIndex
-            while (
-              end + 1 < traceSteps.length &&
-              traceSteps[end + 1].phase === phase
-            )
-              end += 1
-            setTraceIndex(end)
-            selectSingleNode(traceSteps[end]?.nodeId)
-          }}
-        >
-          Finish phase
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsPlaying((playing) => !playing)}
-          disabled={blockingIssues.length > 0}
-        >
-          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <label className="slider-control">
-          Speed
-          <input
-            type="range"
-            min={MIN_PLAY_DELAY_MS}
-            max={MAX_PLAY_DELAY_MS}
-            step="50"
-            value={speedSliderValue}
-            onChange={(event) =>
-              setSpeedSliderValue(Number(event.target.value))
-            }
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => runCanvasAction(runOneTrainingStep)}
-          disabled={blockingIssues.length > 0 || !hasLoss || heldOutSample}
-        >
-          <FastForward size={16} />
-          Run one full training step
-        </button>
-        <button
-          type="button"
-          onClick={() => runCanvasAction(runTenTrainingSteps)}
-          disabled={blockingIssues.length > 0 || !hasLoss || heldOutSample}
-        >
-          Run 10 training steps
-        </button>
-        <label className="slider-control">
-          Learning rate eta ={' '}
-          {graph.learningRate.toFixed(graph.learningRate < 0.01 ? 3 : 2)}
-          <input
-            type="range"
-            min="0.001"
-            max="0.5"
-            step="0.001"
-            value={graph.learningRate}
-            onChange={(event) => updateLearningRate(Number(event.target.value))}
-          />
-        </label>
-        <div className="metric-pill">Epoch {epoch}</div>
-        <div className="metric-pill">
-          Current loss {formatNumber(currentLoss ?? undefined)}
-        </div>
-      </footer>
     </main>
   )
 }
@@ -1662,6 +1730,11 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
     tagName === 'textarea' ||
     tagName === 'select'
   )
+}
+
+function appendLossReport(reports: LossReport[], next: LossReport): LossReport[] {
+  if (reports.at(-1)?.epoch === next.epoch) return [...reports.slice(0, -1), next]
+  return [...reports, next]
 }
 
 function nextVisibleStepEnd(

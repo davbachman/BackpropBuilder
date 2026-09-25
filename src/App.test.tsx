@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Position as FlowPosition } from '@xyflow/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import { DATASET_MENU_OPTIONS } from './domain/datasets'
 import { createNode, createStarterGraph } from './domain/examples'
 import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
+import { scratchModel } from './test/scratchModels'
 import { scalarValue, tensorValue } from './domain/tensor'
 import './index.css'
 import App from './App'
@@ -39,7 +40,7 @@ describe('Backprop Builder app', () => {
 
     expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Visualization' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Reporting' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Show visualization|Hide visualization/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
     expect(screen.getByText(/Build the model/i)).toBeInTheDocument()
@@ -50,14 +51,52 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByLabelText(/Show math layer/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Show gradient layer/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Show code layer/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Build' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Train' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Test' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
     expect(screen.getByRole('button', { name: /^Step$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step backward/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Step forward/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Run 10 training steps/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Run 10 epochs/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Lesson drawer/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/Lesson progress/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Session$/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Download session summary/i })).not.toBeInTheDocument()
+  })
+
+  it('runs configured epochs by shortcut with the left sidebar collapsed and reports at the chosen interval', async () => {
+    render(<App initialGraph={createModelPreset('linear')} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    fireEvent.change(screen.getByLabelText('Epochs per run'), { target: { value: '5' } })
+    fireEvent.change(screen.getByLabelText(/Report loss every/), { target: { value: '2' } })
+    expect(screen.getByRole('button', { name: /^Step$/i })).toHaveAttribute('aria-keyshortcuts', 'Shift+Space')
+    expect(screen.getByRole('button', { name: /Run 5 epochs/ })).toHaveAttribute('aria-keyshortcuts', 'Shift+Enter')
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse left sidebar' }))
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter', shiftKey: true })
+    await waitFor(() => expect(screen.getByText('Completed 5 epochs.')).toBeInTheDocument())
+    expect(screen.getByText('Epoch 5')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    const history = screen.getByRole('list', { name: 'Reported losses' })
+    expect(within(history).getAllByRole('listitem').map(item => item.querySelector('span')?.textContent)).toEqual(['Epoch 0', 'Epoch 2', 'Epoch 4', 'Epoch 5'])
+    fireEvent.keyDown(document, { key: ' ', code: 'Space', shiftKey: true })
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }))
+    expect(screen.getByRole('heading', { name: /^Evaluate / })).toBeInTheDocument()
+  })
+
+  it('shows held-out predictions and final accuracy from the Test tab', () => {
+    const { graph } = scratchModel('transformer')
+    render(<App initialGraph={graph} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Test' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Run inference' }))
+    expect(screen.getByRole('tab', { name: 'Reporting' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Test accuracy')).toHaveTextContent('%')
+    const predictions = screen.getByLabelText('Test predictions')
+    expect(within(predictions).getAllByRole('row').length).toBeGreaterThan(2)
+    expect(predictions).toHaveTextContent('Actual')
+    expect(predictions).toHaveTextContent('Predicted')
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    expect(screen.getByRole('button', { name: /Run one full training step/ })).toBeEnabled()
   })
 
   it('shows project actions inside the File menu', async () => {
@@ -115,7 +154,7 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('region', { name: /Visualization panel/i })).not.toBeInTheDocument()
 
     await chooseFileMenuItem(user, /^Starter$/i)
-    await user.click(screen.getByRole('tab', { name: 'Visualization' }))
+    await user.click(screen.getByRole('tab', { name: 'Reporting' }))
 
     expect(screen.getByRole('region', { name: /Visualization panel/i })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
@@ -149,7 +188,7 @@ describe('Backprop Builder app', () => {
     expect(container.querySelector('.react-flow__node[data-id="a"] .builder-node')).not.toHaveClass('has-error')
     expect(screen.queryByRole('alert', { name: 'Selected block errors' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     fireEvent.click(joinCard()!.querySelector('.node-title-row strong')!)
     expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('alert', { name: 'Selected block errors' })).toHaveTextContent('same row count')
@@ -236,6 +275,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByText('Neuron examples')).toBeInTheDocument()
     expect(screen.getByText(/w = 0.500/i)).toBeInTheDocument()
 
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
     expect(screen.getByText(/Epoch 1/i)).toBeInTheDocument()
     expect(screen.getByText(/Current loss/i)).toBeInTheDocument()
@@ -250,7 +290,8 @@ describe('Backprop Builder app', () => {
 
       await chooseFileMenuItem(user, /^Starter$/i)
 
-      const speedSlider = screen.getByLabelText('Speed')
+      await user.click(screen.getByRole('tab', { name: 'Train' }))
+      const speedSlider = screen.getByLabelText('Playback speed')
       fireEvent.change(speedSlider, { target: { value: '50' } })
 
       await user.click(screen.getByRole('button', { name: 'Play' }))
@@ -270,7 +311,8 @@ describe('Backprop Builder app', () => {
 
       await chooseFileMenuItem(user, /^Starter$/i)
 
-      const speedSlider = screen.getByLabelText('Speed')
+      await user.click(screen.getByRole('tab', { name: 'Train' }))
+      const speedSlider = screen.getByLabelText('Playback speed')
       fireEvent.change(speedSlider, { target: { value: '1800' } })
 
       await user.click(screen.getByRole('button', { name: 'Play' }))
@@ -288,7 +330,8 @@ describe('Backprop Builder app', () => {
       render(<App />)
 
       fireFileMenuItem(/^Starter$/i)
-      fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+      fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+      fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
       const initialPrediction = visualizationPredictionPath()
 
       fireEvent.change(screen.getByDisplayValue('0.5'), { target: { value: '1' } })
@@ -581,6 +624,7 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -592,6 +636,7 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -610,6 +655,7 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     for (let index = 0; index < 5; index += 1) {
       await user.click(screen.getByRole('button', { name: /^Step$/i }))
     }
@@ -630,6 +676,7 @@ describe('Backprop Builder app', () => {
     const { container } = render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: /^Step$/i }))
 
     expect(screen.getByRole('heading', { name: 'Evaluate x * w' })).toBeInTheDocument()
@@ -673,6 +720,7 @@ describe('Backprop Builder app', () => {
   it('moves from the last real backward computation to parameter updates instead of leaf inputs', async () => {
     const user = userEvent.setup()
     render(<App initialGraph={createStarterGraph()} />)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
 
     for (let index = 0; index < 8; index += 1) {
       await user.click(screen.getByRole('button', { name: /^Step$/i }))
@@ -689,6 +737,7 @@ describe('Backprop Builder app', () => {
   it.each(['starter', 'linear'] as const)('starts a new forward pass immediately after the first %s training cycle', kind => {
     const graph = kind === 'starter' ? createStarterGraph(true) : createModelPreset(kind)
     render(<App initialGraph={graph} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
     const step = () => fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
 
     for (let index = 0; index < 40 && !screen.queryByText('Epoch 1'); index += 1) step()
@@ -707,6 +756,7 @@ describe('Backprop Builder app', () => {
     vi.useFakeTimers()
     try {
       render(<App initialGraph={handBuiltLinearGraph()} />)
+      fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
       const step = () => fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
       for (let index = 0; index < 30 && !screen.queryByText('Epoch 1'); index++) step()
       expect(screen.getByText('Epoch 1')).toBeInTheDocument()
@@ -823,6 +873,7 @@ describe('Backprop Builder app', () => {
     render(<App />)
 
     await chooseFileMenuItem(user, /^Starter$/i)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
 
     expect(screen.getByText('Epoch 1')).toBeInTheDocument()
@@ -1258,6 +1309,7 @@ describe('Backprop Builder app', () => {
 
   it('shows only step-specific numbers and the backward derivative', () => {
     render(<App initialGraph={createStarterGraph()} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
     expect(screen.queryByText('Mini calculation')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /^Step$/i }))
@@ -1313,6 +1365,7 @@ describe('Backprop Builder app', () => {
       render(<App />)
 
       await chooseFileMenuItem(user, /^Starter$/i)
+      await user.click(screen.getByRole('tab', { name: 'Train' }))
       await user.click(screen.getByRole('button', { name: /Run one full training step/i }))
       await chooseFileMenuItem(user, /^Save$/i)
 

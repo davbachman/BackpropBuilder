@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { scratchModel } from '../test/scratchModels'
 import { createNode } from '../domain/examples'
 import { blockPalette } from '../domain/blockPalette'
-import { forwardPass, parameterValues } from '../domain/engine'
+import { forwardPass } from '../domain/engine'
 import { datasetOutputValueForSlot } from '../domain/datasets'
 import { tensorValue } from '../domain/tensor'
 import { predictionNode } from '../domain/datasetTraining'
@@ -119,38 +119,12 @@ describe('scratch model authoring controls',()=>{
     expect(screen.getByText('Feature map · before activation')).toBeVisible()
   })
 
-  it('trains a user-created graph through dataset controls and evaluates held-out examples',async()=>{
-    const {graph,datasetId}=scratchModel('transformer'), changed=vi.fn()
-    render(<DatasetWorkbench graph={graph} node={graph.nodes.find(node=>node.id === datasetId)!} onParams={vi.fn()} onGraphChange={changed}/>)
-    fireEvent.click(screen.getByRole('button',{name:'Train 1 epoch'}))
-    await waitFor(()=>expect(changed).toHaveBeenCalledTimes(1))
-    expect(changed.mock.calls[0][1]).toBe(1)
-    fireEvent.click(screen.getByRole('button',{name:'Evaluate training & held-out data'}))
-    expect(screen.getByText('Held out · 8 examples')).toBeVisible()
-    expect(screen.getByRole('status')).toHaveTextContent('without updating parameters')
-  })
-
-  it('switches a trained model to held-out inference and shows each prediction with final accuracy',()=>{
-    const {graph,datasetId}=scratchModel('transformer'), changed=vi.fn(), onParams=vi.fn()
+  it('keeps dataset details for configuration, including a selectable train/test split',()=>{
+    const {graph,datasetId}=scratchModel('transformer'), onParams=vi.fn()
     const node=graph.nodes.find(candidate=>candidate.id === datasetId)!
-    const view=render(<DatasetWorkbench graph={graph} node={node} onParams={onParams} onGraphChange={changed}/>)
+    render(<DatasetWorkbench graph={graph} node={node} onParams={onParams}/>)
     fireEvent.change(screen.getByLabelText('Train/test split'),{target:{value:'80'}})
     expect(onParams).toHaveBeenCalledWith(datasetId,expect.objectContaining({trainPercent:80,datasetSplit:'train'}))
-    const adjustedNode={...node,params:{...node.params,...onParams.mock.lastCall![1]}}
-    const adjustedGraph={...graph,nodes:graph.nodes.map(candidate=>candidate.id === datasetId ? adjustedNode : candidate)}
-    view.rerender(<DatasetWorkbench graph={adjustedGraph} node={adjustedNode} onParams={onParams} onGraphChange={changed}/>)
-    fireEvent.click(screen.getByRole('button',{name:'Run inference on test set'}))
-    expect(changed).toHaveBeenCalledTimes(1)
-    const inferred:GraphModel=changed.mock.calls[0][0]
-    expect(parameterValues(inferred)).toEqual(parameterValues(adjustedGraph))
-    expect(inferred.nodes.find(candidate=>candidate.id === datasetId)?.params.trainPercent).toBe(80)
-    expect(inferred.nodes.find(candidate=>candidate.id === datasetId)?.params.datasetSplit).toBe('test')
-    view.rerender(<DatasetWorkbench graph={inferred} node={inferred.nodes.find(candidate=>candidate.id === datasetId)!} onParams={onParams} onGraphChange={changed}/>)
-    expect(screen.getByLabelText('Test accuracy')).toHaveTextContent('%')
-    expect(screen.getByRole('region',{name:'Test predictions'})).toHaveTextContent('Actual')
-    expect(screen.getByRole('region',{name:'Test predictions'}).querySelectorAll('tbody tr')).toHaveLength(25)
-    fireEvent.click(screen.getByRole('button',{name:'Next'}))
-    expect(screen.getByText(/Page 2 of/)).toBeVisible()
-    expect(screen.getByRole('region',{name:'Test predictions'}).querySelectorAll('tbody tr').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button',{name:/Train 1 epoch|Run inference|Evaluate training/i})).not.toBeInTheDocument()
   })
 })

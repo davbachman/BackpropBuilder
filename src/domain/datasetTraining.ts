@@ -72,7 +72,7 @@ function displayPrediction(value: number, categorical: boolean, classLabels?: st
 
 /** SGD traverses training examples only and restores the inspected example.
  * Yield between chunks so the canvas remains responsive and training can stop. */
-export async function trainDataset(graph: GraphModel, id: string, epochs: number, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void } = {}): Promise<GraphModel> {
+export async function trainDataset(graph: GraphModel, id: string, epochs: number, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void; epochOffset?: number } = {}): Promise<GraphModel> {
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
   if (graph.nodes.filter(node => node.type === 'dataset').length !== 1) throw new Error('Use one dataset block to keep features and targets synchronized during training.')
@@ -84,7 +84,7 @@ export async function trainDataset(graph: GraphModel, id: string, epochs: number
     // Included image files are sorted by class. Shuffle each epoch so SGD
     // doesn't forget earlier classes while processing a long run of one digit.
     const order = [...indices]
-    let seed = 42 + epoch
+    let seed = 42 + (options.epochOffset ?? 0) + epoch
     for (let i = order.length - 1; i > 0; i--) {
       seed = (1664525 * seed + 1013904223) >>> 0
       const j = Math.floor(seed / 4294967296 * (i + 1))

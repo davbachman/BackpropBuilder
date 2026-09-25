@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { tensorValue } from './domain/tensor'
 import { createModelPreset } from './domain/modelPresets'
@@ -23,35 +23,36 @@ describe('Backprop Builder visualization data edits', () => {
     expect(screen.queryByText('Build a CNN from scratch')).not.toBeInTheDocument()
     expect(screen.queryByText('Build a transformer from scratch')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
   })
 
   it('fits the first model to the training split and updates the loss beneath its line', async () => {
     const { container } = render(<App initialGraph={createModelPreset('linear')} />)
     fireEvent.click(container.querySelector('[data-id="model-data"]')!)
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     const trainingLoss = () => Number(screen.getByLabelText('Training loss').textContent)
     const heldOutLoss = () => Number(screen.getByLabelText('Held-out loss').textContent)
     const line = () => container.querySelector('.visualization-prediction-line')?.getAttribute('d')
     const initialLoss = trainingLoss(), initialHeldOutLoss = heldOutLoss(), initialLine = line()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Details' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Train 1 epoch' }))
-    await waitFor(() => expect(screen.queryByRole('status')?.textContent).toMatch(/Completed 1 epoch/))
-    expect(screen.getByText('Epoch 1')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    fireEvent.change(screen.getByLabelText('Epochs per run'), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run 1 epoch/ }))
+    await waitFor(() => expect(screen.getByText('Completed 1 epoch.')).toBeInTheDocument())
+    expect(within(screen.getByRole('tabpanel', { name: 'Train controls' })).getByText('Epoch 1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     const afterOneEpoch = trainingLoss()
     expect(afterOneEpoch).toBeLessThan(initialLoss)
     expect(line()).not.toBe(initialLine)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Details' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Train 5 epochs' }))
-    await waitFor(() => expect(screen.getByText('Epoch 6')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.change(screen.getByLabelText('Epochs per run'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run 5 epochs/ }))
+    await waitFor(() => expect(within(screen.getByRole('tabpanel', { name: 'Train controls' })).getByText('Epoch 6')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     expect(trainingLoss()).toBeLessThan(afterOneEpoch)
     expect(heldOutLoss()).toBeLessThan(initialHeldOutLoss)
-    expect(screen.getByText('Epoch 6')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel', { name: 'Train controls' })).getByText('Epoch 6')).toBeInTheDocument()
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
   })
 
@@ -59,7 +60,7 @@ describe('Backprop Builder visualization data edits', () => {
     const { container } = render(<App />)
 
     fireFileMenuItem(/^Starter$/i)
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     const firstTargetPoint = () => container.querySelector('.visualization-target-point')
     const initialFill = firstTargetPoint()?.getAttribute('fill')
 

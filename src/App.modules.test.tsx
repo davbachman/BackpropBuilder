@@ -50,6 +50,7 @@ describe('module navigation in the builder', () => {
     graph.nodes = graph.nodes.filter((node) => !['loss', 'target'].includes(node.type))
     graph.edges = graph.edges.filter((edge) => edge.target !== 'loss')
     const { container } = render(<App initialGraph={graph} />)
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     expect(screen.getByRole('button', { name: 'Run one full training step' })).toBeDisabled()
     for (let i = 0; i < 5; i += 1) await user.click(screen.getByRole('button', { name: /^Step$/ }))
     expect(container.querySelector('[data-id="pred"]')).toHaveTextContent('out 7.000')

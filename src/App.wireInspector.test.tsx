@@ -22,7 +22,7 @@ describe('wire inspection in the right sidebar', () => {
       edges: [{ id: 'x-relu', source: 'x', target: 'relu', inputSlot: 0 }],
     }
     render(<App initialGraph={graph} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
     fireEvent.click(screen.getByRole('button', { name: 'Collapse right sidebar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Inspect wire' }))
 

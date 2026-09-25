@@ -78,6 +78,7 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
       expect(container.querySelector('[data-id="x"] .semantic-operation-value')).toHaveAttribute('title', formatFullTensor(dataset.featureValues[0]))
       expect(container.querySelector('[data-id="target"] .semantic-operation-value')).toHaveAttribute('title', formatFullTensor(dataset.targetValue))
     }
+    await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: 'Run forward' }))
     expectResults('circle-center')
     fireEvent.click(card)
