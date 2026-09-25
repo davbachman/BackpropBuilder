@@ -28,8 +28,6 @@ interface Props {
   onDataset: (id: string, dataset: DatasetKind) => void
   onOpen: (id: string) => void
   onInspectNeuron: (id: string, unit: number, row?: number) => void
-  onCopy: () => void
-  onDuplicate: () => void
   onGroup: () => void
   selectionCount: number
 }
@@ -46,8 +44,6 @@ export function ModelInspector({
   onDataset,
   onOpen,
   onInspectNeuron,
-  onCopy,
-  onDuplicate,
   onGroup,
   selectionCount,
 }: Props) {
@@ -276,13 +272,9 @@ export function ModelInspector({
             )}
         </>
       )}
-      {((selectionCount > 0 && !node?.id.startsWith('inspect:')) || group) && (
+      {selectionCount > 1 && (
         <div className="inspector-actions">
-          <button onClick={onCopy}>Copy block</button>
-          <button onClick={onDuplicate}>Duplicate</button>
-          {selectionCount > 1 && (
-            <button onClick={onGroup}>Group selection</button>
-          )}
+          <button onClick={onGroup}>Group selection</button>
         </div>
       )}
     </section>

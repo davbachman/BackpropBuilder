@@ -14,7 +14,7 @@ import { DecoderControls } from './DecoderControls'
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { DatasetWorkbench } from './DatasetWorkbench'
 
-const callbacks = {onParams:vi.fn(),onValue:vi.fn(),onDataset:vi.fn(),onOpen:vi.fn(),onInspectNeuron:vi.fn(),onCopy:vi.fn(),onDuplicate:vi.fn(),onGroup:vi.fn(),selectionCount:1}
+const callbacks = {onParams:vi.fn(),onValue:vi.fn(),onDataset:vi.fn(),onOpen:vi.fn(),onInspectNeuron:vi.fn(),onGroup:vi.fn(),selectionCount:1}
 function InspectorHarness({initial}: {initial:GraphNode}) {
   const [node,setNode] = useState(initial)
   return <ModelInspector {...callbacks} graph={{nodes:[node],edges:[],learningRate:.01}} node={node} onValue={(_,value)=>setNode({...node,params:{...node.params,value}})}/>

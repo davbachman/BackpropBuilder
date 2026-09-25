@@ -50,11 +50,11 @@
   white-space: nowrap;
 }
 
-.file-menu {
+.topbar-menu {
   position: relative;
 }
 
-.file-menu-panel {
+.topbar-menu-panel {
   position: absolute;
   top: calc(100% + 7px);
   left: 0;
@@ -69,7 +69,10 @@
   box-shadow: var(--shadow);
 }
 
-.file-menu-panel button {
+.topbar-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 34px;
   justify-content: flex-start;
   border-color: transparent;
@@ -78,8 +81,20 @@
   font-weight: 800;
 }
 
-.file-menu-panel button:hover {
+.topbar-menu-panel button:hover:not(:disabled) {
   background: var(--accent-soft);
+}
+
+.topbar-menu-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.topbar-menu-panel kbd {
+  margin-left: auto;
+  color: var(--muted);
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
 }
 
 .import-error {

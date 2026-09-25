@@ -7,6 +7,9 @@ import {
   BookOpen,
   Calculator,
   ChevronDown,
+  ClipboardPaste,
+  Copy,
+  CopyPlus,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -19,6 +22,7 @@ import {
   Shuffle,
   StepForward,
   Upload,
+  Undo2,
 } from 'lucide-react'
 import {
   useCallback,
@@ -173,6 +177,7 @@ function App({
   const [traceSteps, setTraceSteps] = useState<EvaluationTraceStep[]>([])
   const [traceIndex, setTraceIndex] = useState(0)
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false)
+  const [isEditMenuOpen, setIsEditMenuOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const runCanvasAction = useCallback((action: () => void) => {
     setExecutionError(undefined)
@@ -247,6 +252,8 @@ function App({
   )
   const selectedCodeTarget: CodeTarget | undefined = selectedNodeId ? { kind: 'node', id: selectedNodeId }
     : selectedCodeGroupId ? { kind: 'group', id: selectedCodeGroupId } : undefined
+  const canCopySelection = selectedNodeIds.some(id => graph.nodes.some(node => node.id === id))
+    || Boolean(selectedGroupId && graph.groups?.some(group => group.id === selectedGroupId))
   const inspectedEdge = displayGraph.edges.find(
     (edge) => edge.id === selectedEdgeId,
   ) ?? graph.edges.find((edge) => edge.id === selectedEdgeId)
@@ -981,6 +988,30 @@ function App({
     action()
   }
 
+  const runEditMenuAction = (action: () => void) => {
+    setIsEditMenuOpen(false)
+    action()
+  }
+
+  useEffect(() => {
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest('.topbar-menu')) return
+      setIsFileMenuOpen(false)
+      setIsEditMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setIsFileMenuOpen(false)
+      setIsEditMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [])
+
   const importProjectState = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
@@ -1076,19 +1107,19 @@ function App({
                 Inspect
               </button>
             </>
-          <div className="file-menu">
+          <div className="topbar-menu">
             <button
               type="button"
               className="topbar-button"
               aria-haspopup="menu"
               aria-expanded={isFileMenuOpen}
-              onClick={() => setIsFileMenuOpen((open) => !open)}
+              onClick={() => { setIsEditMenuOpen(false); setIsFileMenuOpen((open) => !open) }}
             >
               File
               <ChevronDown size={15} />
             </button>
             {isFileMenuOpen ? (
-              <div className="file-menu-panel" role="menu" aria-label="File">
+              <div className="topbar-menu-panel" role="menu" aria-label="File">
                 <button
                   type="button"
                   role="menuitem"
@@ -1124,6 +1155,34 @@ function App({
                 >
                   <BookOpen size={15} />
                   Starter
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="topbar-menu">
+            <button
+              type="button"
+              className="topbar-button"
+              aria-haspopup="menu"
+              aria-expanded={isEditMenuOpen}
+              onClick={() => { setIsFileMenuOpen(false); setIsEditMenuOpen((open) => !open) }}
+            >
+              Edit
+              <ChevronDown size={15} />
+            </button>
+            {isEditMenuOpen ? (
+              <div className="topbar-menu-panel" role="menu" aria-label="Edit">
+                <button type="button" role="menuitem" aria-label="Undo" aria-keyshortcuts="Meta+Z Control+Z" disabled={undoStack.length === 0} onClick={() => runEditMenuAction(undoLastAction)}>
+                  <Undo2 size={15} /> Undo <kbd aria-hidden="true">⌘/Ctrl Z</kbd>
+                </button>
+                <button type="button" role="menuitem" aria-label="Copy" aria-keyshortcuts="Meta+C Control+C" disabled={!canCopySelection} onClick={() => runEditMenuAction(copySelectionToClipboard)}>
+                  <Copy size={15} /> Copy <kbd aria-hidden="true">⌘/Ctrl C</kbd>
+                </button>
+                <button type="button" role="menuitem" aria-label="Paste" aria-keyshortcuts="Meta+V Control+V" disabled={!clipboard} onClick={() => runEditMenuAction(pasteClipboard)}>
+                  <ClipboardPaste size={15} /> Paste <kbd aria-hidden="true">⌘/Ctrl V</kbd>
+                </button>
+                <button type="button" role="menuitem" aria-label="Duplicate" disabled={!canCopySelection} onClick={() => runEditMenuAction(duplicateSelection)}>
+                  <CopyPlus size={15} /> Duplicate
                 </button>
               </div>
             ) : null}
@@ -1397,8 +1456,6 @@ function App({
           onDataset={updateDataset}
           onOpen={openGroup}
           onInspectNeuron={inspectNeuron}
-          onCopy={copySelectionToClipboard}
-          onDuplicate={duplicateSelection}
           onGroup={mergeSelectedNodes}
           selectionCount={selectedNodeIds.length}
         />}

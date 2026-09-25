@@ -75,6 +75,39 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('button', { name: /Import state/i })).not.toBeInTheDocument()
   })
 
+  it('puts selection editing in the Edit menu while keeping Details focused on the block', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /^Edit$/i }))
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: 'Paste' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /^File$/i }))
+    expect(screen.queryByRole('menu', { name: 'Edit' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('menuitem', { name: 'Starter' }))
+    expect(screen.queryByRole('button', { name: 'Copy block' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Duplicate' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^Edit$/i }))
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeEnabled()
+    await user.click(screen.getByRole('menuitem', { name: 'Copy' }))
+    expect(screen.queryByRole('menu', { name: 'Edit' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^Edit$/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Paste' }))
+    expect(screen.getByText('10 nodes, 9 edges')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^Edit$/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
+    expect(screen.getByText('11 nodes, 9 edges')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^Edit$/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Undo' }))
+    expect(screen.getByText('10 nodes, 9 edges')).toBeInTheDocument()
+  })
+
   it('activates the visualization panel on demand', async () => {
     const user = userEvent.setup()
     render(<App />)
