@@ -357,6 +357,7 @@ export function cloneGraph(graph: GraphModel): GraphModel {
       ...graph.view,
       inspectedNeuron: graph.view.inspectedNeuron ? { ...graph.view.inspectedNeuron } : undefined,
       layoutOffsets: graph.view.layoutOffsets ? Object.fromEntries(Object.entries(graph.view.layoutOffsets).map(([id, offset]) => [id, { ...offset }])) : undefined,
+      manualNodePlacements: graph.view.manualNodePlacements ? Object.fromEntries(Object.entries(graph.view.manualNodePlacements).map(([id, placement]) => [id, { ...placement, offset: { ...placement.offset } }])) : undefined,
       layoutEdges: graph.view.layoutEdges?.map(edge => ({ ...edge })),
       expandedGroupIds: [...graph.view.expandedGroupIds],
       viewport: graph.view.viewport ? { ...graph.view.viewport } : undefined,

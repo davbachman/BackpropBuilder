@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "train:decoder": "node --experimental-strip-types scripts/train-decoder.ts"
+    "train:decoder": "node --experimental-strip-types scripts/train-decoder.ts",
+    "export:models": "node scripts/export-models.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.2",

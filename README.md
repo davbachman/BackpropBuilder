@@ -5,10 +5,10 @@
 Created by David Bachman with GPT 5.5. To learn more about David see https://pzacad.pitzer.edu/~dbachman/, and subscribe to his AI podcast *Entropy Bonus* at https://profbachman.substack.com/.
 
 ## Brief description
-BackpropBuilder is an editable neural-network canvas. Zoom from a complete model into layers, neurons, and individual calculations; watch values flow forward and gradients flow backward. Eleven presets include dataset-backed regression and classification, attention, a working two-block transformer, and an 8×8 handwritten-digit CNN with editable filters and feature maps.
+BackpropBuilder is an editable neural-network canvas. It opens to a blank builder, where students can create models from individual calculations. Zoom from a complete model into layers, neurons, and calculations; watch values flow forward and gradients flow backward. Importable example files include dataset-backed regression and classification, attention, a working two-block transformer, and an 8×8 handwritten-digit CNN with editable filters and feature maps.
 
 ## Instructions for use
-Run `npm install` and `npm run dev`, then open the displayed local URL. Choose a preset and zoom into its connected architecture. Click a wire for its values, or a calculation to edit its parameters. Use **Blank builder** to build operations, group a neuron, and copy it into a larger network. **File → Save** downloads the working graph as JSON.
+Run `npm install` and `npm run dev`, then open the displayed local URL. Build on the blank canvas, or [download a model JSON file](https://github.com/davbachman/BackpropBuilder/tree/main/public/models) and choose **File → Import**. Click a wire for its values, or a calculation to edit its parameters. Group a neuron and copy it into a larger network. **File → Save** downloads the working graph as JSON for later import.
 
 See the [usage guide](docs/USAGE.md) for lesson workflows and the [validation report](docs/VALIDATION.md) for verified behavior and remaining limits. The decoder learns only a synthetic repeating color sequence; it does not understand ordinary language.
 
@@ -18,6 +18,7 @@ See the [usage guide](docs/USAGE.md) for lesson workflows and the [validation re
 npm test
 npm run build
 npm run lint
+npm run export:models
 npm run train:decoder
 node --experimental-strip-types scripts/train-cnn.ts
 ```

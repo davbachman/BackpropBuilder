@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { initializeTensor, operationHelp, type Initializer } from '../domain/authoring'
-import { BuildRecipes } from './BuildRecipes'
 import { ConvolutionInspector } from './ConvolutionInspector'
 import { TensorHeatmap } from './TensorHeatmap'
-import { formatNumber, formulaForNode } from '../domain/engine'
+import { formatNumber, formulaForNode, lossKindForNode, lossOptionsForNode } from '../domain/engine'
 import { DATASET_OPTIONS, datasetForNode, datasetOutputValueForSlot } from '../domain/datasets'
 import { formatCompactTensor, formatFullTensor, toTensor } from '../domain/tensor'
 import type { CoordinateBinding } from '../domain/neuronProjection'
@@ -70,15 +69,9 @@ export function ModelInspector({
           ? (group.kind ?? 'Building block')
           : node
             ? 'Inside the calculation'
-            : 'Explore & build'}
+            : 'Selection'}
       </p>
-      <h2>{group?.label ?? node?.label ?? 'One model. Every scale.'}</h2>
-      {!group && !node && (
-        <p className="inspector-intro">
-          Follow the wires. Zoom into a block to reveal its layers, then into a
-          neuron to see the arithmetic. Select any calculation to change it.
-        </p>
-      )}
+      <h2>{group?.label ?? node?.label ?? `${selectionCount} blocks selected`}</h2>
       {group && (
         <>
           {onGroupChange && <form key={group.id} onSubmit={event => {
@@ -173,7 +166,7 @@ export function ModelInspector({
           </>}
           {operationHelp[node.type] && <p className="coordinate-note">{operationHelp[node.type]}</p>}
           {node.type === 'conv2d' && <ConvolutionInspector graph={graph} node={node} onValue={onValue}/>}
-          {node.type === 'loss' && <label className="inspector-field">Loss<select aria-label="Loss function" value={node.params.loss ?? 'squared-error'} onChange={event => onParams(node.id,{loss:event.target.value as NodeParams['loss']})}>{['squared-error','mse','mae','binary-cross-entropy'].map(kind => <option key={kind}>{kind}</option>)}</select></label>}
+          {node.type === 'loss' && <label className="inspector-field">Loss<select aria-label="Loss function" value={lossKindForNode(node, graph)} onChange={event => onParams(node.id,{loss:event.target.value as NodeParams['loss']})}>{lossOptionsForNode(node, graph).map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></label>}
           {!dataset && node.value && node.value.data.length > 1 && (
             <TensorHeatmap
               key={`${node.id}:${node.value.shape.join(',')}`}
@@ -289,16 +282,6 @@ export function ModelInspector({
           )}
         </div>
       )}
-      <BuildRecipes/>
-      <div className="inspector-hint">
-        <strong>Build with the canvas</strong>
-        <p>
-          Add operations, connect the handles, then select several nodes and
-          group them. Copy a group to reuse it as a neuron, layer, or attention
-          head.
-        </p>
-        <span>Drag canvas to select · ⌘/Ctrl C, V · Delete</span>
-      </div>
     </section>
   )
 }

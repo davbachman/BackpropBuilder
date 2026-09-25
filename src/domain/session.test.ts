@@ -105,19 +105,25 @@ describe('project state files', () => {
 
   it('saves manual block and projected-node placement with independent cloned coordinates', () => {
     const snapshot = projectSnapshot()
-    snapshot.graph.view = { expandedGroupIds: [], layoutOffsets: {
+    snapshot.graph.view = { expandedGroupIds: [], manualNodePlacements: {
+      pred: { parentId: 'group-1', offset: { x: 12, y: 34 } },
+      w: { offset: { x: -25, y: 40 }, scale: .025 },
+    }, layoutOffsets: {
       'visual-group:blocks.0': { x: 120, y: -35 },
       'inspect:blocks.0.ff1.layer:0:w0': { x: 24, y: 12 },
     } }
     const cloned = cloneGraph(snapshot.graph)
     cloned.view!.layoutOffsets!['visual-group:blocks.0'].x = 999
     expect(snapshot.graph.view.layoutOffsets!['visual-group:blocks.0'].x).toBe(120)
+    cloned.view!.manualNodePlacements!.pred.offset.x = 999
+    expect(snapshot.graph.view.manualNodePlacements!.pred.offset.x).toBe(12)
 
     const file = createProjectStateFile(snapshot)
     const result = parseProjectStateFile(JSON.stringify(file))
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
     expect(result.file.state.graph.view!.layoutOffsets).toEqual(snapshot.graph.view.layoutOffsets)
+    expect(result.file.state.graph.view!.manualNodePlacements).toEqual(snapshot.graph.view.manualNodePlacements)
     result.file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y = 999
     expect(file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)
     expect(snapshot.graph.view.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)

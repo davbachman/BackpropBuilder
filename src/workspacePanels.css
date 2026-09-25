@@ -10,6 +10,7 @@
 .app-shell.workspace-split .right-panel-scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 17px 24px; }
 .app-shell.workspace-split .right-panel-scroll[hidden] { display: none; }
 .app-shell.workspace-split .right-code-scroll { padding: 0; }
+.app-shell.workspace-split .right-visualization-scroll .visualization-panel { margin: 0; padding: 0; border: 0; }
 .app-shell.workspace-split.left-collapsed .left-panel .panel-section,
 .app-shell.workspace-split.right-collapsed .right-panel-scroll { display: none; }
 .sidebar-heading { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 43px; padding: 6px 8px 6px 12px; border-bottom: 1px solid #ede8f1; color: #847091; font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }

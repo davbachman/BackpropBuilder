@@ -1,5 +1,7 @@
-import { useMemo, type ReactElement } from 'react'
+import { useId, useMemo, type ReactElement } from 'react'
 import { formatNumber, forwardPass } from '../domain/engine'
+import { datasetForNode } from '../domain/datasets'
+import { evaluateDataset } from '../domain/datasetTraining'
 import { isScalarTensor, tensorSize, tensorValue, toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from '../domain/types'
 
@@ -17,6 +19,7 @@ type VisualizationData =
       yRange: NumericRange
       targetPoints: Point2D[]
       predictionSamples: Point2D[]
+      datasetId?: string
     }
   | {
       kind: 'two-input'
@@ -27,6 +30,7 @@ type VisualizationData =
       predictionRange: NumericRange
       targetPoints: ColoredPoint[]
       predictionSurface: PredictionSurface
+      datasetId?: string
     }
   | {
       kind: 'unsupported'
@@ -55,6 +59,20 @@ interface NumericRange {
 
 export function VisualizationPanel({ graph }: { graph: GraphModel }): ReactElement {
   const data = useMemo(() => buildVisualizationData(graph), [graph])
+  const losses = useMemo(() => {
+    if (data.kind === 'unsupported') return undefined
+    if (data.datasetId) {
+      try {
+        const training = evaluateDataset(graph, data.datasetId, 'train')
+        const heldOut = evaluateDataset(graph, data.datasetId, 'test')
+        return { kind: 'dataset' as const, training, heldOut }
+      } catch { return undefined }
+    }
+    try {
+      const loss = forwardPass(graph).loss
+      return loss === undefined ? undefined : { kind: 'current' as const, current: loss }
+    } catch { return undefined }
+  }, [graph, data])
 
   return (
     <section className="inspector-card visualization-panel" aria-label="Visualization panel">
@@ -68,6 +86,12 @@ export function VisualizationPanel({ graph }: { graph: GraphModel }): ReactEleme
       {data.kind === 'single-input' ? <SingleInputVisualization data={data} /> : null}
       {data.kind === 'two-input' ? <TwoInputVisualization data={data} /> : null}
       {data.kind === 'unsupported' ? <p className="visualization-empty">{data.message}</p> : null}
+      {losses && <div className="visualization-losses" aria-label="Loss readout">
+        {losses.kind === 'dataset' ? <>
+          <div><span>Training loss</span><output aria-label="Training loss">{losses.training.loss.toFixed(4)}</output><small>{losses.training.examples} examples</small></div>
+          <div><span>Held-out loss</span><output aria-label="Held-out loss">{losses.heldOut.loss.toFixed(4)}</output><small>{losses.heldOut.examples} examples</small></div>
+        </> : <div><span>Current loss</span><output aria-label="Visualization loss">{losses.current.toFixed(4)}</output></div>}
+      </div>}
     </section>
   )
 }
@@ -77,6 +101,7 @@ function SingleInputVisualization({
 }: {
   data: Extract<VisualizationData, { kind: 'single-input' }>
 }): ReactElement {
+  const clipId = useId()
   const bounds = boundsForRanges(data.xRange, data.yRange)
   const predictionPath = data.predictionSamples
     .toSorted((first, second) => first.x - second.x)
@@ -94,11 +119,13 @@ function SingleInputVisualization({
         aria-label="Input-output visualization"
         viewBox={`0 0 ${PLOT_WIDTH} ${PLOT_HEIGHT}`}
       >
+        <defs><clipPath id={clipId}><rect x={PLOT_PADDING} y={PLOT_PADDING} width={PLOT_WIDTH - 2 * PLOT_PADDING} height={PLOT_HEIGHT - 2 * PLOT_PADDING} /></clipPath></defs>
         <PlotAxes xLabel={data.inputLabel} yLabel="output" />
         <path
           className="visualization-prediction-line"
           data-sample-count={data.predictionSamples.length}
           d={predictionPath}
+          clipPath={`url(#${clipId})`}
         >
           <title>prediction curve over sampled input range</title>
         </path>
@@ -118,6 +145,7 @@ function SingleInputVisualization({
       <div className="visualization-meta-row">
         <span>x-axis: {data.inputLabel}</span>
         <span>y-axis: output</span>
+        <span>{data.targetPoints.length} points</span>
       </div>
       <VisualizationLegend />
     </div>
@@ -176,6 +204,7 @@ function TwoInputVisualization({
       <div className="visualization-meta-row">
         <span>x-axis: {data.inputLabels[0]}</span>
         <span>y-axis: {data.inputLabels[1]}</span>
+        <span>{data.targetPoints.length} points</span>
       </div>
       <VisualizationLegend />
     </div>
@@ -271,8 +300,9 @@ function singleInputDataFor(
   predictionNode: GraphNode,
   targetNode: GraphNode,
 ): VisualizationData {
-  const input = toTensor(inputNode.value ?? inputNode.params.value)
-  const target = toTensor(targetNode.value ?? targetNode.params.value)
+  const datasetBinding = fullNumericDatasetValues(graph, [inputNode], targetNode)
+  const input = datasetBinding?.values[0] ?? toTensor(inputNode.value ?? inputNode.params.value)
+  const target = datasetBinding?.values[1] ?? toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(input.data.length, target.data.length)
 
   if (!canExpandToSize(input, pointCount) || !canExpandToSize(target, pointCount)) {
@@ -287,7 +317,6 @@ function singleInputDataFor(
     y: tensorEntryAt(target, index),
   }))
   const xRange = paddedRange(targetPoints.map((point) => point.x))
-  const yRange = paddedRange(targetPoints.map((point) => point.y))
   const predictionSamples = sampleSingleInputPredictions(graph, inputNode.id, predictionNode.id, targetNode.id, xRange)
 
   if (!predictionSamples) {
@@ -301,9 +330,10 @@ function singleInputDataFor(
     kind: 'single-input',
     inputLabel: inputNode.label,
     xRange,
-    yRange,
+    yRange: paddedRange(targetPoints.map(point => point.y), 0.5),
     targetPoints,
     predictionSamples,
+    datasetId: datasetBinding?.sourceId,
   }
 }
 
@@ -313,9 +343,10 @@ function twoInputDataFor(
   predictionNode: GraphNode,
   targetNode: GraphNode,
 ): VisualizationData {
-  const firstInput = toTensor(inputNodes[0].value ?? inputNodes[0].params.value)
-  const secondInput = toTensor(inputNodes[1].value ?? inputNodes[1].params.value)
-  const target = toTensor(targetNode.value ?? targetNode.params.value)
+  const datasetBinding = fullNumericDatasetValues(graph, inputNodes, targetNode)
+  const firstInput = datasetBinding?.values[0] ?? toTensor(inputNodes[0].value ?? inputNodes[0].params.value)
+  const secondInput = datasetBinding?.values[1] ?? toTensor(inputNodes[1].value ?? inputNodes[1].params.value)
+  const target = datasetBinding?.values[2] ?? toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(firstInput.data.length, secondInput.data.length, target.data.length)
 
   if (
@@ -361,6 +392,7 @@ function twoInputDataFor(
     predictionRange: paddedRange(predictionSurface.cells.map((point) => point.value)),
     targetPoints,
     predictionSurface,
+    datasetId: datasetBinding?.sourceId,
   }
 }
 
@@ -470,6 +502,23 @@ function incomingEdges(graph: GraphModel, nodeId: string): GraphEdge[] {
     .sort((first, second) => (first.inputSlot ?? 0) - (second.inputSlot ?? 0))
 }
 
+/** The canvas may trace one example, but the data plot describes the whole
+ * connected numeric dataset. Read its original columns instead of the
+ * currently selected example flowing through the alias nodes. */
+function fullNumericDatasetValues(graph: GraphModel, inputs: GraphNode[], target: GraphNode): { values: TensorValue[]; sourceId: string } | undefined {
+  const ports = [...inputs, target].map(node => incomingEdges(graph, node.id)
+    .find(edge => nodeById(graph, edge.source)?.type === 'dataset'))
+  if (ports.some(port => !port) || ports.some(port => port?.source !== ports[0]?.source)) return undefined
+  const source = nodeById(graph, ports[0]!.source)
+  if (!source) return undefined
+  const dataset = datasetForNode(source)
+  if (dataset.examples) return undefined
+  const columns = [...dataset.featureValues, dataset.targetValue]
+  const values = ports.map(port => columns[port?.sourceSlot ?? 0])
+  if (values.some(value => !value || value.data.length !== dataset.targetValue.data.length)) return undefined
+  return { values, sourceId: source.id }
+}
+
 function nodeById(graph: GraphModel, nodeId: string): GraphNode | undefined {
   return graph.nodes.find((node) => node.id === nodeId)
 }
@@ -531,11 +580,11 @@ function plotY(value: number, bounds: LineBounds): number {
   return PLOT_HEIGHT - PLOT_PADDING - ((value - bounds.minY) / span) * (PLOT_HEIGHT - PLOT_PADDING * 2)
 }
 
-function paddedRange(values: number[]): NumericRange {
+function paddedRange(values: number[], fraction = 0.05): NumericRange {
   if (values.length === 0) return { min: 0, max: 1 }
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const padding = min === max ? Math.max(1, Math.abs(min) * 0.1) : (max - min) * 0.05
+  const padding = min === max ? Math.max(1, Math.abs(min) * 0.1) : (max - min) * fraction
   return { min: min - padding, max: max + padding }
 }
 

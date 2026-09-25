@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import appCss from '../App.css?raw'
 import { forwardPass } from '../domain/engine'
+import { createModelPreset } from '../domain/modelPresets'
 import { scalarValue, tensorValue } from '../domain/tensor'
 import type { GraphModel } from '../domain/types'
 import { VisualizationPanel } from './VisualizationPanel'
@@ -54,6 +55,15 @@ describe('VisualizationPanel', () => {
     expect(screen.getByText('x-axis: x')).toBeInTheDocument()
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
     expect(container.querySelector('.visualization-prediction-line')).toHaveAttribute('data-sample-count', '80')
+  })
+
+  it('plots all 20 dataset examples even when the canvas traces one example', () => {
+    const graph = createModelPreset('linear')
+    const { container } = render(<VisualizationPanel graph={graph} />)
+
+    expect(graph.nodes.find(node => node.type === 'dataset')?.params.datasetMode).toBe('sample')
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
+    expect(screen.getByText('20 points')).toBeInTheDocument()
   })
 })
 

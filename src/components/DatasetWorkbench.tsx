@@ -18,7 +18,7 @@ export function DatasetWorkbench({ graph, node, onParams, onGraphChange }: Props
   const [status, setStatus] = useState(''), [busy, setBusy] = useState(false)
   const [metrics, setMetrics] = useState<{ graph: GraphModel; train: DatasetMetrics; test: DatasetMetrics }>()
   const controller = useRef<AbortController | null>(null)
-  useEffect(() => () => controller.current?.abort(), [graph])
+  useEffect(() => () => controller.current?.abort(), [])
   const counts = { train: examples.filter(example => example.split === 'train').length, test: examples.filter(example => example.split === 'test').length }
   const update = (params: NodeParams) => onParams(node.id, { datasetValues: undefined, ...params })
   async function train(epochs: number) {

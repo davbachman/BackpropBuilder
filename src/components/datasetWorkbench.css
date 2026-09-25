@@ -15,8 +15,3 @@
 .dataset-workbench > a { color: #786397; font-size: 10px; }
 .tensor-initializer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin: 10px 0; }
 .tensor-initializer button { padding: 9px; margin-bottom: 12px; }
-.build-recipes { margin: 20px 0; padding: 14px; background: #f7f5fb; border: 1px solid #e8e1f1; border-radius: 12px; font-size: 12px; line-height: 1.6; }
-.build-recipes summary { font-weight: 650; cursor: pointer; color: #6c528e; }
-.build-recipes ol { padding-left: 18px; }
-.build-recipes li { margin: 9px 0; }
-.build-recipes code { font-size: 11px; color: #604d7d; }

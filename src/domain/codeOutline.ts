@@ -19,16 +19,18 @@ function groupVariable(graph: GraphModel, group: GraphGroup): string {
   return matches.length <= 1 ? base : `${base}_${matches.findIndex(candidate => candidate.id === group.id) + 1}`
 }
 
-/** The visible code for a module is a single call. Its inputs are the values
- * crossing that module's boundary; expanding it shows the actual calculations. */
+/** A group is a named function whose arguments and results come from its
+ * actual boundary wires. Expanding the line shows its internal calculations. */
 export function codeForGroup(graph: GraphModel, group: GraphGroup): string {
   const contained = new Set(group.nodeIds)
   const names = new Map(graph.nodes.map(node => [node.id, node]))
   const sources = [...new Set(graph.edges.filter(edge => contained.has(edge.target) && !contained.has(edge.source)).map(edge => edge.source))]
   const argumentsList = sources.map(id => names.get(id)?.label ?? id).map(identifier).join(', ')
-  const name = groupVariable(graph, group)
-  const operation = identifier(group.kind ?? 'module')
-  return `${name} = ${operation}(${argumentsList})`
+  const outgoing = [...new Set(graph.edges.filter(edge => contained.has(edge.source) && !contained.has(edge.target)).map(edge => edge.source))]
+  const terminals = outgoing.length ? outgoing : group.nodeIds.filter(id => !graph.edges.some(edge => edge.source === id && contained.has(edge.target)))
+  const outputs = terminals.map(id => identifier(names.get(id)?.label ?? id))
+  const result = outputs.length === 1 ? outputs[0] : outputs.length > 1 ? `(${outputs.join(', ')})` : groupVariable(graph, group)
+  return `${result} = ${groupVariable(graph, group)}(${argumentsList})`
 }
 
 /** Build the same hierarchy shown on the continuous canvas. An operation is

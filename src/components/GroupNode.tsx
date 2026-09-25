@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Boxes, ChevronDown, ChevronUp, CircleDot, Network, Sparkles, Layers, ArrowUpRight } from 'lucide-react'
+import { ChevronDown, ChevronUp, ArrowUpRight } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import type { GraphGroup, TensorValue } from '../domain/types'
@@ -37,7 +37,6 @@ export function GroupNode(props: NodeProps): ReactElement {
   const data = props.data as GroupNodeData
   const group = data.group
   const kind = group.kind ?? 'module'
-  const Icon = kind === 'neuron' ? CircleDot : kind === 'attention' || kind === 'head' ? Sparkles : kind === 'layer' || kind === 'mlp' ? Network : kind === 'transformer-block' ? Layers : Boxes
 
   if (data.continuous) {
     const scale = data.sceneScale ?? 1, reveal = data.reveal ?? 0
@@ -76,9 +75,6 @@ export function GroupNode(props: NodeProps): ReactElement {
         />
       ))}
       <div className="visual-group-title-row">
-        <span className="node-icon" aria-hidden="true">
-          <Icon size={14} />
-        </span>
         <div>
           <strong>{group.label}</strong>
           <span>{data.semantic ? kind.replaceAll('-', ' ') : `${group.nodeIds.length} calculations · ${data.inputCount} in / ${data.outputCount} out`}</span>
@@ -116,7 +112,7 @@ export function GroupNode(props: NodeProps): ReactElement {
   )
 }
 
-function GroupPreview({ data }: { data: GroupNodeData }): ReactElement {
+function GroupPreview({ data }: { data: GroupNodeData }): ReactElement | null {
   const kind = data.group.kind
   if (kind === 'neuron') return <div className="neuron-glyph" aria-hidden="true"><svg viewBox="0 0 112 64"><path d="M0 13 L40 32 M0 32 H40 M0 51 L40 32 M73 32 H112"/><circle cx="56" cy="32" r="21"/><text x="56" y="38">σ</text></svg></div>
   if (kind === 'layer' && data.onInspectNeuron && data.unitCount) return <div className="layer-neuron-preview"><span>Individual neurons <span>↗ inspect</span></span><div className="unit-grid" style={{ gridTemplateColumns: `repeat(${Math.min(16, data.unitCount)}, 1fr)` }}>{Array.from({ length: data.unitCount }, (_, i) => <button type="button" key={i} className="unit-dot nodrag nopan" style={{ opacity: 0.4 + Math.min(0.6, Math.abs(data.unitValues?.[i] ?? 1) * 0.25) }} title={`Neuron ${i + 1} · ${data.unitValues?.[i]?.toFixed(4) ?? 'run forward to see activation'}`} aria-label={`Inspect ${data.group.label} neuron ${i + 1}`} onClick={(event) => { event.stopPropagation(); data.onInspectNeuron?.(data.group.id, i) }} />)}</div></div>
@@ -131,7 +127,7 @@ function GroupPreview({ data }: { data: GroupNodeData }): ReactElement {
   if (kind === 'normalization') return <svg className="architecture-preview" viewBox="0 0 190 62" aria-hidden="true"><path d="M6 31 H42 M148 31 H184"/><rect x="42" y="9" width="106" height="44" rx="8"/><text x="95" y="28" textAnchor="middle">center · normalize</text><text x="95" y="43" textAnchor="middle">× γ + β</text></svg>
   if (kind === 'convolution' || kind === 'cnn') return <svg className="architecture-preview" viewBox="0 0 190 62" aria-hidden="true"><path d="M62 29 H96 M144 29 H182"/>{Array.from({length:9},(_,i)=><rect key={`k-${i}`} x={20+i%3*12} y={11+Math.floor(i/3)*12} width="9" height="9" rx="1.5"/>)}{Array.from({length:16},(_,i)=><rect key={`f-${i}`} x={98+i%4*10} y={9+Math.floor(i/4)*10} width="7" height="7" rx="1"/>)}<text x="37" y="59" textAnchor="middle">3 × 3 filter</text><text x="117" y="59" textAnchor="middle">feature maps</text></svg>
   if (kind === 'embedding' || kind === 'projection') return <svg className="architecture-preview" viewBox="0 0 190 62" aria-hidden="true"><path d="M7 31 H34 M94 31 H128 M158 31 H184"/>{Array.from({ length: 24 }, (_, i) => <rect key={i} x={36 + i % 6 * 9} y={12 + Math.floor(i / 6) * 10} width="6" height="7" rx="1"/>)}{Array.from({ length: 4 }, (_, i) => <rect key={i} x="131" y={12 + i * 10} width="23" height="7" rx="1"/>)}</svg>
-  return <svg className="architecture-preview" viewBox="0 0 190 62" aria-hidden="true">{[12, 31, 50].flatMap((y, i) => [8, 23, 39, 55].flatMap((target, j) => [<path key={`a-${i}-${j}`} d={`M22 ${y} L91 ${target}`}/>, <path key={`b-${i}-${j}`} d={`M99 ${target} L168 ${y}`}/>]))}{[12,31,50].flatMap((y, i) => [<circle key={`l-${i}`} cx="18" cy={y} r="5"/>, <circle key={`r-${i}`} cx="172" cy={y} r="5"/>])}{[8,23,39,55].map((y,i) => <circle key={i} cx="95" cy={y} r="5"/>)}</svg>
+  return null
 }
 
 function GroupMetrics({ outputs, showGradient }: { outputs: GroupOutputMetric[]; showGradient: boolean }): ReactElement {

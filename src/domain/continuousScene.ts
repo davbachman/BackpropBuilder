@@ -72,20 +72,31 @@ export function continuousSceneMaxZoom(scene: ContinuousScene): number {
 export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
   const scene: ContinuousScene = { nodes: new Map(), groups: new Map(), scales: new Map(), parents: new Map(), levels: [], repairedOffsetIds: new Set() }
   const groups = graph.groups ?? []
+  const groupIds = new Set(groups.map(group => group.id))
+  const manualPlacements = graph.view?.manualNodePlacements ?? {}
+  const activeManualPlacement = (id: string) => {
+    const placement = manualPlacements[id]
+    return placement && (!placement.parentId || groupIds.has(placement.parentId)) ? placement : undefined
+  }
   function level(parent?: GraphGroup, ancestors = new Set<string>()) {
     if (parent && ancestors.has(parent.id)) return
     const children = groups.filter(group => group.parentId === parent?.id)
+    const manualNodes = graph.nodes.filter(node => {
+      const placement = activeManualPlacement(node.id)
+      return placement && placement.parentId === parent?.id
+    })
     const localGraph: GraphModel = { ...graph,
-      nodes: graph.nodes.filter(node => !parent || parent.nodeIds.includes(node.id)),
+      nodes: graph.nodes.filter(node => (!parent || parent.nodeIds.includes(node.id)) && !activeManualPlacement(node.id)),
       groups: children.map(group => ({ ...group, parentId: parent?.id })),
       view: { expandedGroupIds: [], layoutEdges: graph.view?.layoutEdges },
     }
     const local = layoutSemanticGraph(localGraph, true, parent)
     const rects = [...local.nodes.values(), ...local.groups.values()]
-    if (!rects.length) return
-    const left = Math.min(...rects.map(rect => rect.x)), top = Math.min(...rects.map(rect => rect.y))
-    const width = Math.max(...rects.map(rect => rect.x + rect.width)) - left
-    const height = Math.max(...rects.map(rect => rect.y + rect.height)) - top
+    if (!rects.length && !manualNodes.length) return
+    const left = rects.length ? Math.min(...rects.map(rect => rect.x)) : 0
+    const top = rects.length ? Math.min(...rects.map(rect => rect.y)) : 0
+    const width = rects.length ? Math.max(...rects.map(rect => rect.x + rect.width)) - left : 176
+    const height = rects.length ? Math.max(...rects.map(rect => rect.y + rect.height)) - top : 112
     let scale = 1, x = 0, y = 0
     if (parent) {
       const frame = scene.groups.get(parent.id)!, outerScale = scene.scales.get(sceneGroupId(parent.id))!
@@ -123,6 +134,21 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
     }
     for (const [id, rect] of local.groups) place(id, rect, true)
     for (const [id, rect] of local.nodes) place(id, rect, false)
+    for (const node of manualNodes) {
+      const placement = activeManualPlacement(node.id)!
+      const frame = placement.parentId ? scene.groups.get(placement.parentId) : undefined
+      const offset = graph.view?.layoutOffsets?.[node.id]
+      const nodeScale = placement.scale ?? scale
+      scene.nodes.set(node.id, {
+        x: (frame?.x ?? 0) + placement.offset.x + (offset?.x ?? 0),
+        y: (frame?.y ?? 0) + placement.offset.y + (offset?.y ?? 0),
+        width: 176 * nodeScale,
+        height: (node.type === 'loss' ? 176 : 112) * nodeScale,
+      })
+      scene.scales.set(node.id, nodeScale)
+      scene.parents.set(node.id, parent?.id)
+      ids.push(node.id)
+    }
     scene.levels.push({ parentId: parent?.id, ids, scale, x, y })
     for (const child of children) level(child, new Set([...ancestors, ...(parent ? [parent.id] : [])]))
   }

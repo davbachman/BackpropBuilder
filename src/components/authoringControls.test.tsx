@@ -5,6 +5,7 @@ import { scratchModel } from '../test/scratchModels'
 import { createNode } from '../domain/examples'
 import { forwardPass } from '../domain/engine'
 import { datasetOutputValueForSlot } from '../domain/datasets'
+import { tensorValue } from '../domain/tensor'
 import { predictionNode } from '../domain/datasetTraining'
 import type { GraphModel, GraphNode } from '../domain/types'
 import { ModelInspector } from './ModelInspector'
@@ -45,6 +46,19 @@ describe('scratch model authoring controls',()=>{
     fireEvent.click(screen.getByLabelText('Keep dimensions'))
     fireEvent.click(screen.getByRole('button',{name:'Apply operation'}))
     expect(onParams).toHaveBeenLastCalledWith('mean-1',{axis:undefined,keepDims:true})
+  })
+
+  it('shows the loss function the engine will actually use for tensor inputs',()=>{
+    const prediction={...createNode('input',1),params:{value:tensorValue([2],[.2,.8])}}
+    const target={...createNode('target',1),params:{value:tensorValue([2],[0,1])}}
+    const loss=createNode('loss',1)
+    const graph:GraphModel={nodes:[prediction,target,loss],edges:[
+      {id:'prediction-loss',source:prediction.id,target:loss.id,inputSlot:0},
+      {id:'target-loss',source:target.id,target:loss.id,inputSlot:1},
+    ],learningRate:.01}
+    render(<ModelInspector {...callbacks} graph={graph} node={loss}/>)
+    expect(screen.getByLabelText('Loss function')).toHaveValue('mse')
+    expect(screen.queryByRole('option',{name:'Squared error'})).not.toBeInTheDocument()
   })
 
   it('generates on a transformer whose nodes have only palette IDs',()=>{

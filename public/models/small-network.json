@@ -1,0 +1,4241 @@
+{
+  "kind": "backprop-builder-state",
+  "version": 1,
+  "savedAt": "2026-09-24T00:00:00.000Z",
+  "state": {
+    "graph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [
+          "network",
+          "layer-0",
+          "layer-1"
+        ],
+        "semanticZoom": true
+      },
+      "groups": [
+        {
+          "id": "layer-0",
+          "label": "Hidden layer · 2 neurons",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation",
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation"
+          ],
+          "position": {
+            "x": 270,
+            "y": -45
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 150
+          },
+          "kind": "layer",
+          "parentId": "network"
+        },
+        {
+          "id": "layer-1",
+          "label": "Output layer · 1 neuron",
+          "nodeIds": [
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 1320,
+            "y": -45
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 150
+          },
+          "kind": "layer",
+          "parentId": "network"
+        },
+        {
+          "id": "layer-0/neuron-0",
+          "label": "ReLU neuron 1",
+          "kind": "neuron",
+          "parentId": "layer-0",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation"
+          ],
+          "position": {
+            "x": 450,
+            "y": 0
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "input-0",
+              "input-1"
+            ],
+            "weightNodeIds": [
+              "layer-0/weight-0-0",
+              "layer-0/weight-1-0"
+            ],
+            "biasNodeId": "layer-0/bias-0",
+            "preNodeId": "layer-0/neuron-0/sum",
+            "outputNodeId": "layer-0/neuron-0/activation",
+            "activation": "relu"
+          }
+        },
+        {
+          "id": "layer-0/neuron-1",
+          "label": "ReLU neuron 2",
+          "kind": "neuron",
+          "parentId": "layer-0",
+          "nodeIds": [
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation"
+          ],
+          "position": {
+            "x": 450,
+            "y": 400
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "input-0",
+              "input-1"
+            ],
+            "weightNodeIds": [
+              "layer-0/weight-0-1",
+              "layer-0/weight-1-1"
+            ],
+            "biasNodeId": "layer-0/bias-1",
+            "preNodeId": "layer-0/neuron-1/sum",
+            "outputNodeId": "layer-0/neuron-1/activation",
+            "activation": "relu"
+          }
+        },
+        {
+          "id": "layer-1/neuron-0",
+          "label": "Linear neuron 1",
+          "kind": "neuron",
+          "parentId": "layer-1",
+          "nodeIds": [
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 1500,
+            "y": 0
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "layer-0/neuron-0/activation",
+              "layer-0/neuron-1/activation"
+            ],
+            "weightNodeIds": [
+              "layer-1/weight-0-0",
+              "layer-1/weight-1-0"
+            ],
+            "biasNodeId": "layer-1/bias-0",
+            "preNodeId": "layer-1/neuron-0/sum",
+            "outputNodeId": "layer-1/neuron-0/activation",
+            "activation": "identity"
+          }
+        },
+        {
+          "id": "network",
+          "label": "MLP · 2 → 2 → 1",
+          "kind": "network",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation",
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation",
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 260,
+            "y": -80
+          },
+          "dimensions": {
+            "width": 240,
+            "height": 180
+          }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "plane-2d",
+            "datasetMode": "sample",
+            "datasetIndex": 9
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-0",
+          "type": "input",
+          "label": "input-0",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.6
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1",
+          "type": "input",
+          "label": "input-1",
+          "position": {
+            "x": 0,
+            "y": 180
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.2
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-0",
+          "type": "weight",
+          "label": "layer-0/weight-0-0",
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 500,
+            "y": 0
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-0",
+          "type": "weight",
+          "label": "layer-0/weight-1-0",
+          "position": {
+            "x": 300,
+            "y": 90
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 500,
+            "y": 90
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-0",
+          "type": "bias",
+          "label": "layer-0/bias-0",
+          "position": {
+            "x": 500,
+            "y": 270
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 740,
+            "y": 0
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/activation",
+          "type": "activation",
+          "label": "Neuron 1: relu",
+          "position": {
+            "x": 1000,
+            "y": 0
+          },
+          "params": {
+            "activation": "relu"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-1",
+          "type": "weight",
+          "label": "layer-0/weight-0-1",
+          "position": {
+            "x": 300,
+            "y": 400
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 500,
+            "y": 400
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-1",
+          "type": "weight",
+          "label": "layer-0/weight-1-1",
+          "position": {
+            "x": 300,
+            "y": 490
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 500,
+            "y": 490
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-1",
+          "type": "bias",
+          "label": "layer-0/bias-1",
+          "position": {
+            "x": 500,
+            "y": 670
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 740,
+            "y": 400
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  -0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/activation",
+          "type": "activation",
+          "label": "Neuron 2: relu",
+          "position": {
+            "x": 1000,
+            "y": 400
+          },
+          "params": {
+            "activation": "relu"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-0-0",
+          "type": "weight",
+          "label": "layer-1/weight-0-0",
+          "position": {
+            "x": 1350,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 1550,
+            "y": 0
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-1-0",
+          "type": "weight",
+          "label": "layer-1/weight-1-0",
+          "position": {
+            "x": 1350,
+            "y": 90
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 1550,
+            "y": 90
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/bias-0",
+          "type": "bias",
+          "label": "layer-1/bias-0",
+          "position": {
+            "x": 1550,
+            "y": 270
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 1790,
+            "y": 0
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.3
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/activation",
+          "type": "activation",
+          "label": "Neuron 1: identity",
+          "position": {
+            "x": 2050,
+            "y": 0
+          },
+          "params": {
+            "activation": "identity"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.3
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.3
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "target",
+          "position": {
+            "x": 2400,
+            "y": 180
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.4
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.71
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.71
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "loss",
+          "type": "loss",
+          "label": "Squared error (full square)",
+          "position": {
+            "x": 2650,
+            "y": 0
+          },
+          "params": {
+            "loss": "mse"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.3
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.71
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.16809999999999994
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.8199999999999998
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "error": {
+              "shape": [],
+              "data": [
+                -0.4099999999999999
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.16809999999999994
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              -0.8199999999999998
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "input-0:layer-0/neuron-0/product-0:0",
+          "source": "input-0",
+          "target": "layer-0/neuron-0/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-0:layer-0/neuron-0/product-0:1",
+          "source": "layer-0/weight-0-0",
+          "target": "layer-0/neuron-0/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1:layer-0/neuron-0/product-1:0",
+          "source": "input-1",
+          "target": "layer-0/neuron-0/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-0:layer-0/neuron-0/product-1:1",
+          "source": "layer-0/weight-1-0",
+          "target": "layer-0/neuron-0/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-0:layer-0/neuron-0/sum:0",
+          "source": "layer-0/neuron-0/product-0",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-1:layer-0/neuron-0/sum:1",
+          "source": "layer-0/neuron-0/product-1",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-0:layer-0/neuron-0/sum:2",
+          "source": "layer-0/bias-0",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/sum:layer-0/neuron-0/activation:0",
+          "source": "layer-0/neuron-0/sum",
+          "target": "layer-0/neuron-0/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-0:layer-0/neuron-1/product-0:0",
+          "source": "input-0",
+          "target": "layer-0/neuron-1/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-1:layer-0/neuron-1/product-0:1",
+          "source": "layer-0/weight-0-1",
+          "target": "layer-0/neuron-1/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1:layer-0/neuron-1/product-1:0",
+          "source": "input-1",
+          "target": "layer-0/neuron-1/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-1:layer-0/neuron-1/product-1:1",
+          "source": "layer-0/weight-1-1",
+          "target": "layer-0/neuron-1/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-0:layer-0/neuron-1/sum:0",
+          "source": "layer-0/neuron-1/product-0",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-1:layer-0/neuron-1/sum:1",
+          "source": "layer-0/neuron-1/product-1",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-1:layer-0/neuron-1/sum:2",
+          "source": "layer-0/bias-1",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/sum:layer-0/neuron-1/activation:0",
+          "source": "layer-0/neuron-1/sum",
+          "target": "layer-0/neuron-1/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/activation:layer-1/neuron-0/product-0:0",
+          "source": "layer-0/neuron-0/activation",
+          "target": "layer-1/neuron-0/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-0-0:layer-1/neuron-0/product-0:1",
+          "source": "layer-1/weight-0-0",
+          "target": "layer-1/neuron-0/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/activation:layer-1/neuron-0/product-1:0",
+          "source": "layer-0/neuron-1/activation",
+          "target": "layer-1/neuron-0/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-1-0:layer-1/neuron-0/product-1:1",
+          "source": "layer-1/weight-1-0",
+          "target": "layer-1/neuron-0/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-0:layer-1/neuron-0/sum:0",
+          "source": "layer-1/neuron-0/product-0",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-1:layer-1/neuron-0/sum:1",
+          "source": "layer-1/neuron-0/product-1",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/bias-0:layer-1/neuron-0/sum:2",
+          "source": "layer-1/bias-0",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/sum:layer-1/neuron-0/activation:0",
+          "source": "layer-1/neuron-0/sum",
+          "target": "layer-1/neuron-0/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/activation:loss:0",
+          "source": "layer-1/neuron-0/activation",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "target:loss:1",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→input-0",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "input-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→input-1",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "input-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→target",
+          "source": "model-data",
+          "sourceSlot": 2,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "visualizationGraph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [
+          "network",
+          "layer-0",
+          "layer-1"
+        ],
+        "semanticZoom": true
+      },
+      "groups": [
+        {
+          "id": "layer-0",
+          "label": "Hidden layer · 2 neurons",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation",
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation"
+          ],
+          "position": {
+            "x": 270,
+            "y": -45
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 150
+          },
+          "kind": "layer",
+          "parentId": "network"
+        },
+        {
+          "id": "layer-1",
+          "label": "Output layer · 1 neuron",
+          "nodeIds": [
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 1320,
+            "y": -45
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 150
+          },
+          "kind": "layer",
+          "parentId": "network"
+        },
+        {
+          "id": "layer-0/neuron-0",
+          "label": "ReLU neuron 1",
+          "kind": "neuron",
+          "parentId": "layer-0",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation"
+          ],
+          "position": {
+            "x": 450,
+            "y": 0
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "input-0",
+              "input-1"
+            ],
+            "weightNodeIds": [
+              "layer-0/weight-0-0",
+              "layer-0/weight-1-0"
+            ],
+            "biasNodeId": "layer-0/bias-0",
+            "preNodeId": "layer-0/neuron-0/sum",
+            "outputNodeId": "layer-0/neuron-0/activation",
+            "activation": "relu"
+          }
+        },
+        {
+          "id": "layer-0/neuron-1",
+          "label": "ReLU neuron 2",
+          "kind": "neuron",
+          "parentId": "layer-0",
+          "nodeIds": [
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation"
+          ],
+          "position": {
+            "x": 450,
+            "y": 400
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "input-0",
+              "input-1"
+            ],
+            "weightNodeIds": [
+              "layer-0/weight-0-1",
+              "layer-0/weight-1-1"
+            ],
+            "biasNodeId": "layer-0/bias-1",
+            "preNodeId": "layer-0/neuron-1/sum",
+            "outputNodeId": "layer-0/neuron-1/activation",
+            "activation": "relu"
+          }
+        },
+        {
+          "id": "layer-1/neuron-0",
+          "label": "Linear neuron 1",
+          "kind": "neuron",
+          "parentId": "layer-1",
+          "nodeIds": [
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 1500,
+            "y": 0
+          },
+          "dimensions": {
+            "width": 200,
+            "height": 160
+          },
+          "detail": {
+            "inputNodeIds": [
+              "layer-0/neuron-0/activation",
+              "layer-0/neuron-1/activation"
+            ],
+            "weightNodeIds": [
+              "layer-1/weight-0-0",
+              "layer-1/weight-1-0"
+            ],
+            "biasNodeId": "layer-1/bias-0",
+            "preNodeId": "layer-1/neuron-0/sum",
+            "outputNodeId": "layer-1/neuron-0/activation",
+            "activation": "identity"
+          }
+        },
+        {
+          "id": "network",
+          "label": "MLP · 2 → 2 → 1",
+          "kind": "network",
+          "nodeIds": [
+            "layer-0/weight-0-0",
+            "layer-0/neuron-0/product-0",
+            "layer-0/weight-1-0",
+            "layer-0/neuron-0/product-1",
+            "layer-0/bias-0",
+            "layer-0/neuron-0/sum",
+            "layer-0/neuron-0/activation",
+            "layer-0/weight-0-1",
+            "layer-0/neuron-1/product-0",
+            "layer-0/weight-1-1",
+            "layer-0/neuron-1/product-1",
+            "layer-0/bias-1",
+            "layer-0/neuron-1/sum",
+            "layer-0/neuron-1/activation",
+            "layer-1/weight-0-0",
+            "layer-1/neuron-0/product-0",
+            "layer-1/weight-1-0",
+            "layer-1/neuron-0/product-1",
+            "layer-1/bias-0",
+            "layer-1/neuron-0/sum",
+            "layer-1/neuron-0/activation"
+          ],
+          "position": {
+            "x": 260,
+            "y": -80
+          },
+          "dimensions": {
+            "width": 240,
+            "height": 180
+          }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "plane-2d",
+            "datasetMode": "sample",
+            "datasetIndex": 9
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-0",
+          "type": "input",
+          "label": "input-0",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.6
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1",
+          "type": "input",
+          "label": "input-1",
+          "position": {
+            "x": 0,
+            "y": 180
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.2
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-0",
+          "type": "weight",
+          "label": "layer-0/weight-0-0",
+          "position": {
+            "x": 300,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 500,
+            "y": 0
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-0",
+          "type": "weight",
+          "label": "layer-0/weight-1-0",
+          "position": {
+            "x": 300,
+            "y": 90
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 500,
+            "y": 90
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-0",
+          "type": "bias",
+          "label": "layer-0/bias-0",
+          "position": {
+            "x": 500,
+            "y": 270
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 740,
+            "y": 0
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/activation",
+          "type": "activation",
+          "label": "Neuron 1: relu",
+          "position": {
+            "x": 1000,
+            "y": 0
+          },
+          "params": {
+            "activation": "relu"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.6
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-1",
+          "type": "weight",
+          "label": "layer-0/weight-0-1",
+          "position": {
+            "x": 300,
+            "y": 400
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 500,
+            "y": 400
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-1",
+          "type": "weight",
+          "label": "layer-0/weight-1-1",
+          "position": {
+            "x": 300,
+            "y": 490
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 500,
+            "y": 490
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-1",
+          "type": "bias",
+          "label": "layer-0/bias-1",
+          "position": {
+            "x": 500,
+            "y": 670
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 740,
+            "y": 400
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  -0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/activation",
+          "type": "activation",
+          "label": "Neuron 2: relu",
+          "position": {
+            "x": 1000,
+            "y": 400
+          },
+          "params": {
+            "activation": "relu"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-0-0",
+          "type": "weight",
+          "label": "layer-1/weight-0-0",
+          "position": {
+            "x": 1350,
+            "y": 0
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-0",
+          "type": "multiply",
+          "label": "x0 × w0",
+          "position": {
+            "x": 1550,
+            "y": 0
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.8
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.6
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-1-0",
+          "type": "weight",
+          "label": "layer-1/weight-1-0",
+          "position": {
+            "x": 1350,
+            "y": 90
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-1",
+          "type": "multiply",
+          "label": "x1 × w1",
+          "position": {
+            "x": 1550,
+            "y": 90
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/bias-0",
+          "type": "bias",
+          "label": "layer-1/bias-0",
+          "position": {
+            "x": 1550,
+            "y": 270
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/sum",
+          "type": "add",
+          "label": "Weighted sum",
+          "position": {
+            "x": 1790,
+            "y": 0
+          },
+          "params": {
+            "inputCount": 3
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.8
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.3
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/activation",
+          "type": "activation",
+          "label": "Neuron 1: identity",
+          "position": {
+            "x": 2050,
+            "y": 0
+          },
+          "params": {
+            "activation": "identity"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.3
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.3
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "target",
+          "position": {
+            "x": 2400,
+            "y": 180
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.4
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.71
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1.71
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "loss",
+          "type": "loss",
+          "label": "Squared error (full square)",
+          "position": {
+            "x": 2650,
+            "y": 0
+          },
+          "params": {
+            "loss": "mse"
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1.3
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1.71
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.16809999999999994
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.8199999999999998
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "error": {
+              "shape": [],
+              "data": [
+                -0.4099999999999999
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.16809999999999994
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              -0.8199999999999998
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "input-0:layer-0/neuron-0/product-0:0",
+          "source": "input-0",
+          "target": "layer-0/neuron-0/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-0:layer-0/neuron-0/product-0:1",
+          "source": "layer-0/weight-0-0",
+          "target": "layer-0/neuron-0/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1:layer-0/neuron-0/product-1:0",
+          "source": "input-1",
+          "target": "layer-0/neuron-0/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-0:layer-0/neuron-0/product-1:1",
+          "source": "layer-0/weight-1-0",
+          "target": "layer-0/neuron-0/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-0:layer-0/neuron-0/sum:0",
+          "source": "layer-0/neuron-0/product-0",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/product-1:layer-0/neuron-0/sum:1",
+          "source": "layer-0/neuron-0/product-1",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-0:layer-0/neuron-0/sum:2",
+          "source": "layer-0/bias-0",
+          "target": "layer-0/neuron-0/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/sum:layer-0/neuron-0/activation:0",
+          "source": "layer-0/neuron-0/sum",
+          "target": "layer-0/neuron-0/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-0:layer-0/neuron-1/product-0:0",
+          "source": "input-0",
+          "target": "layer-0/neuron-1/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-0-1:layer-0/neuron-1/product-0:1",
+          "source": "layer-0/weight-0-1",
+          "target": "layer-0/neuron-1/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "input-1:layer-0/neuron-1/product-1:0",
+          "source": "input-1",
+          "target": "layer-0/neuron-1/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/weight-1-1:layer-0/neuron-1/product-1:1",
+          "source": "layer-0/weight-1-1",
+          "target": "layer-0/neuron-1/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-0:layer-0/neuron-1/sum:0",
+          "source": "layer-0/neuron-1/product-0",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/product-1:layer-0/neuron-1/sum:1",
+          "source": "layer-0/neuron-1/product-1",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/bias-1:layer-0/neuron-1/sum:2",
+          "source": "layer-0/bias-1",
+          "target": "layer-0/neuron-1/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/sum:layer-0/neuron-1/activation:0",
+          "source": "layer-0/neuron-1/sum",
+          "target": "layer-0/neuron-1/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-0/activation:layer-1/neuron-0/product-0:0",
+          "source": "layer-0/neuron-0/activation",
+          "target": "layer-1/neuron-0/product-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-0-0:layer-1/neuron-0/product-0:1",
+          "source": "layer-1/weight-0-0",
+          "target": "layer-1/neuron-0/product-0",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-0/neuron-1/activation:layer-1/neuron-0/product-1:0",
+          "source": "layer-0/neuron-1/activation",
+          "target": "layer-1/neuron-0/product-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/weight-1-0:layer-1/neuron-0/product-1:1",
+          "source": "layer-1/weight-1-0",
+          "target": "layer-1/neuron-0/product-1",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-0:layer-1/neuron-0/sum:0",
+          "source": "layer-1/neuron-0/product-0",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/product-1:layer-1/neuron-0/sum:1",
+          "source": "layer-1/neuron-0/product-1",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/bias-0:layer-1/neuron-0/sum:2",
+          "source": "layer-1/bias-0",
+          "target": "layer-1/neuron-0/sum",
+          "inputSlot": 2,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/sum:layer-1/neuron-0/activation:0",
+          "source": "layer-1/neuron-0/sum",
+          "target": "layer-1/neuron-0/activation",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "layer-1/neuron-0/activation:loss:0",
+          "source": "layer-1/neuron-0/activation",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "target:loss:1",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→input-0",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "input-0",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.6
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→input-1",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "input-1",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.8
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→target",
+          "source": "model-data",
+          "sourceSlot": 2,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1.71
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "initialParameterValues": {
+      "layer-0/weight-0-0": {
+        "shape": [],
+        "data": [
+          0.5
+        ]
+      },
+      "layer-0/weight-1-0": {
+        "shape": [],
+        "data": [
+          1
+        ]
+      },
+      "layer-0/bias-0": {
+        "shape": [],
+        "data": [
+          0
+        ]
+      },
+      "layer-0/weight-0-1": {
+        "shape": [],
+        "data": [
+          -0.5
+        ]
+      },
+      "layer-0/weight-1-1": {
+        "shape": [],
+        "data": [
+          1
+        ]
+      },
+      "layer-0/bias-1": {
+        "shape": [],
+        "data": [
+          0
+        ]
+      },
+      "layer-1/weight-0-0": {
+        "shape": [],
+        "data": [
+          0.5
+        ]
+      },
+      "layer-1/weight-1-0": {
+        "shape": [],
+        "data": [
+          -0.5
+        ]
+      },
+      "layer-1/bias-0": {
+        "shape": [],
+        "data": [
+          0.5
+        ]
+      }
+    },
+    "selectedNodeIds": [],
+    "phase": "edit",
+    "traceSteps": [],
+    "traceIndex": 0,
+    "epoch": 0,
+    "currentLoss": 0.16809999999999994,
+    "display": {
+      "showMath": true,
+      "showGradient": true,
+      "showCode": false,
+      "showVisualization": false
+    }
+  }
+}

@@ -1,0 +1,920 @@
+{
+  "kind": "backprop-builder-state",
+  "version": 1,
+  "savedAt": "2026-09-24T00:00:00.000Z",
+  "state": {
+    "graph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [],
+        "semanticZoom": true
+      },
+      "groups": [],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "class-scores",
+            "datasetMode": "sample",
+            "datasetIndex": 0
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "scores",
+          "type": "input",
+          "label": "Scores",
+          "position": {
+            "x": 80,
+            "y": 100
+          },
+          "params": {
+            "value": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "probabilities",
+          "type": "softmax",
+          "label": "Softmax probabilities",
+          "position": {
+            "x": 380,
+            "y": 100
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                0.6380663511479376,
+                0.2347314926906046,
+                0.09543470311362204,
+                0.031767453047835854
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0.6380663511479376,
+              0.2347314926906046,
+              0.09543470311362204,
+              0.031767453047835854
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "Target class",
+          "position": {
+            "x": 380,
+            "y": 350
+          },
+          "params": {
+            "value": {
+              "shape": [
+                1
+              ],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1
+              ],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "loss",
+          "type": "cross-entropy",
+          "label": "Cross-entropy",
+          "position": {
+            "x": 710,
+            "y": 200
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              },
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.4493130023803542
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.4493130023803542
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "scores→probabilities:0",
+          "source": "scores",
+          "target": "probabilities",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "scores→loss:0",
+          "source": "scores",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "target→loss:1",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→scores",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→target",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "visualizationGraph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [],
+        "semanticZoom": true
+      },
+      "groups": [],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "class-scores",
+            "datasetMode": "sample",
+            "datasetIndex": 0
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "scores",
+          "type": "input",
+          "label": "Scores",
+          "position": {
+            "x": 80,
+            "y": 100
+          },
+          "params": {
+            "value": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                2,
+                1,
+                0.1,
+                -1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "probabilities",
+          "type": "softmax",
+          "label": "Softmax probabilities",
+          "position": {
+            "x": 380,
+            "y": 100
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1,
+                4
+              ],
+              "data": [
+                0.6380663511479376,
+                0.2347314926906046,
+                0.09543470311362204,
+                0.031767453047835854
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0.6380663511479376,
+              0.2347314926906046,
+              0.09543470311362204,
+              0.031767453047835854
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "Target class",
+          "position": {
+            "x": 380,
+            "y": 350
+          },
+          "params": {
+            "value": {
+              "shape": [
+                1
+              ],
+              "data": [
+                0
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                1
+              ],
+              "data": [
+                0
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "loss",
+          "type": "cross-entropy",
+          "label": "Cross-entropy",
+          "position": {
+            "x": 710,
+            "y": 200
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  1,
+                  4
+                ],
+                "data": [
+                  2,
+                  1,
+                  0.1,
+                  -1
+                ]
+              },
+              {
+                "shape": [
+                  1
+                ],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.4493130023803542
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.4493130023803542
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "scores→probabilities:0",
+          "source": "scores",
+          "target": "probabilities",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "scores→loss:0",
+          "source": "scores",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "target→loss:1",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→scores",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              2,
+              1,
+              0.1,
+              -1
+            ]
+          },
+          "grad": {
+            "shape": [
+              1,
+              4
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→target",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          },
+          "grad": {
+            "shape": [
+              1
+            ],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "initialParameterValues": {},
+    "selectedNodeIds": [],
+    "phase": "edit",
+    "traceSteps": [],
+    "traceIndex": 0,
+    "epoch": 0,
+    "currentLoss": 0.4493130023803542,
+    "display": {
+      "showMath": true,
+      "showGradient": true,
+      "showCode": false,
+      "showVisualization": false
+    }
+  }
+}

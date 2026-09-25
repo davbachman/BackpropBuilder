@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LESSONS } from '../learning/presets'
-import { compactVisualHierarchy, layoutContinuousScene } from './continuousScene'
+import { compactVisualHierarchy, layoutContinuousScene, sceneContentBounds, sceneGroupId } from './continuousScene'
 import { createNode, createEmptyGraph } from './examples'
 import { createModelPreset } from './modelPresets'
 import { projectDenseNeurons } from './neuronProjection'
@@ -56,6 +56,47 @@ it('preserves projected neuron geometry without copying virtual calculations int
   expectUnmoved(before, geometry(projectDenseNeurons(next, inspectedNeuron).graph))
   expect(next.nodes).toHaveLength(graph.nodes.length + 1)
   expect(next.nodes.some(node => node.id.startsWith('inspect:'))).toBe(false)
+})
+
+it('places a new transformer calculation at the layer-normalization scale without moving existing blocks', () => {
+  const graph = createModelPreset('decoder')
+  const groupId = 'blocks.0.norm1'
+  const before = layoutContinuousScene(compactVisualHierarchy(graph))
+  const bounds = sceneContentBounds(before, groupId)
+  const scale = before.levels.find(level => level.parentId === groupId)!.scale
+  const position = { x: bounds.x + bounds.width / 3, y: bounds.y + bounds.height / 3 }
+  const node = { ...createNode('add', 99), position }
+  const next = placeCanvasNode(graph, node, graph, groupId)
+  const after = layoutContinuousScene(compactVisualHierarchy(next))
+
+  expectUnmoved(before, after)
+  expect(after.scales.get(node.id)).toBeCloseTo(scale)
+  expect(after.nodes.get(node.id)!.width).toBeCloseTo(176 * scale)
+  expect(after.nodes.get(node.id)!.height).toBeCloseTo(112 * scale)
+  expect(next.groups?.find(group => group.id === groupId)?.nodeIds).toContain(node.id)
+  expect(next.groups?.find(group => group.id === 'blocks.0')?.nodeIds).toContain(node.id)
+  expect(after.parents.get(node.id)).toBe(groupId)
+
+  const shifted = layoutContinuousScene(compactVisualHierarchy({ ...next, view: { ...next.view!, layoutOffsets: {
+    ...next.view?.layoutOffsets, [sceneGroupId(groupId)]: { x: 5, y: 7 },
+  } } }))
+  expect(shifted.nodes.get(node.id)!.x).toBeCloseTo(after.nodes.get(node.id)!.x + 5)
+  expect(shifted.nodes.get(node.id)!.y).toBeCloseTo(after.nodes.get(node.id)!.y + 7)
+})
+
+it('scales a free-canvas block to the current close-up without moving the transformer', () => {
+  const graph = createModelPreset('block')
+  const before = layoutContinuousScene(compactVisualHierarchy(graph))
+  const position = { x: -600, y: -400 }
+  const scale = .008
+  const node = { ...createNode('mean', 98), position }
+  const next = placeCanvasNode(graph, node, graph, undefined, scale)
+  const after = layoutContinuousScene(compactVisualHierarchy(next))
+  expectUnmoved(before, after)
+  expect(after.nodes.get(node.id)).toEqual({ ...position, width: 176 * scale, height: 112 * scale })
+  expect(after.scales.get(node.id)).toBe(scale)
+  expect(after.parents.get(node.id)).toBeUndefined()
+  expect(next.groups).toBe(graph.groups)
 })
 
 it('keeps free-form builder placement in native canvas coordinates', () => {

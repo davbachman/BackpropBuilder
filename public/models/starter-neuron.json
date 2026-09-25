@@ -1,0 +1,1277 @@
+{
+  "kind": "backprop-builder-state",
+  "version": 1,
+  "savedAt": "2026-09-24T00:00:00.000Z",
+  "state": {
+    "graph": {
+      "learningRate": 0.1,
+      "nodes": [
+        {
+          "id": "starter-data",
+          "type": "dataset",
+          "label": "Neuron examples",
+          "position": {
+            "x": -240,
+            "y": 60
+          },
+          "params": {
+            "dataset": "neuron-basics",
+            "datasetMode": "sample"
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "x",
+          "type": "input",
+          "label": "x",
+          "position": {
+            "x": 40,
+            "y": 60
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "w",
+          "type": "weight",
+          "label": "w",
+          "position": {
+            "x": 40,
+            "y": 260
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "b",
+          "type": "bias",
+          "label": "b",
+          "position": {
+            "x": 320,
+            "y": 360
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.3
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.3
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "mul",
+          "type": "multiply",
+          "label": "x * w",
+          "position": {
+            "x": 320,
+            "y": 160
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "add",
+          "type": "add",
+          "label": "xw + b",
+          "position": {
+            "x": 600,
+            "y": 260
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.3
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.7
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.7
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "pred",
+          "type": "activation",
+          "label": "activation",
+          "position": {
+            "x": 880,
+            "y": 160
+          },
+          "params": {
+            "activation": "sigmoid"
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.7
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.6681877721681662
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.22171287329310904
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.6681877721681662
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              0.22171287329310904
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "y",
+          "position": {
+            "x": 880,
+            "y": 360
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "loss",
+          "type": "loss",
+          "label": "loss",
+          "position": {
+            "x": 1160,
+            "y": 260
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.6681877721681662
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.055049677269362406
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.33181222783183384
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "error": {
+              "shape": [],
+              "data": [
+                -0.33181222783183384
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.055049677269362406
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              -0.33181222783183384
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "x-mul",
+          "source": "x",
+          "target": "mul",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "w-mul",
+          "source": "w",
+          "target": "mul",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "mul-add",
+          "source": "mul",
+          "target": "add",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "b-add",
+          "source": "b",
+          "target": "add",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "add-act",
+          "source": "add",
+          "target": "pred",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.7
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "act-loss",
+          "source": "pred",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.6681877721681662
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "target-loss",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "data-x",
+          "source": "starter-data",
+          "sourceSlot": 0,
+          "target": "x",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "data-y",
+          "source": "starter-data",
+          "sourceSlot": 1,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "visualizationGraph": {
+      "learningRate": 0.1,
+      "nodes": [
+        {
+          "id": "starter-data",
+          "type": "dataset",
+          "label": "Neuron examples",
+          "position": {
+            "x": -240,
+            "y": 60
+          },
+          "params": {
+            "dataset": "neuron-basics",
+            "datasetMode": "sample"
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "x",
+          "type": "input",
+          "label": "x",
+          "position": {
+            "x": 40,
+            "y": 60
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                2
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "w",
+          "type": "weight",
+          "label": "w",
+          "position": {
+            "x": 40,
+            "y": 260
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.5
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "b",
+          "type": "bias",
+          "label": "b",
+          "position": {
+            "x": 320,
+            "y": 360
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                -0.3
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              -0.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                -0.3
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "mul",
+          "type": "multiply",
+          "label": "x * w",
+          "position": {
+            "x": 320,
+            "y": 160
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.5
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  2
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "add",
+          "type": "add",
+          "label": "xw + b",
+          "position": {
+            "x": 600,
+            "y": 260
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  -0.3
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.7
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.7
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          }
+        },
+        {
+          "id": "pred",
+          "type": "activation",
+          "label": "activation",
+          "position": {
+            "x": 880,
+            "y": 160
+          },
+          "params": {
+            "activation": "sigmoid"
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.7
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.6681877721681662
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.22171287329310904
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.6681877721681662
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              0.22171287329310904
+            ]
+          }
+        },
+        {
+          "id": "target",
+          "type": "target",
+          "label": "y",
+          "position": {
+            "x": 880,
+            "y": 360
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                1
+              ]
+            },
+            "localDerivatives": []
+          }
+        },
+        {
+          "id": "loss",
+          "type": "loss",
+          "label": "loss",
+          "position": {
+            "x": 1160,
+            "y": 260
+          },
+          "params": {},
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [],
+                "data": [
+                  0.6681877721681662
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.055049677269362406
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  -0.33181222783183384
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0
+                ]
+              }
+            ],
+            "error": {
+              "shape": [],
+              "data": [
+                -0.33181222783183384
+              ]
+            }
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.055049677269362406
+            ]
+          },
+          "localDerivative": {
+            "shape": [],
+            "data": [
+              -0.33181222783183384
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "x-mul",
+          "source": "x",
+          "target": "mul",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "w-mul",
+          "source": "w",
+          "target": "mul",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.5
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "mul-add",
+          "source": "mul",
+          "target": "add",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "b-add",
+          "source": "b",
+          "target": "add",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              -0.3
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "add-act",
+          "source": "add",
+          "target": "pred",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.7
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "act-loss",
+          "source": "pred",
+          "target": "loss",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              0.6681877721681662
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "target-loss",
+          "source": "target",
+          "target": "loss",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "data-x",
+          "source": "starter-data",
+          "sourceSlot": 0,
+          "target": "x",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              2
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "data-y",
+          "source": "starter-data",
+          "sourceSlot": 1,
+          "target": "target",
+          "inputSlot": 0,
+          "value": {
+            "shape": [],
+            "data": [
+              1
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "initialParameterValues": {
+      "w": {
+        "shape": [],
+        "data": [
+          0.5
+        ]
+      },
+      "b": {
+        "shape": [],
+        "data": [
+          -0.3
+        ]
+      }
+    },
+    "selectedNodeIds": [],
+    "phase": "edit",
+    "traceSteps": [],
+    "traceIndex": 0,
+    "epoch": 0,
+    "currentLoss": 0.055049677269362406,
+    "display": {
+      "showMath": true,
+      "showGradient": true,
+      "showCode": false,
+      "showVisualization": false
+    }
+  }
+}

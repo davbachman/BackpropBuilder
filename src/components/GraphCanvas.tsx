@@ -102,7 +102,7 @@ interface GraphCanvasProps {
   onGraphChange: (graph: GraphModel) => void
   onViewChange?: (view: GraphViewState) => void
   onSelectionChange: (selection: CanvasSelection) => void
-  onCreateNode: (type: NodeType, position: GraphPosition) => void
+  onCreateNode: (type: NodeType, position: GraphPosition, parentGroupId?: string, sceneScale?: number) => void
   onCancelPendingPlacement: () => void
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
@@ -110,6 +110,7 @@ interface GraphCanvasProps {
   onDatasetChange?: (nodeId: string, dataset: DatasetKind) => void
   onGroupCreate: () => void
   onGroupExplode: (groupId: string) => void
+  onGroupRename?: (groupId: string, label: string) => void
   onGroupMove: (groupId: string, position: GraphPosition) => void
   onInspectNeuron?: (groupId: string, unitIndex: number) => void
   onInspectEdge?: (edgeId: string) => void
@@ -146,26 +147,30 @@ function GraphCanvasInner({
   onDatasetChange,
   onGroupCreate,
   onGroupExplode,
+  onGroupRename,
   onInspectNeuron,
   onInspectEdge,
 }: GraphCanvasProps): ReactElement {
   const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
   const sourceGraph = displayGraph ?? graph
-  const semantic = sourceGraph.view?.semanticZoom !== undefined || Boolean(sourceGraph.groups?.some((group) => group.kind))
+  const semantic = sourceGraph.view?.canvasStyle === 'architecture' ||
+    (sourceGraph.view?.canvasStyle !== 'builder' &&
+      (sourceGraph.view?.semanticZoom !== undefined || Boolean(sourceGraph.groups?.some((group) => group.kind))))
   const continuous = semantic && sourceGraph.view?.semanticZoom !== false
   const renderedGraph = useMemo(() => continuous ? compactVisualHierarchy(sourceGraph) : sourceGraph, [sourceGraph, continuous])
   const geometryKey = JSON.stringify({
     nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, dataset: params.dataset } })),
     edges: renderedGraph.edges.map(({ id, source, target, inputSlot, sourceSlot }) => ({ id, source, target, inputSlot, sourceSlot })),
     groups: renderedGraph.groups,
-    view: { expandedGroupIds: [], layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges },
+    view: { expandedGroupIds: [], layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges, manualNodePlacements: renderedGraph.view?.manualNodePlacements },
   })
   const geometryGraph = useMemo(() => JSON.parse(geometryKey) as GraphModel, [geometryKey])
   const scene = useMemo(() => continuous ? layoutContinuousScene(geometryGraph) : undefined, [geometryGraph, continuous])
   const layout = useMemo(() => scene ?? (semantic ? layoutSemanticGraph(renderedGraph) : undefined), [renderedGraph, semantic, scene])
   const shell = useRef<HTMLDivElement>(null)
   const [camera, setCamera] = useState(graph.view?.viewport ?? { x: 0, y: 0, zoom: 1 })
-  const [addMenu, setAddMenu] = useState<{ x: number; y: number; position: GraphPosition }>()
+  const [addMenu, setAddMenu] = useState<{ x: number; y: number; position: GraphPosition; parentGroupId?: string; sceneScale?: number }>()
+  const [renameGroup, setRenameGroup] = useState<{ id: string; x: number; y: number; label: string }>()
   const [addQuery, setAddQuery] = useState('')
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const addSearch = useRef<HTMLInputElement>(null)
@@ -395,7 +400,7 @@ function GraphCanvasInner({
         .filter((node) => !groupedNodeIds.has(node.id))
         .map<CanvasNode>((node) => ({
           id: node.id,
-          type: semantic ? 'semanticNode' : 'builderNode',
+          type: node.type === 'loss' ? 'builderNode' : semantic ? 'semanticNode' : 'builderNode',
           position: layout?.nodes.get(node.id) ?? node.position,
           draggable: true,
           width: semantic ? layout?.nodes.get(node.id)?.width ?? 176 : isFlexibleInputNodeType(node.type) ? NODE_WIDTH : undefined,
@@ -408,7 +413,7 @@ function GraphCanvasInner({
             sceneScale: scene?.scales.get(node.id),
             displayInputCount: Math.max(0, ...renderedGraph.edges.filter(edge => edge.target === node.id).map(edge => (edge.inputSlot ?? 0) + 1)),
             coordinate: node.id.startsWith('inspect:'),
-            vertical: semantic && renderedGraph.groups?.some((group) => group.kind === 'transformer-block' || group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
+            vertical: node.type !== 'loss' && semantic && renderedGraph.groups?.some((group) => group.kind === 'transformer-block' || group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
             compactStage: semantic && renderedGraph.groups?.some((group) => group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
             showMath,
             showGradient: semantic ? showGradient && phase === 'backward' : showGradient,
@@ -533,8 +538,32 @@ function GraphCanvasInner({
     }
     return edges.map(edge => wireRoutes.has(edge.id) ? { ...edge, data: { ...edge.data!, route: wireRoutes.get(edge.id), crossings: wireCrossings.get(edge.id) } } : edge)
   }, [edges, wireRoutes, wireCrossings, scene, sceneRoutes])
-  const reveals = new Map(scene ? [...scene.groups].map(([id, rect]) => [id, cardReveal(rect, cameraZoom, canvasSize.width, canvasSize.height)]) : [])
-  const accessible = (id?: string): boolean => !id || ((reveals.get(id) ?? 0) > .92 && accessible(scene?.parents.get(groupNodeId(id))))
+  const reveals = useMemo(() => new Map(scene ? [...scene.groups].map(([id, rect]) => [id, cardReveal(rect, cameraZoom, canvasSize.width, canvasSize.height)] as const) : []), [scene, cameraZoom, canvasSize.width, canvasSize.height])
+  const accessible = useCallback((id?: string): boolean => {
+    let current = id
+    while (current) {
+      if ((reveals.get(current) ?? 0) <= .92) return false
+      current = scene?.parents.get(groupNodeId(current))
+    }
+    return true
+  }, [reveals, scene])
+  const insertionGroupAt = useCallback((position: GraphPosition): string | undefined => scene && [...scene.groups]
+    .filter(([id, rect]) => graph.groups?.some(group => group.id === id) && accessible(id)
+      && position.x >= rect.x && position.x <= rect.x + rect.width
+      && position.y >= rect.y && position.y <= rect.y + rect.height)
+    .sort(([, a], [, b]) => a.width * a.height - b.width * b.height)[0]?.[0], [scene, graph.groups, accessible])
+  const insertionScaleAt = useCallback((position: GraphPosition): number | undefined => {
+    if (!scene) return undefined
+    const nearby = [...scene.nodes].flatMap(([id, rect]) => {
+      const scale = scene.scales.get(id) ?? 1
+      const screenWidth = 176 * scale * cameraZoom
+      if (!accessible(scene.parents.get(id)) || screenWidth < 72 || screenWidth > 400) return []
+      const dx = Math.max(rect.x - position.x, 0, position.x - rect.x - rect.width)
+      const dy = Math.max(rect.y - position.y, 0, position.y - rect.y - rect.height)
+      return [{ scale, distance: dx * dx + dy * dy }]
+    }).sort((a, b) => a.distance - b.distance)[0]
+    return nearby?.scale ?? Math.min(1, 1.25 / Math.max(.01, cameraZoom))
+  }, [scene, cameraZoom, accessible])
   const presentedNodes = scene ? nodes.filter(node => scene.nodes.has(node.id) || scene.groups.has(groupIdFromNodeId(node.id) ?? '')).map(node => {
     const groupId = groupIdFromNodeId(node.id)
     const reveal = groupId ? reveals.get(groupId) ?? 0 : 1
@@ -786,29 +815,41 @@ function GraphCanvasInner({
   const handlePaneClick = useCallback(
     (event: ReactMouseEvent) => {
       if (pendingNodeType) {
-        onCreateNode(
-          pendingNodeType,
-          screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
-          }),
-        )
+        const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+        const parentGroupId = insertionGroupAt(position)
+        if (parentGroupId) onCreateNode(pendingNodeType, position, parentGroupId)
+        else if (scene) onCreateNode(pendingNodeType, position, undefined, insertionScaleAt(position))
+        else onCreateNode(pendingNodeType, position)
         setAddMenu(undefined)
         return
       }
       onSelectionChange({ nodeIds: [] })
+      setAddMenu(undefined)
+      setRenameGroup(undefined)
+    },
+    [onCreateNode, onSelectionChange, pendingNodeType, screenToFlowPosition, insertionGroupAt, insertionScaleAt, scene],
+  )
+
+  const handlePaneDoubleClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (pendingNodeType || !(event.target as HTMLElement).classList.contains('react-flow__pane')) return
+      event.preventDefault()
       const frame = shell.current?.getBoundingClientRect()
       if (!frame) return
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      const parentGroupId = insertionGroupAt(position)
       setAddQuery('')
       setActiveSuggestion(0)
-      setAddMenu({ x: Math.max(8, Math.min(event.clientX - frame.left, frame.width - 288)), y: Math.max(8, Math.min(event.clientY - frame.top, frame.height - 350)), position: screenToFlowPosition({ x: event.clientX, y: event.clientY }) })
+      setAddMenu({ x: Math.max(8, Math.min(event.clientX - frame.left, frame.width - 288)), y: Math.max(8, Math.min(event.clientY - frame.top, frame.height - 350)), position, parentGroupId, sceneScale: parentGroupId ? undefined : insertionScaleAt(position) })
     },
-    [onCreateNode, onSelectionChange, pendingNodeType, screenToFlowPosition],
+    [pendingNodeType, screenToFlowPosition, insertionGroupAt, insertionScaleAt],
   )
 
   const handleFlowPointerDownCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button === 2) {
+        const node = (event.target as HTMLElement).closest('.react-flow__node')
+        if (node?.getAttribute('data-id')?.startsWith(GROUP_NODE_ID_PREFIX)) return
         setAddMenu(undefined)
         event.preventDefault()
         event.stopPropagation()
@@ -832,6 +873,7 @@ function GraphCanvasInner({
   const handleNodeClick = useCallback(
     (_: ReactMouseEvent, node: CanvasNode) => {
       setAddMenu(undefined)
+      setRenameGroup(undefined)
       const groupId = groupIdFromNodeId(node.id)
       const group = renderedGraph.groups?.find((candidate) => candidate.id === groupId)
       if (group?.detail?.virtual && typeof group.detail.layerId === 'string' && typeof group.detail.unitIndex === 'number') {
@@ -861,7 +903,9 @@ function GraphCanvasInner({
   const suggestions = blockPalette.filter(item => `${item.label} ${item.type}`.toLowerCase().includes(addQuery.trim().toLowerCase()))
   const placeSuggestion = (type: NodeType) => {
     if (!addMenu) return
-    onCreateNode(type, addMenu.position)
+    if (addMenu.parentGroupId) onCreateNode(type, addMenu.position, addMenu.parentGroupId)
+    else if (addMenu.sceneScale) onCreateNode(type, addMenu.position, undefined, addMenu.sceneScale)
+    else onCreateNode(type, addMenu.position)
     setAddMenu(undefined)
   }
 
@@ -869,7 +913,7 @@ function GraphCanvasInner({
     <section className="canvas-panel" aria-label="Graph canvas">
       <div className="canvas-header">
         <div>
-          <p className="eyebrow">{semantic ? 'ONE MODEL · EVERY SCALE' : 'Graph canvas'}</p>
+          <p className="eyebrow">Graph canvas</p>
           <h2>{semantic ? 'Follow the computation' : 'Tensor computation graph'}</h2>
           {semantic && <div className="flow-legend"><span><i/>Forward →</span><span><i/>← Gradient</span><span>Color strength = magnitude · click a wire for values</span></div>}
         </div>
@@ -877,6 +921,9 @@ function GraphCanvasInner({
           <p>
             {graph.nodes.length} nodes, {graph.edges.length} edges{groupCount > 0 ? `, ${groupCount} ${groupCount === 1 ? 'group' : 'groups'}` : ''}
           </p>
+          <button type="button" className="canvas-action-button" onClick={() => changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], canvasStyle: semantic ? 'builder' : 'architecture', semanticZoom: graph.view?.semanticZoom ?? true })}>
+            {semantic ? 'Builder cards' : 'Architecture cards'}
+          </button>
           {selectedNodeIds.length >= 2 ? (
             <button type="button" className="canvas-action-button" onClick={onGroupCreate}>
               <Combine size={15} />
@@ -907,7 +954,7 @@ function GraphCanvasInner({
         {semantic ? <button type="button" onClick={compactLayout} title="Rearrange all blocks and fit the model; keep the current weights and values"><LayoutGrid size={14} /> Compact layout</button> : null}
         {semantic ? <label className="semantic-zoom-switch"><input type="checkbox" checked={graph.view?.semanticZoom !== false} onChange={(event) => changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: event.target.checked })}/> Zoom reveals detail</label> : null}
       </nav> : null}
-      <div className={`flow-shell ${semantic ? 'semantic-flow' : ''}`} ref={shell} onPointerDownCapture={handleFlowPointerDownCapture}
+      <div className={`flow-shell ${semantic ? 'semantic-flow' : ''}`} ref={shell} onPointerDownCapture={handleFlowPointerDownCapture} onDoubleClick={handlePaneDoubleClick}
         onContextMenu={(event) => event.preventDefault()}
         onPointerMove={(event) => {
           const pan = secondaryPan.current
@@ -951,8 +998,21 @@ function GraphCanvasInner({
           onNodeDragStop={commitNodePosition}
           onNodeClick={handleNodeClick}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onNodeContextMenu={(event, node) => {
+            const groupId = groupIdFromNodeId(node.id)
+            const group = graph.groups?.find(candidate => candidate.id === groupId)
+            if (!group) return
+            event.preventDefault()
+            event.stopPropagation()
+            const frame = shell.current?.getBoundingClientRect()
+            if (!frame) return
+            setAddMenu(undefined)
+            onSelectionChange({ nodeIds: [], groupId })
+            setRenameGroup({ id: group.id, label: group.label, x: Math.max(8, Math.min(event.clientX - frame.left, frame.width - 240)), y: Math.max(8, Math.min(event.clientY - frame.top, frame.height - 100)) })
+          }}
           onEdgeClick={(_, edge) => onInspectEdge?.(edge.data?.canonicalEdgeId ?? edge.id)}
           onPaneClick={handlePaneClick}
+          zoomOnDoubleClick={false}
           isValidConnection={isValidConnection}
           selectionOnDrag={!pendingNodeType}
           selectionMode={SelectionMode.Partial}
@@ -980,7 +1040,11 @@ function GraphCanvasInner({
           </div>
           <div className="canvas-add-hint">↑ ↓ choose · Enter place · Esc close</div>
         </div> : null}
-        {semantic ? <div className="semantic-canvas-hint"><ScanSearch size={15}/><span>Drag to move or select · two-finger click-drag to pan · double-click to explore</span></div> : null}
+        {renameGroup ? <form className="canvas-group-rename" role="dialog" aria-label="Name block group" style={{ left: renameGroup.x, top: renameGroup.y }} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onSubmit={event => { event.preventDefault(); const name = renameGroup.label.trim(); if (name) onGroupRename?.(renameGroup.id, name); setRenameGroup(undefined) }}>
+          <label>Block name<input autoFocus aria-label="Group name" value={renameGroup.label} onChange={event => setRenameGroup({ ...renameGroup, label: event.target.value })} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setRenameGroup(undefined) } }} /></label>
+          <button type="submit">Rename</button>
+        </form> : null}
+        {semantic ? <div className="semantic-canvas-hint"><ScanSearch size={15}/><span>Drag to move or select · two-finger click-drag to pan · double-click blocks to explore or canvas to add</span></div> : null}
       </div>
     </section>
   )

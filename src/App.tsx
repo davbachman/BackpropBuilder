@@ -12,7 +12,6 @@ import {
   PanelRightOpen,
   Download,
   FastForward,
-  Eye,
   Pause,
   Play,
   RotateCcw,
@@ -38,10 +37,8 @@ import './workspacePanels.css'
 import { CodeOutline, type CodeTarget } from './components/CodeOutline'
 import { ModelInspector } from './components/ModelInspector'
 import { DecoderControls } from './components/DecoderControls'
-import { DatasetControls } from './components/DatasetControls'
 import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
-import { createModelPreset, type ModelPresetKind } from './domain/modelPresets'
 import { placeCanvasNode } from './domain/nodePlacement'
 import { blockPalette } from './domain/blockPalette'
 import { compactVisualHierarchy } from './domain/continuousScene'
@@ -49,7 +46,6 @@ import {
   activeProjectionEdges,
   projectDenseNeurons,
 } from './domain/neuronProjection'
-import { LESSONS } from './learning/presets'
 import { GraphCanvas } from './components/GraphCanvas'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import {
@@ -141,14 +137,10 @@ function speedSliderValueToDelay(value: number): number {
 
 interface AppProps {
   initialGraph?: GraphModel
-  presetKind?: ModelPresetKind
-  onGallery?: () => void
 }
 
 function App({
   initialGraph,
-  presetKind,
-  onGallery,
 }: AppProps = {}): ReactElement {
   const [graph, setGraph] = useState<GraphModel>(
     () => safeForward(initialGraph ?? createEmptyGraph()).graph,
@@ -166,9 +158,9 @@ function App({
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [leftOpen, setLeftOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(true)
-  const [leftWidth, setLeftWidth] = useState(presetKind ? 164 : 220)
-  const [rightWidth, setRightWidth] = useState(presetKind ? 286 : 340)
-  const [rightTab, setRightTab] = useState<'details' | 'code'>('details')
+  const [leftWidth, setLeftWidth] = useState(220)
+  const [rightWidth, setRightWidth] = useState(340)
+  const [rightTab, setRightTab] = useState<'details' | 'code' | 'visualization'>('details')
   const [codeFocus, setCodeFocus] = useState<{ kind: 'group' | 'node'; id: string; serial: number }>()
   const nextCodeFocus = useRef(0)
   const resizeDrag = useRef<{ side: 'left' | 'right'; x: number; width: number } | undefined>(undefined)
@@ -176,7 +168,6 @@ function App({
   const [phase, setPhase] = useState<GraphPhase>('edit')
   const [traceSteps, setTraceSteps] = useState<EvaluationTraceStep[]>([])
   const [traceIndex, setTraceIndex] = useState(0)
-  const [showVisualization, setShowVisualization] = useState(false)
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const runCanvasAction = useCallback((action: () => void) => {
@@ -247,7 +238,6 @@ function App({
   )
   const selectedCodeTarget: CodeTarget | undefined = selectedNodeId ? { kind: 'node', id: selectedNodeId }
     : selectedCodeGroupId ? { kind: 'group', id: selectedCodeGroupId } : undefined
-  const preset = LESSONS.find((item) => item.id === presetKind)
   const inspectedEdge = displayGraph.edges.find(
     (edge) => edge.id === selectedEdgeId,
   )
@@ -526,7 +516,8 @@ function App({
   }, [isPlaying, speedSliderValue, stepForward, runCanvasAction])
 
   const runOneTrainingStep = useCallback(() => {
-    if (blockingIssues.length > 0 || !hasLoss || heldOutSample) return
+    if (blockingIssues.length > 0 || !hasLoss) return
+    if (heldOutSample) return
     pushHistory()
     const result = runTrainingStep(graph, graph.learningRate)
     const updateSteps = result.steps.filter((step) => step.phase === 'update')
@@ -548,7 +539,8 @@ function App({
   ])
 
   const runTenTrainingSteps = useCallback(() => {
-    if (blockingIssues.length > 0 || !hasLoss || heldOutSample) return
+    if (blockingIssues.length > 0 || !hasLoss) return
+    if (heldOutSample) return
     pushHistory()
     let nextGraph = graph
     const startingLoss = currentLoss
@@ -600,11 +592,11 @@ function App({
   }
 
   const placePaletteNode = useCallback(
-    (type: NodeType, position: { x: number; y: number }) => {
+    (type: NodeType, position: { x: number; y: number }, parentGroupId?: string, sceneScale?: number) => {
       pushHistory()
       const nextNode = createNode(type, nextNodeIndexForType(graph, type))
       const placedNode = { ...nextNode, position }
-      setGraph(placeCanvasNode(graph, placedNode, displayGraph))
+      setGraph(placeCanvasNode(graph, placedNode, displayGraph, parentGroupId, sceneScale))
       selectSingleNode(placedNode.id)
       setPendingNodeType(undefined)
       setPhase('edit')
@@ -922,7 +914,7 @@ function App({
           showMath: SHOW_MATH_LAYER,
           showGradient: SHOW_GRADIENT_LAYER,
           showCode: SHOW_CODE_LAYER,
-          showVisualization,
+          showVisualization: rightTab === 'visualization',
         },
       }),
     )
@@ -961,7 +953,7 @@ function App({
     setTraceIndex(nextState.traceIndex)
     setEpoch(nextState.epoch)
     setCurrentLoss(nextState.currentLoss)
-    setShowVisualization(nextState.display.showVisualization)
+    setRightTab(nextState.display.showVisualization ? 'visualization' : 'details')
     setPendingNodeType(undefined)
     setIsPlaying(false)
     setImportError(undefined)
@@ -995,7 +987,7 @@ function App({
 
   return (
     <main
-      className={`app-shell workspace-split ${presetKind ? 'unified-studio' : ''} ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''} ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
+      className={`app-shell workspace-split unified-studio ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''} ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
       style={{ '--left-size': leftOpen ? `${leftWidth}px` : '42px', '--right-size': rightOpen ? `${rightWidth}px` : '42px' } as CSSProperties}
     >
       <header className="top-bar">
@@ -1003,11 +995,6 @@ function App({
           <div className="brand-mark">BB</div>
           <div>
             <h1>Backprop Builder</h1>
-            {presetKind && (
-              <p className="model-title">
-                {preset?.title ?? 'Your model, from scratch'}
-              </p>
-            )}
           </div>
         </div>
 
@@ -1038,11 +1025,6 @@ function App({
                 Inspect
               </button>
             </>
-          {onGallery ? (
-            <button type="button" className="topbar-button" onClick={onGallery}>
-              <BookOpen size={16} /> Preset gallery
-            </button>
-          ) : null}
           <div className="file-menu">
             <button
               type="button"
@@ -1095,19 +1077,6 @@ function App({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            className={
-              showVisualization
-                ? 'topbar-button panel-toggle-button is-active'
-                : 'topbar-button panel-toggle-button'
-            }
-            aria-pressed={showVisualization}
-            onClick={() => setShowVisualization((visible) => !visible)}
-          >
-            <Eye size={16} />
-            {showVisualization ? 'Hide visualization' : 'Show visualization'}
-          </button>
           <button
             type="button"
             className="topbar-button"
@@ -1169,7 +1138,7 @@ function App({
       <div className={`sidebar-splitter sidebar-splitter-left ${leftOpen ? '' : 'is-collapsed'}`} role="separator" aria-label="Resize left sidebar" aria-orientation="vertical" aria-valuemin={126} aria-valuemax={430} aria-valuenow={leftWidth} tabIndex={leftOpen ? 0 : -1}
         onPointerDown={event => { if (leftOpen) handleResizeStart('left', event) }} onPointerMove={handleResizeMove}
         onPointerUp={event => { resizeDrag.current = undefined; event.currentTarget.releasePointerCapture?.(event.pointerId) }} onLostPointerCapture={() => { resizeDrag.current = undefined }}
-        onKeyDown={event => handleResizeKey('left', event)} onDoubleClick={() => setLeftWidth(presetKind ? 164 : 220)} />
+        onKeyDown={event => handleResizeKey('left', event)} onDoubleClick={() => setLeftWidth(220)} />
 
       <GraphCanvas
         graph={graph}
@@ -1187,7 +1156,7 @@ function App({
           setPaletteOpen(false)
         }}
         showMath={SHOW_MATH_LAYER}
-        showGradient={presetKind ? phase === 'backward' : SHOW_GRADIENT_LAYER}
+        showGradient={SHOW_GRADIENT_LAYER}
         phase={phase}
         pendingNodeType={pendingNodeType}
         onGraphChange={applyGraphChange}
@@ -1197,6 +1166,7 @@ function App({
             JSON.stringify(graph.view?.expandedGroupIds ?? []) !==
               JSON.stringify(view.expandedGroupIds) ||
             graph.view?.focusedGroupId !== view.focusedGroupId ||
+            graph.view?.canvasStyle !== view.canvasStyle ||
             JSON.stringify(graph.view?.layoutOffsets) !== JSON.stringify(view.layoutOffsets) ||
             JSON.stringify(graph.view?.layoutEdges) !== JSON.stringify(view.layoutEdges)
           )
@@ -1227,19 +1197,21 @@ function App({
         onDatasetChange={updateDataset}
         onGroupCreate={mergeSelectedNodes}
         onGroupExplode={explodeGroup}
+        onGroupRename={(id, label) => applyGraphChange({ ...graph, groups: graph.groups?.map(group => group.id === id ? { ...group, label } : group) })}
         onGroupMove={moveGroup}
       />
 
       <div className={`sidebar-splitter sidebar-splitter-right ${rightOpen ? '' : 'is-collapsed'}`} role="separator" aria-label="Resize right sidebar" aria-orientation="vertical" aria-valuemin={230} aria-valuemax={620} aria-valuenow={rightWidth} tabIndex={rightOpen ? 0 : -1}
         onPointerDown={event => { if (rightOpen) handleResizeStart('right', event) }} onPointerMove={handleResizeMove}
         onPointerUp={event => { resizeDrag.current = undefined; event.currentTarget.releasePointerCapture?.(event.pointerId) }} onLostPointerCapture={() => { resizeDrag.current = undefined }}
-        onKeyDown={event => handleResizeKey('right', event)} onDoubleClick={() => setRightWidth(presetKind ? 286 : 340)} />
+        onKeyDown={event => handleResizeKey('right', event)} onDoubleClick={() => setRightWidth(340)} />
 
       <aside className="right-panel" aria-label="Model sidebar">
         <div className="sidebar-heading right-sidebar-heading">
           {rightOpen ? <div className="right-sidebar-tabs" role="tablist" aria-label="Right sidebar views">
             <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
             <button type="button" role="tab" aria-selected={rightTab === 'code'} onClick={() => { setRightTab('code'); setRightWidth(width => Math.max(width, 390)) }}>Code</button>
+            <button type="button" role="tab" aria-selected={rightTab === 'visualization'} onClick={() => { setRightTab('visualization'); setRightWidth(width => Math.max(width, 390)) }}>Visualization</button>
           </div> : null}
           <button type="button" aria-label={rightOpen ? 'Collapse right sidebar' : 'Expand right sidebar'} title={rightOpen ? 'Collapse sidebar' : 'Expand sidebar'} onClick={() => { if (rightOpen) setInspectorOpen(false); setRightOpen(value => !value) }}>
             {rightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
@@ -1324,26 +1296,6 @@ function App({
               }}
             />
           )}
-        {!selectedNodeId &&
-          !selectedGroupId &&
-          !selectedEdgeId &&
-          graph.groups?.some((group) => group.id === 'network') &&
-          graph.nodes.some(node => node.type === 'dataset' && !datasetForNode(node).examples) && (
-            <DatasetControls
-              graph={graph}
-              onGraphChange={(next, epochs = 0, loss) => {
-                pushHistory()
-                setGraph(next)
-                setVisualizationGraph(next)
-                setPhase(epochs ? 'update' : 'edit')
-                setTraceSteps([])
-                setTraceIndex(0)
-                setCurrentLoss(loss ?? null)
-                setEpoch((value) => value + epochs)
-                setIsPlaying(false)
-              }}
-            />
-          )}
         {(!selectedNodeId || graph.nodes.find(node => node.id === selectedNodeId)?.type === 'dataset') &&
           !selectedGroupId &&
           !selectedEdgeId &&
@@ -1360,20 +1312,12 @@ function App({
                 setCurrentLoss(null)
                 setIsPlaying(false)
               }}
-              onReloadCheckpoint={['block', 'decoder'].includes(presetKind ?? '') ? (checkpoint) =>
-                loadGraph(
-                  createModelPreset(
-                    presetKind === 'block' ? 'block' : 'decoder',
-                    checkpoint,
-                  ),
-                ) : undefined
-              }
             />
           )}
         {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onGraphChange={(next, epochs = 0) => {
           pushHistory(); setGraph(next); setVisualizationGraph(next); setPhase(epochs ? 'update' : 'forward'); setTraceSteps([]); setTraceIndex(0); setCurrentLoss(next.nodes.find(isLossNode)?.value?.data[0] ?? null); setEpoch(value => value + epochs); setIsPlaying(false)
         }}/>) }
-        <ModelInspector
+        {(selectedNodeIds.length > 0 || selectedGroup) && <ModelInspector
           graph={graph}
           node={inspectedNode}
           binding={
@@ -1391,7 +1335,7 @@ function App({
           onDuplicate={duplicateSelection}
           onGroup={mergeSelectedNodes}
           selectionCount={selectedNodeIds.length}
-        />
+        />}
         {blockingIssues.length > 0 && (
           <div className="graph-issues" role="status">
             <strong>Complete the connections</strong>
@@ -1400,10 +1344,6 @@ function App({
             ))}
           </div>
         )}
-        {showVisualization ? (
-          <VisualizationPanel graph={visualizationGraph} />
-        ) : null}
-
         <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>
@@ -1427,6 +1367,9 @@ function App({
         </div>
         <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}
+        </div>
+        <div className="right-panel-scroll right-visualization-scroll" hidden={rightTab !== 'visualization'} role="tabpanel" aria-label="Model visualization">
+          {rightTab === 'visualization' ? <VisualizationPanel graph={visualizationGraph} /> : null}
         </div>
       </aside>
 

@@ -54,13 +54,13 @@ export function mergeNodesIntoVisualGroup(graph: GraphModel, nodeIds: string[]):
   const group: GraphGroup = {
     id,
     label: `Group ${groupIndexFromId(id)}`,
-    kind: nodes.filter(node => node.type === 'activation').length === 1 ? 'neuron' : 'module',
+    kind: 'module',
     ...(parent ? { parentId: parent.id } : {}),
     nodeIds: ids,
     position: collapsedPositionForNodes(nodes),
     dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
   }
-  group.detail = denseGroupDetail(graph, group)
+  group.detail = { ...denseGroupDetail(graph, group), userCreated: true }
   return {
     graph: { ...graph, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: true }, groups: [...groups.map((candidate) =>
       candidate.parentId === parent?.id && candidate.nodeIds.every((nodeId) => selected.has(nodeId))

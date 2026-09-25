@@ -4,19 +4,17 @@ import { datasetForNode, datasetOutputValueForSlot } from '../domain/datasets'
 import { predictionNode } from '../domain/datasetTraining'
 import { forwardPass } from '../domain/engine'
 import type { GraphModel } from '../domain/types'
-import type { ModelCheckpoint } from '../domain/modelPresets'
 import { samplingDistribution } from '../learning/decoder'
 import './decoderControls.css'
 
 export interface DecoderControlsProps {
   graph: GraphModel
   onGraphChange: (graph: GraphModel) => void
-  onReloadCheckpoint?: (checkpoint: ModelCheckpoint) => void
 }
 
 /** Prompt edits and generation execute the editable canvas itself, including
  * parameter changes made at any depth of the architecture. */
-export function DecoderControls({ graph, onGraphChange, onReloadCheckpoint }: DecoderControlsProps) {
+export function DecoderControls({ graph, onGraphChange }: DecoderControlsProps) {
   const dataNode = graph.nodes.find(node => node.type === 'dataset' && datasetForNode(node).task === 'sequence')
   const dataset = dataNode ? datasetForNode(dataNode) : undefined
   const vocabulary = dataset?.vocabulary ?? []
@@ -100,6 +98,5 @@ export function DecoderControls({ graph, onGraphChange, onReloadCheckpoint }: De
       {(ended || full || draft !== null) && <p className="decoder-status">{ended ? 'End token reached. Edit the prompt to continue.' : full ? `The ${maxLength}-token context is full. Shorten the prompt to continue.` : 'Apply your prompt before generating.'}</p>}
     </>}
     {(message || inference.error) && <p className="decoder-error" role="alert">{message || inference.error}</p>}
-    {onReloadCheckpoint && <div className="decoder-checkpoints"><span>Load parameters</span><button type="button" onClick={() => { setDraft(null); setMessage(''); onReloadCheckpoint('trained') }}>Trained</button><button type="button" onClick={() => { setDraft(null); setMessage(''); onReloadCheckpoint('untrained') }}>Initial</button></div>}
   </section>
 }

@@ -1,10 +1,10 @@
 # BackpropBuilder: explore one model at every scale
 
-Run `npm install` and `npm run dev`, then open the displayed URL. Models, datasets, training, and generation run locally in the browser.
+Run `npm install` and `npm run dev`, then open the displayed URL. The app opens to a blank builder canvas. Download an example from [`public/models`](../public/models/README.md) and use **File → Import** when you want one. Models, datasets, training, and generation run locally in the browser.
 
 ## Explore the architecture
 
-Every preset opens on the same editable graph canvas. There is no separate transformer demonstration or network editor. Groups organize the actual computation; opening them does not change parameters or run another model.
+Every imported model opens on the same editable graph canvas. There is no separate transformer demonstration or network editor. Groups organize the actual computation; opening them does not change parameters or run another model. The **Builder cards / Architecture cards** button is available for every graph; it changes the canvas presentation without changing the calculation. A Loss block keeps its editable loss selector and side ports in both presentations.
 
 Layouts place parameters beside the operations they feed and pack parallel branches into compact rows to reduce crossings and empty space. Targets sit just below the input stack, with a clear wire lane beneath intervening blocks and the loss nearby. Rounded wires route around blocks. Moving a block updates its wire routes; your manual offsets remain part of the saved view. **Compact layout** reapplies the automatic arrangement at every level and fits the model in view without changing its calculations or learned weights. You can undo this arrangement with Cmd/Ctrl+Z.
 
@@ -28,7 +28,7 @@ Wires remain uncluttered: color intensity represents mean absolute magnitude on 
 
 ## Build a neuron and reuse it
 
-Start with **Blank builder**, or edit a preset. Pick operations from the palette, place them, and connect output handles to input handles. A new operation appears at the canvas point you click, preserving the positions of existing blocks and the current zoom and pan. Connecting, replacing, or deleting wires also preserves the arrangement at every level; the wire routes and computation update immediately. Use **Compact layout** when you want an automatic rearrangement using the current connections. For a neuron, connect inputs and weights to multiplication nodes, combine the products with a bias, and connect the sum to an activation.
+Start on the blank canvas, or import a model. Pick operations from the palette, place them, and connect output handles to input handles. A new operation appears at the canvas point you click, preserving the positions of existing blocks and the current zoom and pan. Connecting, replacing, or deleting wires also preserves the arrangement at every level; the wire routes and computation update immediately. Use **Compact layout** when you want an automatic rearrangement using the current connections. For a neuron, connect inputs and weights to multiplication nodes, combine the products with a bias, and connect the sum to an activation.
 
 Drag empty canvas to select calculations and group them. Drag an expanded group's title to move its contents together. Manual placements persist through zooming, execution, and saving. A group can contain other groups. Use **Copy block**, **Duplicate**, or Cmd/Ctrl+C and Cmd/Ctrl+V to reuse a neuron, layer, or attention mechanism. Copies keep incoming source connections and independent copied parameters; their outputs are exposed for wiring into the next layer. **Ungroup** removes a container without deleting its calculations. Deleting a group removes its calculations. Cmd/Ctrl+Z restores edits and navigation.
 
@@ -38,9 +38,9 @@ Tensor operations include matrix multiplication, embedding lookup, transpose, sl
 
 For a model you build yourself, add a **Dataset** node and choose its data from the dropdown on the card or in its inspector. The card labels its output ports: **x** and **y** for 1D datasets, or **x1**, **x2**, and **y** for 2D datasets. Feature ports feed the model inputs; **y** supplies the target to a Target or Loss node. Choose one example or a numeric batch in the Dataset panel; the original toy datasets contain 20 examples. Switching datasets keeps the target connection attached to **y** even when the number of features changes; connections to features no longer present are removed.
 
-Regression and classification presets include deterministic training and held-out samples. Select a dataset or point from **Model controls**. The prediction curve or decision-boundary colors use the parameters of the canvas model. Click a point to load it into that model and follow its computation.
+Regression and classification datasets include deterministic training and held-out samples. Select the Dataset block to choose the example sent through the model. The **Visualization** tab plots every point, the prediction curve or decision surface, and training and held-out loss using the current canvas parameters.
 
-**Train 1 epoch** and **Train 25 epochs** use the training split, with full-batch gradients. Training and test losses are reported separately. Dataset changes preserve parameters. The simple linear/ReLU models accept one-dimensional regression data; the small MLP accepts two-dimensional regression data; the classifier includes nonlinear two-dimensional classification datasets.
+**Train 1 epoch** and **Train 5 epochs** use only the training split. Numeric datasets can train on one example at a time or as a batch. The Dataset panel also evaluates the training and held-out splits without changing parameters.
 
 ## Attention and the miniature transformer
 
@@ -50,7 +50,7 @@ The complete decoder has two pre-normalization blocks, width 8, two heads, feed-
 
 Edit the prompt using `<bos>`, `red`, `green`, `blue`, and `<eos>`. **Apply prompt** updates token IDs and positions together. **Generate next token** runs the current edited graph, chooses a token greedily or by sampling, and appends it. Temperature and top-k change sampling, not the model's logits. The context limit is 12 tokens; generation stops there or at `<eos>`. Prompt edits refresh the synthetic next-token training targets.
 
-The **Trained** and **Initial** buttons reload the corresponding model preset. `<eos>` and absolute positions 10–11 were not trained in the supplied checkpoint. Ordinary language and arbitrary long prompts are outside its task.
+Import `decoder.json` or `decoder-untrained.json` to compare trained and initial parameters. `<eos>` and absolute positions 10–11 were not trained in the supplied checkpoint. Ordinary language and arbitrary long prompts are outside its task.
 
 ## Small image classifier
 
@@ -60,16 +60,16 @@ Choose **Restore trained weights** to reload the included checkpoint, including 
 
 ## Build a transformer or CNN from scratch
 
-Open **Blank builder**. The inspector includes expandable CNN and transformer recipes with the exact shapes and connections for working models. All operations run in the same editable graph as the presets.
+Start on the blank builder canvas. All operations run in the same editable graph as the importable models.
 
 - Select a Weight or Bias, enter its shape, and choose **Initialize tensor**. Xavier suits dense and embedding matrices; He suits ReLU layers and convolution filters; ones and zeros initialize normalization scales and biases. Each new node has its own reproducible random seed. You can still enter or edit individual values.
 - Operation help explains the input-port order and tensor shapes. Transpose accepts an empty axes field for its default permutation. Mean can average the whole tensor or retain dimensions. Reshape supports one `-1` dimension, such as `-1, 1`, to work across different batch sizes.
-- Select calculations and group them, then edit the block's name and kind. A grouped Matrix product → Add bias → Activation exposes its individual neurons automatically. Duplicate and reconnect groups to build deeper networks and multiple attention heads.
+- Select calculations and group them. Right-click a group to name it; the expandable Code tab then shows its boundary connections as a function call such as `y = func(x)`. New groups have no assumed icon. If useful, choose a block kind in the inspector to give them a matching visual. A grouped Matrix product → Add bias → Activation exposes its individual neurons automatically. Duplicate and reconnect groups to build deeper networks and multiple attention heads.
 - Select any Convolution to inspect its filters by output filter and input channel, edit shared weights, and inspect its actual input and feature maps. Convolution uses valid padding and stride 1; average pooling uses 2×2 patches and stride 2. Filter size and channel counts come from the tensors you connect.
 
 ## Dataset blocks and model testing
 
-Every gallery preset and **File → Starter** gets its inputs and targets through a visible Dataset block. Inputs and targets connected to the dataset are aliases; choose data on the dataset itself. Model constants, such as attention's `1/√d`, remain ordinary fixed Input nodes.
+Every importable example and **File → Starter** gets its inputs and targets through a visible Dataset block. Inputs and targets connected to the dataset are aliases; choose data on the dataset itself. Model constants, such as attention's `1/√d`, remain ordinary fixed Input nodes.
 
 The Dataset selector includes:
 
@@ -84,7 +84,7 @@ These controls work with user-created node names and connections. Connect raw lo
 
 ## Save and reproduce
 
-**File → Save** downloads the complete graph, parameters, inputs, group hierarchy, inspection view, and recorded execution state. **File → Import** restores it. Save before switching presets or reloading; those actions start a fresh preset. There is no hosted sharing service and no saved-project migration guarantee.
+**File → Save** downloads the complete graph, parameters, inputs, group hierarchy, inspection view, and recorded execution state. **File → Import** restores it. Download examples from [`public/models`](../public/models/README.md) and import them the same way as your saved work. There is no hosted sharing service and no saved-project migration guarantee.
 
 ```sh
 npm test

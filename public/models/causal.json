@@ -1,0 +1,2798 @@
+{
+  "kind": "backprop-builder-state",
+  "version": 1,
+  "savedAt": "2026-09-24T00:00:00.000Z",
+  "state": {
+    "graph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [
+          "attention"
+        ],
+        "semanticZoom": true
+      },
+      "groups": [
+        {
+          "id": "attention",
+          "label": "Causal self-attention",
+          "kind": "attention",
+          "nodeIds": [
+            "keys-transposed",
+            "query-key-products",
+            "attention-scale",
+            "attention-scores",
+            "masked-scores",
+            "attention-weights",
+            "attention-output"
+          ],
+          "position": {
+            "x": 420,
+            "y": 100
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 160
+          }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "attention-sequence",
+            "datasetMode": "sample",
+            "datasetIndex": 0
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "queries",
+          "type": "input",
+          "label": "Queries · 3 tokens",
+          "position": {
+            "x": 80,
+            "y": 60
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys",
+          "type": "input",
+          "label": "Keys · 3 tokens",
+          "position": {
+            "x": 80,
+            "y": 340
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "values",
+          "type": "input",
+          "label": "Values · 3 messages",
+          "position": {
+            "x": 80,
+            "y": 620
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                2,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  2,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                2,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys-transposed",
+          "type": "transpose",
+          "label": "Transpose keys",
+          "position": {
+            "x": 360,
+            "y": 340
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                2,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "query-key-products",
+          "type": "matmul",
+          "label": "Query · key scores",
+          "position": {
+            "x": 650,
+            "y": 140
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              },
+              {
+                "shape": [
+                  2,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                1,
+                1,
+                2
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              2
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scale",
+          "type": "input",
+          "label": "1 / √d",
+          "position": {
+            "x": 650,
+            "y": 400
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.7071067811865475
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.7071067811865475
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.7071067811865475
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scores",
+          "type": "multiply",
+          "label": "Scaled scores",
+          "position": {
+            "x": 920,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.7071067811865475
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                0.7071067811865475,
+                0,
+                0.7071067811865475,
+                0,
+                0.7071067811865475,
+                0.7071067811865475,
+                0.7071067811865475,
+                0.7071067811865475,
+                1.414213562373095
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.7071067811865475
+                ]
+              },
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "masked-scores",
+          "type": "causal-mask",
+          "label": "Hide future tokens",
+          "position": {
+            "x": 1200,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  0.7071067811865475,
+                  0,
+                  0.7071067811865475,
+                  0,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  1.414213562373095
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                0.7071067811865475,
+                -1000000000,
+                -1000000000,
+                0,
+                0.7071067811865475,
+                -1000000000,
+                0.7071067811865475,
+                0.7071067811865475,
+                1.414213562373095
+              ],
+              "excluded": [
+                false,
+                true,
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              -1000000000,
+              -1000000000,
+              0,
+              0.7071067811865475,
+              -1000000000,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ],
+            "excluded": [
+              false,
+              true,
+              true,
+              false,
+              false,
+              true,
+              false,
+              false,
+              false
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-weights",
+          "type": "softmax",
+          "label": "Attention weights",
+          "position": {
+            "x": 1480,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  0.7071067811865475,
+                  -1000000000,
+                  -1000000000,
+                  0,
+                  0.7071067811865475,
+                  -1000000000,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  1.414213562373095
+                ],
+                "excluded": [
+                  false,
+                  true,
+                  true,
+                  false,
+                  false,
+                  true,
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                0.3302384506733431,
+                0.6697615493266569,
+                0,
+                0.2482550782577231,
+                0.2482550782577231,
+                0.5034898434845538
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              0.3302384506733431,
+              0.6697615493266569,
+              0,
+              0.2482550782577231,
+              0.2482550782577231,
+              0.5034898434845538
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-output",
+          "type": "matmul",
+          "label": "Weighted messages",
+          "position": {
+            "x": 1780,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  0.3302384506733431,
+                  0.6697615493266569,
+                  0,
+                  0.2482550782577231,
+                  0.2482550782577231,
+                  0.5034898434845538
+                ]
+              },
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  2,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0.3302384506733431,
+                1.3395230986533138,
+                0.7517449217422769,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0.3302384506733431,
+              1.3395230986533138,
+              0.7517449217422769,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "keys→keys-transposed:0",
+          "source": "keys",
+          "target": "keys-transposed",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "queries→query-key-products:0",
+          "source": "queries",
+          "target": "query-key-products",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys-transposed→query-key-products:1",
+          "source": "keys-transposed",
+          "target": "query-key-products",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "query-key-products→attention-scores:0",
+          "source": "query-key-products",
+          "target": "attention-scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              2
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scale→attention-scores:1",
+          "source": "attention-scale",
+          "target": "attention-scores",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.7071067811865475
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scores→masked-scores:0",
+          "source": "attention-scores",
+          "target": "masked-scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "masked-scores→attention-weights:0",
+          "source": "masked-scores",
+          "target": "attention-weights",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              -1000000000,
+              -1000000000,
+              0,
+              0.7071067811865475,
+              -1000000000,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ],
+            "excluded": [
+              false,
+              true,
+              true,
+              false,
+              false,
+              true,
+              false,
+              false,
+              false
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-weights→attention-output:0",
+          "source": "attention-weights",
+          "target": "attention-output",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              0.3302384506733431,
+              0.6697615493266569,
+              0,
+              0.2482550782577231,
+              0.2482550782577231,
+              0.5034898434845538
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "values→attention-output:1",
+          "source": "values",
+          "target": "attention-output",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→queries",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "queries",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→keys",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "keys",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→values",
+          "source": "model-data",
+          "sourceSlot": 2,
+          "target": "values",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "visualizationGraph": {
+      "learningRate": 0.03,
+      "view": {
+        "expandedGroupIds": [
+          "attention"
+        ],
+        "semanticZoom": true
+      },
+      "groups": [
+        {
+          "id": "attention",
+          "label": "Causal self-attention",
+          "kind": "attention",
+          "nodeIds": [
+            "keys-transposed",
+            "query-key-products",
+            "attention-scale",
+            "attention-scores",
+            "masked-scores",
+            "attention-weights",
+            "attention-output"
+          ],
+          "position": {
+            "x": 420,
+            "y": 100
+          },
+          "dimensions": {
+            "width": 220,
+            "height": 160
+          }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "model-data",
+          "type": "dataset",
+          "label": "Dataset",
+          "position": {
+            "x": -320,
+            "y": 0
+          },
+          "params": {
+            "dataset": "attention-sequence",
+            "datasetMode": "sample",
+            "datasetIndex": 0
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "queries",
+          "type": "input",
+          "label": "Queries · 3 tokens",
+          "position": {
+            "x": 80,
+            "y": 60
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys",
+          "type": "input",
+          "label": "Keys · 3 tokens",
+          "position": {
+            "x": 80,
+            "y": 340
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "values",
+          "type": "input",
+          "label": "Values · 3 messages",
+          "position": {
+            "x": 80,
+            "y": 620
+          },
+          "params": {
+            "value": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                2,
+                1,
+                1
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  2,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                2,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys-transposed",
+          "type": "transpose",
+          "label": "Transpose keys",
+          "position": {
+            "x": 360,
+            "y": 340
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                2,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "query-key-products",
+          "type": "matmul",
+          "label": "Query · key scores",
+          "position": {
+            "x": 650,
+            "y": 140
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  1,
+                  1
+                ]
+              },
+              {
+                "shape": [
+                  2,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                1,
+                1,
+                2
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              2
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scale",
+          "type": "input",
+          "label": "1 / √d",
+          "position": {
+            "x": 650,
+            "y": 400
+          },
+          "params": {
+            "value": {
+              "shape": [],
+              "data": [
+                0.7071067811865475
+              ]
+            }
+          },
+          "cache": {
+            "inputValues": [],
+            "outputValue": {
+              "shape": [],
+              "data": [
+                0.7071067811865475
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [],
+            "data": [
+              0.7071067811865475
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scores",
+          "type": "multiply",
+          "label": "Scaled scores",
+          "position": {
+            "x": 920,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2
+                ]
+              },
+              {
+                "shape": [],
+                "data": [
+                  0.7071067811865475
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                0.7071067811865475,
+                0,
+                0.7071067811865475,
+                0,
+                0.7071067811865475,
+                0.7071067811865475,
+                0.7071067811865475,
+                0.7071067811865475,
+                1.414213562373095
+              ]
+            },
+            "localDerivatives": [
+              {
+                "shape": [],
+                "data": [
+                  0.7071067811865475
+                ]
+              },
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  1,
+                  0,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2
+                ]
+              }
+            ]
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "masked-scores",
+          "type": "causal-mask",
+          "label": "Hide future tokens",
+          "position": {
+            "x": 1200,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  0.7071067811865475,
+                  0,
+                  0.7071067811865475,
+                  0,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  1.414213562373095
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                0.7071067811865475,
+                -1000000000,
+                -1000000000,
+                0,
+                0.7071067811865475,
+                -1000000000,
+                0.7071067811865475,
+                0.7071067811865475,
+                1.414213562373095
+              ],
+              "excluded": [
+                false,
+                true,
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              -1000000000,
+              -1000000000,
+              0,
+              0.7071067811865475,
+              -1000000000,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ],
+            "excluded": [
+              false,
+              true,
+              true,
+              false,
+              false,
+              true,
+              false,
+              false,
+              false
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-weights",
+          "type": "softmax",
+          "label": "Attention weights",
+          "position": {
+            "x": 1480,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  0.7071067811865475,
+                  -1000000000,
+                  -1000000000,
+                  0,
+                  0.7071067811865475,
+                  -1000000000,
+                  0.7071067811865475,
+                  0.7071067811865475,
+                  1.414213562373095
+                ],
+                "excluded": [
+                  false,
+                  true,
+                  true,
+                  false,
+                  false,
+                  true,
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                3
+              ],
+              "data": [
+                1,
+                0,
+                0,
+                0.3302384506733431,
+                0.6697615493266569,
+                0,
+                0.2482550782577231,
+                0.2482550782577231,
+                0.5034898434845538
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              0.3302384506733431,
+              0.6697615493266569,
+              0,
+              0.2482550782577231,
+              0.2482550782577231,
+              0.5034898434845538
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-output",
+          "type": "matmul",
+          "label": "Weighted messages",
+          "position": {
+            "x": 1780,
+            "y": 160
+          },
+          "params": {},
+          "cache": {
+            "inputValues": [
+              {
+                "shape": [
+                  3,
+                  3
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  0.3302384506733431,
+                  0.6697615493266569,
+                  0,
+                  0.2482550782577231,
+                  0.2482550782577231,
+                  0.5034898434845538
+                ]
+              },
+              {
+                "shape": [
+                  3,
+                  2
+                ],
+                "data": [
+                  1,
+                  0,
+                  0,
+                  2,
+                  1,
+                  1
+                ]
+              }
+            ],
+            "outputValue": {
+              "shape": [
+                3,
+                2
+              ],
+              "data": [
+                1,
+                0,
+                0.3302384506733431,
+                1.3395230986533138,
+                0.7517449217422769,
+                1
+              ]
+            },
+            "localDerivatives": []
+          },
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0.3302384506733431,
+              1.3395230986533138,
+              0.7517449217422769,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "keys→keys-transposed:0",
+          "source": "keys",
+          "target": "keys-transposed",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "queries→query-key-products:0",
+          "source": "queries",
+          "target": "query-key-products",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "keys-transposed→query-key-products:1",
+          "source": "keys-transposed",
+          "target": "query-key-products",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              2,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "query-key-products→attention-scores:0",
+          "source": "query-key-products",
+          "target": "attention-scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              2
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scale→attention-scores:1",
+          "source": "attention-scale",
+          "target": "attention-scores",
+          "inputSlot": 1,
+          "value": {
+            "shape": [],
+            "data": [
+              0.7071067811865475
+            ]
+          },
+          "grad": {
+            "shape": [],
+            "data": [
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-scores→masked-scores:0",
+          "source": "attention-scores",
+          "target": "masked-scores",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "masked-scores→attention-weights:0",
+          "source": "masked-scores",
+          "target": "attention-weights",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0.7071067811865475,
+              -1000000000,
+              -1000000000,
+              0,
+              0.7071067811865475,
+              -1000000000,
+              0.7071067811865475,
+              0.7071067811865475,
+              1.414213562373095
+            ],
+            "excluded": [
+              false,
+              true,
+              true,
+              false,
+              false,
+              true,
+              false,
+              false,
+              false
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "attention-weights→attention-output:0",
+          "source": "attention-weights",
+          "target": "attention-output",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              0.3302384506733431,
+              0.6697615493266569,
+              0,
+              0.2482550782577231,
+              0.2482550782577231,
+              0.5034898434845538
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              3
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "values→attention-output:1",
+          "source": "values",
+          "target": "attention-output",
+          "inputSlot": 1,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→queries",
+          "source": "model-data",
+          "sourceSlot": 0,
+          "target": "queries",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→keys",
+          "source": "model-data",
+          "sourceSlot": 1,
+          "target": "keys",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              1,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "id": "model-data→values",
+          "source": "model-data",
+          "sourceSlot": 2,
+          "target": "values",
+          "inputSlot": 0,
+          "value": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              1,
+              0,
+              0,
+              2,
+              1,
+              1
+            ]
+          },
+          "grad": {
+            "shape": [
+              3,
+              2
+            ],
+            "data": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    "initialParameterValues": {},
+    "selectedNodeIds": [],
+    "phase": "edit",
+    "traceSteps": [],
+    "traceIndex": 0,
+    "epoch": 0,
+    "currentLoss": null,
+    "display": {
+      "showMath": true,
+      "showGradient": true,
+      "showCode": false,
+      "showVisualization": false
+    }
+  }
+}

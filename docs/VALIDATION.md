@@ -1,16 +1,16 @@
 # Validation and scope
 
-All gallery presets now run through the editable `GraphModel` execution API. The architecture view, scalar arithmetic inspection, parameter editor, dataset experiments, and token generation share canonical parameters. The former lesson components remain in source for their numerical/reference tests but are no longer gallery destinations.
+The app opens on a blank canvas. Fourteen public, importable model files run through the editable `GraphModel` execution API. The architecture view, scalar arithmetic inspection, parameter editor, dataset experiments, and token generation share canonical parameters.
 
 ## Verification
 
 Run `npm test`, `npm run build`, and `npm run lint` from the project root.
 
-The final test run on September 23, 2026 passed **383 tests across 36 files**.
+The latest test run on September 24, 2026 passed **441 tests across 39 files**.
 
 The suite checks:
 
-- Every preset is executable and opens directly in the same graph workspace.
+- Every public example imports as an editable, dataset-backed project and executes in the same graph workspace.
 - Transformer logits, probabilities, and intermediate tensors match the reference decoder for both checkpoints.
 - All transformer parameter gradients agree with reference autograd; an SGD update reduces loss.
 - Finite-difference checks cover broadcasting, embedding reuse, matrix operations, softmax, masking, normalization, cross-entropy, convolution, and pooling.
@@ -29,7 +29,8 @@ The suite checks:
 - Block dragging preserves manual offsets through nested zoom and saved projects. Expanded groups move their contents together, primary drags select/move blocks, and secondary pointer drags pan without changing selections or model parameters.
 - Copied neuron outputs remain available for wiring without duplicating occupied destination ports.
 - Dataset plots and training read the current canvas parameters; training/test splits remain separate.
-- Dataset nodes expose all six dataset choices on the card and in the inspector, with labeled feature and target ports. Both zoom modes preserve feature/target values and target wiring through 1D/2D changes and undo.
+- Dataset nodes expose the regression, classification, image, sequence, attention, and score datasets on the card and in the inspector, with labeled feature and target ports. Both zoom modes preserve feature/target values and target wiring through 1D/2D changes and undo.
+- A named custom group renders as an expandable function call in Code view. Right-clicking a group opens its rename control. Loss selectors and side ports remain the same in builder and architecture presentations.
 - Decoder generation uses live edited parameters, validates prompts, refreshes positions, and stops at the context or end-token limit.
 
 ## Decoder checkpoint evidence
@@ -46,7 +47,7 @@ The supplied checkpoint records training loss `0.0005509947040016146` and valida
 - Computation and bounded training run on the browser's main thread. Large models and datasets are not the target.
 - Opening tensor MLP arithmetic projects one neuron's coordinates for a selected token onto the canvas. Its parameters and gradients belong to the shared model; execution still uses the efficient tensor operations. User-built scalar neurons remain ordinary executable operation groups.
 - Automatic layout supplies initial positions; manual offsets persist across semantic views. Graph edits and connections change the executable topology. Groups are views, not separate numerical modules.
-- Save/import uses local JSON files. Switching presets discards unsaved working state. Broad migration compatibility is intentionally outside scope.
+- Save/import uses local JSON files. Examples are downloadable from `public/models`; opening a file replaces the current graph, so save work you want to retain. Broad migration compatibility is intentionally outside scope.
 - The digit example uses UCI 8×8 images rather than MNIST. Checkpoint metrics and dataset attribution are documented with the CNN assets.
 - Keyboard controls, numeric alternatives to colors, responsive panels, and reduced-motion styles are provided. A formal screen-reader audit and physical touch-device test have not been performed.
 
@@ -54,6 +55,6 @@ The supplied checkpoint records training loss `0.0005509947040016146` and valida
 ## Scratch authoring and dataset-backed presets
 
 - Palette-based integration tests assemble a two-filter CNN and a complete two-head transformer block from `createNode`, tensor initialization, and `connectGraphNodes`, without presets, checkpoints, or reserved node IDs. Both differentiate, reduce training loss, evaluate held-out data, and survive a project save/import round trip.
-- Every gallery preset is checked for a visible Dataset source and data/target wires; example changes preserve parameters. Dataset tests check aligned shapes, finite values, and train/test splits. Changing held-out labels leaves training updates unchanged; cancellation leaves the input graph unchanged.
+- Every public example is checked for a visible Dataset source and an executable graph; example changes preserve parameters. Dataset tests check aligned shapes, finite values, and train/test splits. Changing held-out labels leaves training updates unchanged; cancellation leaves the input graph unchanged.
 - Numeric batch tests cover inferred reshape dimensions and switching between training, test and full batches. UI tests cover tensor initialization, operation settings, generic filter editing, prompt generation, and dataset training/evaluation.
 - Browser verification: initialized a 4×3×3×1 He filter from Blank builder; evaluated the CNN (100% training / 97% held-out accuracy for the included checkpoint) and completed an epoch through the Dataset panel. The user’s Safari model was left intact.

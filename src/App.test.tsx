@@ -21,7 +21,8 @@ describe('Backprop Builder app', () => {
 
     expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Show visualization/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Visualization' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Show visualization|Hide visualization/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Randomize parameters/i })).toBeInTheDocument()
     expect(screen.getByText(/Build the model/i)).toBeInTheDocument()
     expect(screen.getByText(/Graph canvas/i)).toBeInTheDocument()
@@ -63,7 +64,7 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByRole('region', { name: /Visualization panel/i })).not.toBeInTheDocument()
 
     await chooseFileMenuItem(user, /^Starter$/i)
-    await user.click(screen.getByRole('button', { name: /Show visualization/i }))
+    await user.click(screen.getByRole('tab', { name: 'Visualization' }))
 
     expect(screen.getByRole('region', { name: /Visualization panel/i })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
@@ -129,7 +130,7 @@ describe('Backprop Builder app', () => {
   })
 
   it('shows a foldable model code view and navigates from a calculation to the canvas', async () => {
-    const { container } = render(<App initialGraph={createModelPreset('linear')} presetKind="linear" />)
+    const { container } = render(<App initialGraph={createModelPreset('linear')} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Code' }))
     const outline = screen.getByRole('region', { name: 'Model code' })
     expect(outline).toBeInTheDocument()
@@ -206,7 +207,7 @@ describe('Backprop Builder app', () => {
       render(<App />)
 
       fireFileMenuItem(/^Starter$/i)
-      fireEvent.click(screen.getByRole('button', { name: /Show visualization/i }))
+      fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
       const initialPrediction = visualizationPredictionPath()
 
       fireEvent.change(screen.getByDisplayValue('0.5'), { target: { value: '1' } })

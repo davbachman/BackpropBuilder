@@ -6,7 +6,7 @@ import { GraphCanvas } from './GraphCanvas'
 import { createModelPreset } from '../domain/modelPresets'
 import { setVisualGroupExpanded } from '../domain/grouping'
 import { projectDenseNeurons } from '../domain/neuronProjection'
-import { compactVisualHierarchy } from '../domain/continuousScene'
+import { compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene } from '../domain/continuousScene'
 import type { GraphModel } from '../domain/types'
 import { LESSONS } from '../learning/presets'
 import { segmentCrossesRect } from '../domain/wireRouting'
@@ -81,13 +81,19 @@ function dragStop(nodes: Node[]) {
 describe('canvas movement gestures', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('searches block types at a blank click and places the chosen block at that click’s flow coordinates', () => {
+  it('opens the block picker on a blank-canvas double-click and places the chosen block there', () => {
     flow.screenToFlowPosition.mockImplementationOnce(() => ({ x: 417, y: -83 }))
-    const { getByRole, queryByRole, onCreateNode, onSelectionChange } = mountCanvas(createModelPreset('blank'))
+    const { container, getByRole, queryByRole, onCreateNode, onSelectionChange } = mountCanvas(createModelPreset('blank'))
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    container.querySelector('.flow-shell')!.append(pane)
     act(() => flow.props!.onPaneClick!(new MouseEvent('click', { clientX: 523, clientY: 186 }) as unknown as ReactMouseEvent))
+    expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
+    expect(onSelectionChange).toHaveBeenCalledWith({ nodeIds: [] })
+    fireEvent.doubleClick(pane, { clientX: 523, clientY: 186 })
     expect(getByRole('dialog', { name: 'Add a block' })).toBeInTheDocument()
     expect(getByRole('searchbox', { name: 'Search blocks' })).toHaveFocus()
-    expect(onSelectionChange).toHaveBeenCalledWith({ nodeIds: [] })
+    expect(flow.props!.zoomOnDoubleClick).toBe(false)
     fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'convol' } })
     expect(getByRole('option', { name: /Convolution/ })).toBeInTheDocument()
     fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
@@ -96,11 +102,52 @@ describe('canvas movement gestures', () => {
   })
 
   it('dismisses the blank-canvas block picker with Escape', () => {
-    const { getByRole, queryByRole, onCreateNode } = mountCanvas(createModelPreset('blank'))
-    act(() => flow.props!.onPaneClick!(new MouseEvent('click', { clientX: 100, clientY: 100 }) as unknown as ReactMouseEvent))
+    const { container, getByRole, queryByRole, onCreateNode } = mountCanvas(createModelPreset('blank'))
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    container.querySelector('.flow-shell')!.append(pane)
+    fireEvent.doubleClick(pane, { clientX: 100, clientY: 100 })
     fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Escape' })
     expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
     expect(onCreateNode).not.toHaveBeenCalled()
+  })
+
+  it('adds a block to the visible transformer region at that region’s scale', () => {
+    const graph = createModelPreset('block')
+    const scene = layoutContinuousScene(compactVisualHierarchy(graph))
+    const rect = scene.groups.get('blocks.0.norm1')!
+    const position = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+    graph.view = { ...graph.view!, viewport: { x: 0, y: 0, zoom: continuousSceneMaxZoom(scene) } }
+    flow.screenToFlowPosition.mockImplementationOnce(() => position)
+    const { container, getByRole, onCreateNode } = mountCanvas(graph)
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    container.querySelector('.flow-shell')!.append(pane)
+    fireEvent.doubleClick(pane, { clientX: 450, clientY: 300 })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'add' } })
+    fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
+    expect(onCreateNode).toHaveBeenCalledExactlyOnceWith('add', position, 'blocks.0.norm1')
+  })
+
+  it('uses a close-up scale when adding to empty canvas outside a module', () => {
+    const graph = createModelPreset('block')
+    const scene = layoutContinuousScene(compactVisualHierarchy(graph))
+    graph.view = { ...graph.view!, viewport: { x: 0, y: 0, zoom: continuousSceneMaxZoom(scene) } }
+    const position = { x: -1000, y: -1000 }
+    flow.screenToFlowPosition.mockImplementationOnce(() => position)
+    const { container, getByRole, onCreateNode } = mountCanvas(graph)
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    container.querySelector('.flow-shell')!.append(pane)
+    fireEvent.doubleClick(pane, { clientX: 450, clientY: 300 })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: 'mean' } })
+    fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
+    expect(onCreateNode).toHaveBeenCalledOnce()
+    expect(onCreateNode.mock.calls[0][0]).toBe('mean')
+    expect(onCreateNode.mock.calls[0][1]).toEqual(position)
+    expect(onCreateNode.mock.calls[0][2]).toBeUndefined()
+    expect(onCreateNode.mock.calls[0][3]).toBeGreaterThan(0)
+    expect(onCreateNode.mock.calls[0][3]).toBeLessThan(1)
   })
 
   it('keeps blocks and the camera still through connection edits until Compact layout is requested', () => {

@@ -30,14 +30,14 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
       if (!expanded.has(group.id)) {
         const neuron = group.kind === 'neuron'
         const stage = tower && !parent
-        return { id: group.id, group, memberIds: group.nodeIds, width: stage ? 420 : neuron && !nestedCards ? 126 : 238, height: stage && !nestedCards ? 84 : neuron && !nestedCards ? 152 : 172, x: 0, y: 0 }
+        return { id: group.id, group, memberIds: group.nodeIds, width: stage ? 420 : neuron && !nestedCards ? 126 : 238, height: stage && !nestedCards ? 84 : neuron && !nestedCards ? 152 : group.detail?.userCreated && group.kind === 'module' ? 136 : 172, x: 0, y: 0 }
       }
       const nested = layoutLevel(group)
       const width = Math.max(240, ...nested.map((item) => item.x + item.width)) + 56
       const height = Math.max(130, ...nested.map((item) => item.y + item.height)) + 94
       return { id: group.id, group, memberIds: group.nodeIds, nested, width, height, x: 0, y: 0 }
     })
-    items.push(...ownNodes.map((node) => ({ id: node.id, node, memberIds: [node.id], width: coordinates ? 112 : 176, height: coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112, x: 0, y: 0 })))
+    items.push(...ownNodes.map((node) => ({ id: node.id, node, memberIds: [node.id], width: coordinates ? 112 : 176, height: node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112, x: 0, y: 0 })))
     const owner = new Map(items.flatMap((item) => item.memberIds.map((id) => [id, item.id] as const)))
     const incoming = new Map(items.map((item) => [item.id, new Set<string>()]))
     const outgoing = new Map(items.map((item) => [item.id, new Set<string>()]))

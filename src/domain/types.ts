@@ -117,10 +117,13 @@ export interface GraphGroup {
 }
 
 export interface GraphViewState {
+  canvasStyle?: 'builder' | 'architecture'
   semanticZoom?: boolean
   inspectedNeuron?: { groupId: string; unitIndex: number; row: number }
   /** User adjustments to semantic auto-layout; group keys use `visual-group:`. */
   layoutOffsets?: Record<string, Position>
+  /** Manually placed calculations keep their scale and location in the continuous scene. */
+  manualNodePlacements?: Record<string, { parentId?: string; offset: Position; scale?: number }>
   /** Connection reference for layout only. Live wiring can change independently. */
   layoutEdges?: Array<Pick<GraphEdge, 'id' | 'source' | 'target' | 'inputSlot' | 'sourceSlot'>>
   expandedGroupIds: string[]

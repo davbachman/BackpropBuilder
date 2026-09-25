@@ -206,12 +206,6 @@
   color: #fff;
 }
 
-.panel-toggle-button.is-active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
 .right-panel p {
   color: var(--muted-strong);
   font-size: 13px;
@@ -736,6 +730,26 @@
   font-size: 12px;
   font-weight: 800;
 }
+
+.visualization-losses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.visualization-losses > div {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fbf9fd;
+}
+
+.visualization-losses span,
+.visualization-losses small { color: var(--muted-strong); font-size: 11px; }
+.visualization-losses output { color: var(--accent); font: 600 19px var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .legend-dot {
   width: 9px;

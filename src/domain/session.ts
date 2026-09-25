@@ -182,9 +182,13 @@ function isGraphEdge(value: unknown): value is GraphEdge {
 
 function isGraphView(value: unknown): boolean {
   if (!isRecord(value)) return false
-  return (value.semanticZoom === undefined || typeof value.semanticZoom === 'boolean') && Array.isArray(value.expandedGroupIds) && value.expandedGroupIds.every((id) => typeof id === 'string') &&
+  return (value.canvasStyle === undefined || value.canvasStyle === 'builder' || value.canvasStyle === 'architecture') &&
+    (value.semanticZoom === undefined || typeof value.semanticZoom === 'boolean') && Array.isArray(value.expandedGroupIds) && value.expandedGroupIds.every((id) => typeof id === 'string') &&
     (value.focusedGroupId === undefined || typeof value.focusedGroupId === 'string') &&
     (value.layoutOffsets === undefined || (isRecord(value.layoutOffsets) && Object.values(value.layoutOffsets).every(isPosition))) &&
+    (value.manualNodePlacements === undefined || (isRecord(value.manualNodePlacements) && Object.values(value.manualNodePlacements).every(placement =>
+      isRecord(placement) && (placement.parentId === undefined || typeof placement.parentId === 'string') && isPosition(placement.offset) &&
+      (placement.scale === undefined || (isFiniteNumber(placement.scale) && placement.scale > 0))))) &&
     (value.layoutEdges === undefined || (Array.isArray(value.layoutEdges) && value.layoutEdges.every(isGraphEdge))) &&
     (value.inspectedNeuron === undefined || (isRecord(value.inspectedNeuron) && typeof value.inspectedNeuron.groupId === 'string' && isNonNegativeInteger(value.inspectedNeuron.unitIndex) && isNonNegativeInteger(value.inspectedNeuron.row))) &&
     (value.viewport === undefined || (isRecord(value.viewport) && isPosition(value.viewport) && isFiniteNumber(value.viewport.zoom) && value.viewport.zoom > 0))

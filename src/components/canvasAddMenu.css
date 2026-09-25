@@ -9,3 +9,8 @@
 .canvas-add-results small { color: #9b8ca9; font-size: 9px; }
 .canvas-add-results p { margin: 0; padding: 12px; color: #9b8ca9; font-size: 11px; }
 .canvas-add-hint { padding: 8px 12px; border-top: 1px solid #eee8f3; color: #a197aa; font-size: 9px; }
+.canvas-group-rename { position: absolute; z-index: 41; display: flex; align-items: flex-end; gap: 8px; width: 232px; max-width: calc(100% - 16px); padding: 10px; border: 1px solid #dacee7; border-radius: 10px; background: #fff; box-shadow: 0 16px 45px #30203d2b; }
+.canvas-group-rename label { display: grid; flex: 1; min-width: 0; gap: 4px; color: #776681; font-size: 9px; font-weight: 600; }
+.canvas-group-rename input { min-width: 0; width: 100%; box-sizing: border-box; padding: 6px 7px; border: 1px solid #dacee7; border-radius: 6px; color: #382b46; background: #fff; font-size: 11px; }
+.canvas-group-rename input:focus { outline: 2px solid #bda4d7; outline-offset: 1px; }
+.canvas-group-rename button { min-height: 28px; padding: 5px 8px; border: 1px solid #72509c; border-radius: 6px; color: #fff; background: #72509c; font-size: 10px; }

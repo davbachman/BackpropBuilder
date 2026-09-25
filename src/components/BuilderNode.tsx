@@ -97,7 +97,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
   return (
     <div
       className={`builder-node node-${node.type} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
-      style={isFlexibleInputNode ? { height: nodeHeight } : undefined}
+      style={{ ...(isFlexibleInputNode ? { height: nodeHeight } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
       {Array.from({ length: inputCount }).map((_, index) => (
         <Handle
@@ -106,7 +106,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
           type="target"
           position={Position.Left}
           className="node-handle"
-          style={{ top: `${FLEX_INPUT_HEIGHT_STEP + index * FLEX_INPUT_HEIGHT_STEP}px` }}
+          style={node.type === 'loss' ? { top: `${(index + 1) * 100 / (inputCount + 1)}%` } : { top: `${FLEX_INPUT_HEIGHT_STEP + index * FLEX_INPUT_HEIGHT_STEP}px` }}
         />
       ))}
       {canAddInput ? (
