@@ -1,6 +1,6 @@
 import { useId, useMemo, type ReactElement } from 'react'
 import { formatNumber, forwardPass } from '../domain/engine'
-import { datasetForNode } from '../domain/datasets'
+import { datasetForNode, datasetTargetSlotForNode } from '../domain/datasets'
 import { evaluateDataset } from '../domain/datasetTraining'
 import { isScalarTensor, tensorSize, tensorValue, toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from '../domain/types'
@@ -513,8 +513,11 @@ function fullNumericDatasetValues(graph: GraphModel, inputs: GraphNode[], target
   if (!source) return undefined
   const dataset = datasetForNode(source)
   if (dataset.examples) return undefined
-  const columns = [...dataset.featureValues, dataset.targetValue]
-  const values = ports.map(port => columns[port?.sourceSlot ?? 0])
+  const targetSlot = datasetTargetSlotForNode(source)
+  const values = ports.map(port => {
+    const slot = port?.sourceSlot ?? 0
+    return slot === targetSlot ? dataset.targetValue : dataset.featureValues[slot < targetSlot ? slot : slot - 1]
+  })
   if (values.some(value => !value || value.data.length !== dataset.targetValue.data.length)) return undefined
   return { values, sourceId: source.id }
 }

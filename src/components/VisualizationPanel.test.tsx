@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import appCss from '../App.css?raw'
 import { forwardPass } from '../domain/engine'
 import { createModelPreset } from '../domain/modelPresets'
+import { parseCustomCsv } from '../domain/customCsv'
 import { scalarValue, tensorValue } from '../domain/tensor'
 import type { GraphModel } from '../domain/types'
 import { VisualizationPanel } from './VisualizationPanel'
@@ -65,7 +66,36 @@ describe('VisualizationPanel', () => {
     expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(20)
     expect(screen.getByText('20 points')).toBeInTheDocument()
   })
+
+  it('uses the selected CSV target column even when it is not the last column', () => {
+    const last = render(<VisualizationPanel graph={customCsvGraph('feature,target\n1,10\n2,20\n3,30\n', 0, 1)} />)
+    const expected = targetPointPositions(last.container)
+    last.unmount()
+
+    const first = render(<VisualizationPanel graph={customCsvGraph('target,feature\n10,1\n20,2\n30,3\n', 1, 0)} />)
+    expect(targetPointPositions(first.container)).toEqual(expected)
+  })
 })
+
+function customCsvGraph(csvText: string, featureSlot: number, targetSlot: number): GraphModel {
+  const customCsv = parseCustomCsv(csvText, 'ordered.csv')
+  customCsv.targetColumn = targetSlot
+  return {
+    learningRate: 0.1,
+    nodes: [
+      { id: 'dataset', type: 'dataset', label: 'Dataset', position: { x: 0, y: 0 }, params: { dataset: 'custom-csv', customCsv, datasetMode: 'batch', datasetSplit: 'all' } },
+      { id: 'x', type: 'input', label: 'x', position: { x: 200, y: 0 }, params: {} },
+      { id: 'y', type: 'target', label: 'y', position: { x: 200, y: 180 }, params: {} },
+      { id: 'loss', type: 'loss', label: 'loss', position: { x: 400, y: 80 }, params: { loss: 'mse' } },
+    ],
+    edges: [
+      { id: 'feature', source: 'dataset', sourceSlot: featureSlot, target: 'x', inputSlot: 0 },
+      { id: 'prediction', source: 'x', target: 'loss', inputSlot: 0 },
+      { id: 'target', source: 'dataset', sourceSlot: targetSlot, target: 'y', inputSlot: 0 },
+      { id: 'target-loss', source: 'y', target: 'loss', inputSlot: 1 },
+    ],
+  }
+}
 
 function targetPointPositions(container: HTMLElement): Array<{ cx: string | null; cy: string | null }> {
   return Array.from(container.querySelectorAll('.visualization-target-point')).map((point) => ({
