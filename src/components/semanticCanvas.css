@@ -154,3 +154,16 @@
 .visual-group-node.semantic-group.is-active.is-selected { border-color: #b99b72; box-shadow: inset 3px 0 #b99b72; }
 .continuous-group-heading .visual-group-node.semantic-group.is-expanded.is-selected { border: 0; box-shadow: none; }
 .continuous-group-outline.is-selected { border-color: #8057af; background: #8057af05; }
+.semantic-operation.has-error,
+.semantic-operation.has-error.is-selected,
+.semantic-operation.has-error.is-active {
+  border: 2px solid #c94e58;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(201, 78, 88, 0.16), 0 8px 20px rgba(95, 35, 42, 0.1);
+}
+.visual-group-node.semantic-group.has-error:not(.is-expanded),
+.continuous-card-cover .visual-group-node.semantic-group.has-error:not(.is-expanded) {
+  border: 2px solid #c94e58;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(201, 78, 88, 0.16), 0 8px 20px rgba(95, 35, 42, 0.1);
+}

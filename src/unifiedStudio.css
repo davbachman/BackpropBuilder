@@ -267,6 +267,14 @@
   border-radius: 8px;
   margin: 10px 0;
 }
+.node-issues {
+  border-color: #e8b8bd;
+  background: #fff8f8;
+  color: #88363d;
+}
+.node-issues p,
+.graph-issues p { margin: 5px 0 0; }
+.validation-hint { margin: 6px 0 13px; color: #9a5b62; font-size: 11px; line-height: 1.5; }
 .operation-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -78,6 +78,7 @@ const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode, semanticNode
 const edgeTypes = { builderEdge: BuilderEdge }
 const GROUP_NODE_ID_PREFIX = 'visual-group:'
 const EMPTY_SELECTED_NODE_IDS: string[] = []
+const EMPTY_PROBLEM_NODE_IDS = new Set<string>()
 const INITIAL_FIT_OPTIONS = { padding: 0.2 }
 
 interface CanvasSelection {
@@ -93,6 +94,7 @@ interface GraphCanvasProps {
   displayGraph?: GraphModel
   activeStep?: EvaluationTraceStep
   selectedNodeIds?: string[]
+  problemNodeIds?: ReadonlySet<string>
   selectedGroupId?: string
   selectedEdgeId?: string
   focusRequest?: { kind: 'group' | 'node'; id: string; serial: number }
@@ -132,6 +134,7 @@ function GraphCanvasInner({
   displayGraph,
   activeStep,
   selectedNodeIds = EMPTY_SELECTED_NODE_IDS,
+  problemNodeIds = EMPTY_PROBLEM_NODE_IDS,
   selectedGroupId,
   selectedEdgeId,
   focusRequest,
@@ -396,6 +399,7 @@ function GraphCanvasInner({
             }),
             showGradient: semantic ? showGradient && phase === 'backward' : showGradient,
             active: group.nodeIds.includes(activeStep?.nodeId ?? ''),
+            validationError: group.nodeIds.some(id => problemNodeIds.has(id)),
             onToggle: toggleGroup,
           },
         }
@@ -427,6 +431,7 @@ function GraphCanvasInner({
             lossKind: node.type === 'loss' ? lossKindForNode(node, renderedGraph) : undefined,
             lossOptions: node.type === 'loss' ? lossOptionsForNode(node, renderedGraph) : undefined,
             active: activeStep?.nodeId === node.id,
+            validationError: problemNodeIds.has(node.id),
             hasIncomingValue: renderedGraph.edges.some((edge) => edge.target === node.id),
             onFlexibleInputAdd: addFlexibleInput,
             onValueChange: onNodeValueChange,
@@ -455,6 +460,7 @@ function GraphCanvasInner({
       renderedGraph,
       selectedGroupId,
       selectedNodeIdSet,
+      problemNodeIds,
       showGradient,
       showMath,
       layout,

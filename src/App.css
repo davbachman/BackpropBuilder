@@ -334,6 +334,14 @@
   border-color: rgba(124, 58, 237, 0.38);
 }
 
+.builder-node.has-error,
+.builder-node.has-error.is-selected,
+.builder-node.has-error.is-active {
+  border: 2px solid #c94e58;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(201, 78, 88, 0.16), 0 8px 20px rgba(95, 35, 42, 0.1);
+}
+
 .visual-group-node {
   box-sizing: border-box;
   position: relative;
@@ -354,6 +362,12 @@
 .visual-group-node.is-selected {
   border-color: var(--update);
   box-shadow: 0 0 0 3px var(--update-soft), var(--shadow);
+}
+
+.visual-group-node.has-error:not(.is-expanded) {
+  border: 2px solid #c94e58;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(201, 78, 88, 0.16), 0 8px 20px rgba(95, 35, 42, 0.1);
 }
 
 .visual-group-title-row {

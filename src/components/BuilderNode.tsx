@@ -34,6 +34,7 @@ export interface BuilderNodeData extends Record<string, unknown> {
   lossKind?: LossKind
   lossOptions?: Array<{ kind: LossKind; label: string }>
   active: boolean
+  validationError?: boolean
   hasIncomingValue: boolean
   onFlexibleInputAdd: (nodeId: string) => void
   onValueChange: (nodeId: string, value: TensorValue) => void
@@ -112,7 +113,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
 
   return (
     <div
-      className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
+      className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError ? 'has-error' : ''}`}
+      aria-invalid={data.validationError || undefined}
       style={{ ...(variableInputLayout ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
       {Array.from({ length: inputCount }).map((_, index) => (

@@ -130,6 +130,36 @@ describe('Backprop Builder app', () => {
     expect(screen.queryByText(/Add exactly one loss node/i)).not.toBeInTheDocument()
   })
 
+  it('marks an invalid block and shows its error only when selected', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'a', type: 'input', label: 'a', params: { value: tensorValue([3], [1, 2, 3]) }, position: { x: 40, y: 50 } },
+        { id: 'b', type: 'input', label: 'b', params: { value: tensorValue([3], [4, 5, 6]) }, position: { x: 40, y: 230 } },
+        { id: 'join', type: 'concat', label: 'Join', params: { axis: 1, inputCount: 2 }, position: { x: 330, y: 130 } },
+      ],
+      edges: [
+        { id: 'a-join', source: 'a', target: 'join', inputSlot: 0 },
+        { id: 'b-join', source: 'b', target: 'join', inputSlot: 1 },
+      ],
+    }
+    const { container } = render(<App initialGraph={graph} />)
+    const joinCard = () => container.querySelector('.react-flow__node[data-id="join"] .builder-node')
+    expect(joinCard()).toHaveClass('has-error')
+    expect(container.querySelector('.react-flow__node[data-id="a"] .builder-node')).not.toHaveClass('has-error')
+    expect(screen.queryByRole('alert', { name: 'Selected block errors' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Visualization' }))
+    fireEvent.click(joinCard()!.querySelector('.node-title-row strong')!)
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('alert', { name: 'Selected block errors' })).toHaveTextContent('Axis 1 does not exist in a vector')
+
+    fireEvent.change(screen.getByLabelText('axis'), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply operation' }))
+    expect(joinCard()).not.toHaveClass('has-error')
+    expect(screen.queryByRole('alert', { name: 'Selected block errors' })).not.toBeInTheDocument()
+  })
+
   it('locks the workspace to the viewport and makes sidebars scroll internally', () => {
     const { container } = render(<App />)
 

@@ -34,13 +34,13 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
   }),
 }))
 
-function mountCanvas(graph: GraphModel, displayGraph?: GraphModel) {
+function mountCanvas(graph: GraphModel, displayGraph?: GraphModel, problemNodeIds?: ReadonlySet<string>) {
   const onGraphChange = vi.fn()
   const onViewChange = vi.fn()
   const onSelectionChange = vi.fn()
   const onCreateNode = vi.fn()
   const canvas = (current: GraphModel) => <GraphCanvas
-    graph={current} displayGraph={displayGraph} showMath showGradient={false} phase="edit"
+    graph={current} displayGraph={displayGraph} problemNodeIds={problemNodeIds} showMath showGradient={false} phase="edit"
     onGraphChange={onGraphChange} onViewChange={onViewChange} onSelectionChange={onSelectionChange}
     onCreateNode={onCreateNode} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()}
     onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()}
@@ -212,6 +212,15 @@ describe('canvas movement gestures', () => {
     expect(flow.props!.nodes!.map(node => [node.id, node.position])).toEqual(positions)
     expect(flow.props!.edges!.map(edge => [edge.id, edge.data?.route])).toEqual(initialEdges)
     expect(flow.fitView).not.toHaveBeenCalled()
+  })
+
+  it('marks a collapsed parent card when an inner calculation has an error', () => {
+    const graph = createModelPreset('linear')
+    const root = compactVisualHierarchy(graph).groups!.find(group => !group.parentId)!
+    const memberId = root.nodeIds[0]
+    mountCanvas(graph, undefined, new Set([memberId]))
+    expect(nodeById(memberId).data.validationError).toBe(true)
+    expect(nodeById(`visual-group:${root.id}`).data.validationError).toBe(true)
   })
 
   it('moves a revealed continuous card and its actual descendants together', () => {

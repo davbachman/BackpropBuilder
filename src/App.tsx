@@ -100,6 +100,7 @@ import {
   visibleGraphForTrace,
   visibleStepEdgeIds,
 } from './domain/traceVisibility'
+import { issueNodeIds, problemNodeIds } from './domain/validationPresentation'
 import type {
   ActivationKind,
   CustomCsvData,
@@ -214,9 +215,10 @@ function App({
   const pendingCustomCsvNodeId = useRef<string | undefined>(undefined)
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
-  const blockingIssues = validationIssues.filter(
+  const blockingIssues = useMemo(() => validationIssues.filter(
     (issue) => issue.code !== 'disconnected',
-  )
+  ), [validationIssues])
+  const problemNodes = useMemo(() => problemNodeIds(graph, blockingIssues), [graph, blockingIssues])
   const hasLoss = graph.nodes.some(isLossNode)
   const heldOutSample = isHeldOutSample(graph)
   const activeStep = traceSteps[traceIndex]
@@ -240,6 +242,16 @@ function App({
   const selectedGroup = graph.groups?.find(
     (group) => group.id === selectedGroupId,
   )
+  const selectedIssueNodeIds = new Set([
+    ...selectedNodeIds,
+    ...(selectedGroup?.nodeIds ?? []),
+    ...(selectedNodeId && projection.bindings[selectedNodeId] ? [projection.bindings[selectedNodeId].nodeId] : []),
+  ])
+  const selectedBlockingIssues = blockingIssues.filter(issue =>
+    (issue.edgeId && issue.edgeId === selectedEdgeId)
+    || issueNodeIds(graph, issue).some(id => selectedIssueNodeIds.has(id)),
+  ).filter(issue => issue.code !== 'invalid-arity' || issue.edgeId || !blockingIssues.some(other => other.code === 'missing-input' && other.nodeId === issue.nodeId))
+  const globalBlockingIssues = blockingIssues.filter(issue => issueNodeIds(graph, issue).length === 0)
   const inspectedNeuron = graph.view?.inspectedNeuron
   const selectedCodeGroupId = selectedGroupId && (
     (inspectedNeuron?.groupId === selectedGroupId
@@ -344,8 +356,13 @@ function App({
       )
       if (selection.nodeIds.length > 0 || selection.groupId)
         setPendingNodeType(undefined)
+      const groupNodeIds = graph.groups?.find(group => group.id === selection.groupId)?.nodeIds ?? []
+      if ([...selection.nodeIds, ...groupNodeIds].some(id => problemNodes.has(projection.bindings[id]?.nodeId ?? id))) {
+        setRightOpen(true)
+        setRightTab('details')
+      }
     },
-    [],
+    [graph.groups, problemNodes, projection.bindings],
   )
 
   const copySelectionToClipboard = useCallback((): boolean => {
@@ -511,7 +528,7 @@ function App({
       selectSingleNode(updateSummary.nodeId)
     }
   }, [
-    blockingIssues.length,
+    blockingIssues,
     graph,
     hasLoss,
     heldOutSample,
@@ -547,7 +564,7 @@ function App({
     setCurrentLoss(result.loss ?? null)
     selectSingleNode(updateSummary.nodeId)
   }, [
-    blockingIssues.length,
+    blockingIssues,
     graph,
     hasLoss,
     heldOutSample,
@@ -594,7 +611,7 @@ function App({
     setCurrentLoss(loss)
     selectSingleNode(summaryStep.nodeId)
   }, [
-    blockingIssues.length,
+    blockingIssues,
     currentLoss,
     graph,
     hasLoss,
@@ -1262,6 +1279,7 @@ function App({
       <GraphCanvas
         graph={graph}
         displayGraph={displayGraph}
+        problemNodeIds={problemNodes}
         activeStep={canvasStep}
         selectedNodeIds={selectedNodeIds}
         selectedGroupId={selectedGroupId}
@@ -1346,6 +1364,15 @@ function App({
             {executionError}
           </div>
         )}
+        {globalBlockingIssues.length > 0 && <section className="graph-issues" role="alert" aria-label="Model errors">
+          <strong>Model issue</strong>
+          {globalBlockingIssues.map((issue, index) => <p key={`${issue.code}-${index}`}>{issue.message}</p>)}
+        </section>}
+        {selectedBlockingIssues.length > 0 && <section className="graph-issues node-issues" role="alert" aria-label="Selected block errors">
+          <strong>{selectedGroup ? 'Problem inside this block' : 'Fix this block'}</strong>
+          {selectedBlockingIssues.map((issue, index) => <p key={`${issue.code}-${issue.nodeId ?? issue.edgeId}-${index}`}>{issue.message}</p>)}
+        </section>}
+        {problemNodes.size > 0 && !selectedNodeId && !selectedGroupId && !selectedEdgeId && <p className="validation-hint">Select a red block to see what needs fixing.</p>}
         {heldOutSample && (
           <p className="coordinate-note">
             Held-out example: inspect its prediction and gradients. Parameter
@@ -1457,14 +1484,6 @@ function App({
           onGroup={mergeSelectedNodes}
           selectionCount={selectedNodeIds.length}
         />}
-        {blockingIssues.length > 0 && (
-          <div className="graph-issues" role="status">
-            <strong>Complete the connections</strong>
-            {blockingIssues.slice(0, 4).map((issue, index) => (
-              <p key={index}>{issue.message}</p>
-            ))}
-          </div>
-        )}
         <section className="inspector-card">
           <p className="eyebrow">Current step</p>
           <h3>{activeStep?.title ?? 'Ready to evaluate'}</h3>

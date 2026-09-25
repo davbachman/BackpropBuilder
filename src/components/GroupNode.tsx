@@ -17,6 +17,7 @@ export interface GroupNodeData extends Record<string, unknown> {
   outputMetrics: GroupOutputMetric[]
   showGradient: boolean
   active: boolean
+  validationError?: boolean
   expanded: boolean
   onToggle: (groupId: string) => void
   semantic?: boolean
@@ -58,7 +59,8 @@ export function GroupNode(props: NodeProps): ReactElement {
 
   return (
     <div
-      className={`visual-group-node ${data.semantic ? 'semantic-group' : ''} ${data.modelStage ? 'is-model-stage' : ''} group-kind-${kind} ${data.expanded ? 'is-expanded' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''}`}
+      className={`visual-group-node ${data.semantic ? 'semantic-group' : ''} ${data.modelStage ? 'is-model-stage' : ''} group-kind-${kind} ${data.expanded ? 'is-expanded' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError && !data.expanded ? 'has-error' : ''}`}
+      aria-invalid={data.validationError && !data.expanded || undefined}
       style={{
         width: group.dimensions.width,
         height: group.dimensions.height,
