@@ -34,8 +34,6 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
   const groups = graph.groups ?? []
   const edges = graph.view?.layoutEdges ?? graph.edges
   const expanded = new Set(graph.view?.expandedGroupIds ?? [])
-  const cnn = groups.some((group) => group.kind === 'cnn' && !group.parentId)
-  const tower = cnn || groups.some((group) => group.kind === 'transformer-block' && !group.parentId)
   type Item = { id: string; memberIds: string[]; width: number; height: number; group?: GraphGroup; node?: GraphNode; nested?: Item[]; x: number; y: number }
 
   function layoutLevel(parent?: GraphGroup): Item[] {
@@ -46,8 +44,7 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     const items: Item[] = children.map((group) => {
       if (!expanded.has(group.id)) {
         const neuron = group.kind === 'neuron'
-        const stage = tower && !parent
-        return { id: group.id, group, memberIds: group.nodeIds, width: stage ? 420 : neuron && !nestedCards ? 126 : 238, height: stage && !nestedCards ? 84 : neuron && !nestedCards ? 152 : group.detail?.userCreated && group.kind === 'module' ? 136 : 172, x: 0, y: 0 }
+        return { id: group.id, group, memberIds: group.nodeIds, width: neuron && !nestedCards ? 126 : 238, height: neuron && !nestedCards ? 152 : group.detail?.userCreated && group.kind === 'module' ? 136 : 172, x: 0, y: 0 }
       }
       const nested = layoutLevel(group)
       const width = Math.max(240, ...nested.map((item) => item.x + item.width)) + 56
@@ -89,7 +86,7 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     // Put learned constants beside the operation they feed, instead of sending
     // every parameter wire across the entire region from column zero.
     for (const item of items) {
-      if (!item.node || !['weight', 'bias', ...(parent ? ['input'] : []), ...(tower && !parent ? ['target'] : [])].includes(item.node.type) || incoming.get(item.id)?.size) continue
+      if (!item.node || !['weight', 'bias', ...(parent ? ['input'] : [])].includes(item.node.type) || incoming.get(item.id)?.size) continue
       const consumers = [...(outgoing.get(item.id) ?? [])]
       if (consumers.length) rank.set(item.id, Math.max(0, Math.min(...consumers.map(id => rank.get(id) ?? 1)) - 1))
     }
@@ -140,17 +137,6 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     }
     const columnHeights = [...columns.values()].map((column) => column.reduce((sum, item) => sum + item.height, 0) + (column.length - 1) * ROW_GAP)
     const maxHeight = Math.max(0, ...columnHeights)
-    if (tower && !parent) {
-      const stageGap = 64
-      const maxWidth = Math.max(0, ...[...columns.values()].map((column) => column.reduce((sum, item) => sum + item.width, 0) + (column.length - 1) * stageGap))
-      let y = 0
-      for (const [, row] of ordered) {
-        let x = (maxWidth - row.reduce((sum, item) => sum + item.width, 0) - (row.length - 1) * stageGap) / 2
-        for (const item of row) { item.x = x; item.y = y; x += item.width + stageGap }
-        y += Math.max(...row.map((item) => item.height)) + 48
-      }
-      return items
-    }
     let x = 0
     for (const [, column] of ordered) {
       const height = column.reduce((sum, item) => sum + item.height, 0) + (column.length - 1) * ROW_GAP

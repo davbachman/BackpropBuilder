@@ -21,7 +21,6 @@ export interface GroupNodeData extends Record<string, unknown> {
   expanded: boolean
   onToggle: (groupId: string) => void
   semantic?: boolean
-  modelStage?: boolean
   unitCount?: number
   unitValues?: number[]
   attentionWeights?: TensorValue
@@ -59,7 +58,7 @@ export function GroupNode(props: NodeProps): ReactElement {
 
   return (
     <div
-      className={`visual-group-node ${data.semantic ? 'semantic-group' : ''} ${data.modelStage ? 'is-model-stage' : ''} group-kind-${kind} ${data.expanded ? 'is-expanded' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError && !data.expanded ? 'has-error' : ''}`}
+      className={`visual-group-node ${data.semantic ? 'semantic-group' : ''} group-kind-${kind} ${data.expanded ? 'is-expanded' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError && !data.expanded ? 'has-error' : ''}`}
       aria-invalid={data.validationError && !data.expanded || undefined}
       style={{
         width: group.dimensions.width,
@@ -71,9 +70,9 @@ export function GroupNode(props: NodeProps): ReactElement {
           key={`in-${index}`}
           id={`in-${index}`}
           type="target"
-          position={data.modelStage ? Position.Top : Position.Left}
+          position={Position.Left}
           className="node-handle group-handle"
-          style={data.modelStage ? { left: handleTop(index, data.inputCount) } : { top: handleTop(index, data.inputCount) }}
+          style={{ top: handleTop(index, data.inputCount) }}
         />
       ))}
       <div className="visual-group-title-row">
@@ -105,9 +104,9 @@ export function GroupNode(props: NodeProps): ReactElement {
           key={`out-${index}`}
           id={`out-${index}`}
           type="source"
-          position={data.modelStage ? Position.Bottom : Position.Right}
+          position={Position.Right}
           className="node-handle source-handle group-handle"
-          style={data.modelStage ? { left: handleTop(index, data.outputCount) } : { top: handleTop(index, data.outputCount) }}
+          style={{ top: handleTop(index, data.outputCount) }}
         />
       ))}
     </div>

@@ -1,5 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react'
-import type { Node, ReactFlowProps } from '@xyflow/react'
+import { Position, type Node, type ReactFlowProps } from '@xyflow/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphCanvas } from './GraphCanvas'
@@ -9,7 +9,6 @@ import { projectDenseNeurons } from '../domain/neuronProjection'
 import { compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene } from '../domain/continuousScene'
 import type { GraphModel } from '../domain/types'
 import { LESSONS } from '../learning/presets'
-import { segmentCrossesRect } from '../domain/wireRouting'
 import { createNode } from '../domain/examples'
 import { placeCanvasNode } from '../domain/nodePlacement'
 
@@ -391,20 +390,30 @@ describe('canvas movement gestures', () => {
     expect(nodeById('placed').type).toBe('builderNode')
   })
 
-  it.each(LESSONS)('routes the wires of $id around other visible blocks at every hierarchy level', ({ id }) => {
+  it.each(['decoder', 'cnn'] as const)('uses side ports on $id groups like a blank builder', id => {
+    const graph = createModelPreset(id)
+    const group = graph.groups!.find(candidate => candidate.kind === (id === 'decoder' ? 'transformer-block' : 'cnn'))!
+    mountCanvas(graph)
+    const card = nodeById(`visual-group:${group.id}`)
+    expect(card.handles?.some(handle => handle.type === 'target')).toBe(true)
+    expect(card.handles?.some(handle => handle.type === 'source')).toBe(true)
+    expect(card.handles?.filter(handle => handle.type === 'target').every(handle => handle.position === Position.Left && handle.x === 0)).toBe(true)
+    expect(card.handles?.filter(handle => handle.type === 'source').every(handle => handle.position === Position.Right && handle.x === card.width)).toBe(true)
+  })
+
+  it.each(LESSONS)('draws direct builder curves at every hierarchy level of $id', ({ id }) => {
     const base = createModelPreset(id)
     if (!base.groups?.length) return
     base.view = { ...base.view!, expandedGroupIds: [], semanticZoom: false }
     const views = [base, ...(base.groups ?? []).map(group => setVisualGroupExpanded(base, group.id, true)), { ...base, view: { ...base.view!, expandedGroupIds: base.groups!.map(group => group.id) } }]
     for (const graph of views) {
       const { unmount } = mountCanvas(graph)
-      const obstacles = flow.props!.nodes!.filter(node => !node.data.expanded).map(node => ({ id: node.id, ...node.position, width: node.width!, height: node.height! }))
       for (const edge of flow.props!.edges!) {
         const route = edge.data?.route as { x: number; y: number }[]
-        expect(route?.length).toBeGreaterThan(1)
-        for (let i = 1; i < route.length; i++) for (const obstacle of obstacles) {
-          expect(segmentCrossesRect(route[i - 1], route[i], obstacle), `${id} ${graph.view?.focusedGroupId ?? 'overview'}: ${edge.id} crosses ${obstacle.id}`).toBe(false)
-        }
+        expect(route, `${id}: ${edge.id}`).toHaveLength(2)
+        expect(edge.data?.sourceSide).toMatch(/^(left|right|top|bottom)$/)
+        expect(edge.data?.targetSide).toMatch(/^(left|right|top|bottom)$/)
+        expect(route.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true)
       }
       unmount()
     }
@@ -470,10 +479,7 @@ describe('canvas movement gestures', () => {
     const node = nodeById(id)
     for (const edge of flow.props!.edges!) {
       const route = edge.data?.route as { x: number; y: number }[]
-      for (const obstacle of flow.props!.nodes!.filter(candidate => !candidate.data.expanded)) {
-        const rect = { id: obstacle.id, ...obstacle.position, width: obstacle.width!, height: obstacle.height! }
-        for (let i = 1; i < route.length; i++) expect(segmentCrossesRect(route[i - 1], route[i], rect), `${edge.id} crosses ${obstacle.id}`).toBe(false)
-      }
+      expect(route).toHaveLength(2)
     }
     dragStart([node])
     const moved = [displaced(node, -30, 40)]

@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { edgeSignalIntensity } from '../domain/edgeSignal'
 
-function renderEdge(data: Partial<BuilderEdgeData> = {}, selected = false) {
-  const props = { id: 'wire', source: 'a', target: 'b', sourceX: 0, sourceY: 80, targetX: 240, targetY: 80, sourcePosition: Position.Right, targetPosition: Position.Left, selected, data: { active: true, phase: 'forward', showGradient: false, label: 'Input → Product', ...data } } as EdgeProps
+function renderEdge(data: Partial<BuilderEdgeData> = {}, selected = false, y = 80) {
+  const props = { id: 'wire', source: 'a', target: 'b', sourceX: 0, sourceY: y, targetX: 240, targetY: y, sourcePosition: Position.Right, targetPosition: Position.Left, selected, data: { active: true, phase: 'forward', showGradient: false, label: 'Input → Product', ...data } } as EdgeProps
   return render(<svg><BuilderEdge {...props} /></svg>)
 }
 
@@ -40,49 +40,47 @@ describe('clean directional connection flow', () => {
     expect(onInspect).toHaveBeenLastCalledWith('wire')
   })
 
-  it('places bands on the exact residual path', () => {
+  it('places bands on the exact residual curve', () => {
     const { container } = renderEdge({ residual: true, forward: { shape: [], data: [1] } })
     const path = container.querySelector('path.builder-edge')!.getAttribute('d')
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('d')).toBe(path)
-    expect(path).toContain('L180,16')
+    expect(path).toContain('C')
   })
 
-  it('keeps backward flow bands on the routed path around blocks', () => {
-    const { container } = renderEdge({ phase: 'backward', gradient: { shape: [], data: [2] }, route: [
-      { x: 0, y: 80 }, { x: 40, y: 80 }, { x: 40, y: 20 }, { x: 200, y: 20 }, { x: 200, y: 80 }, { x: 240, y: 80 },
-    ] })
+  it('keeps backward flow bands on the same smooth curve', () => {
+    const { container } = renderEdge({ phase: 'backward', gradient: { shape: [], data: [2] } })
     const path = container.querySelector('path.builder-edge')!.getAttribute('d')
-    expect(path).toContain('Q40,20')
+    expect(path).toContain('C')
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('d')).toBe(path)
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('data-direction')).toBe('backward')
   })
 
-  it('draws grouped builder wires with broad bends and readable weight at overview zoom', () => {
+  it('draws grouped and ungrouped builder connections with the same curve', () => {
+    const plain = renderEdge({}, false, 0)
+    const plainPath = plain.container.querySelector('path.builder-edge')!.getAttribute('d')
+    plain.unmount()
     const { container } = renderEdge({ absoluteRoute: true, sceneScale: 1, cameraZoom: .6,
-      route: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 60 }, { x: 184, y: 60 }],
+      route: [{ x: 0, y: 80 }, { x: 240, y: 80 }], sourceSide: 'right', targetSide: 'left',
       forward: { shape: [], data: [1] },
     })
     const wire = container.querySelector('.builder-edge-flow')!
-    expect(wire.getAttribute('style')).toContain('--edge-scale: 1.4')
+    expect(wire.getAttribute('style')).toContain('--edge-scale: 1')
     const path = container.querySelector('path.builder-edge')!.getAttribute('d')!
-    expect(path).toContain('L44,0 Q80,0 80,30')
+    expect(path).toBe(plainPath)
+    expect(path).toContain('C')
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('d')).toBe(path)
   })
 
-  it('masks the crossing gap on both the wire and its moving bands at deep zoom', () => {
+  it('uses the same curve for a nested vertical connection and its moving bands', () => {
     const { container } = renderEdge({ absoluteRoute: true, sceneScale: .01, cameraZoom: 150,
-      route: [{ x: 12, y: 34 }, { x: 12, y: 35 }], crossings: { points: [{ x: 12, y: 34.5 }], gaps: [{ x: 12, y: 34.5 }] },
+      route: [{ x: 12, y: 34 }, { x: 12, y: 35 }], sourceSide: 'bottom', targetSide: 'top',
       phase: 'backward', gradient: { shape: [], data: [-.25] },
     })
-    const mask = container.querySelector('mask')!, circle = mask.querySelector('circle')!
-    expect(mask.getAttribute('maskUnits')).toBe('userSpaceOnUse')
-    expect(circle.getAttribute('cx')).toBe('0')
-    expect(circle.getAttribute('cy')).toBe('50')
-    expect(circle.getAttribute('r')).toBe('4')
     const wire = container.querySelector('path.builder-edge')!, bands = container.querySelector('.builder-edge-bands')!
-    expect(wire.closest('g[mask]')?.getAttribute('mask')).toBe(`url(#${mask.id})`)
-    expect(bands.closest('g[mask]')).toBe(wire.closest('g[mask]'))
+    expect(wire.getAttribute('d')).toContain('C')
+    expect(wire.getAttribute('d')).toContain('0,100')
     expect(bands.getAttribute('d')).toBe(wire.getAttribute('d'))
+    expect(container.querySelector('.builder-edge-halo')?.getAttribute('d')).toBe(wire.getAttribute('d'))
   })
 
   it('encodes absolute magnitude consistently, excluding causal sentinels', () => {
@@ -96,14 +94,14 @@ describe('clean directional connection flow', () => {
 it('keeps nested wire segments in their exact world coordinates and preserves gradient inspection', () => {
   const onInspect = vi.fn()
   const { container } = renderEdge({ absoluteRoute: true, sceneScale: .01, cameraZoom: 100,
-    route: [{ x: 12, y: 34 }, { x: 12.5, y: 34 }, { x: 12.5, y: 34.5 }, { x: 13, y: 34.5 }],
+    route: [{ x: 12, y: 34 }, { x: 13, y: 34.5 }], sourceSide: 'right', targetSide: 'left',
     phase: 'backward', gradient: { shape: [], data: [-.25] }, onInspect,
   })
   const path = container.querySelector('path.builder-edge')!.getAttribute('d')
   expect(container.querySelector('.builder-edge-flow')!.getAttribute('transform')).toBe('translate(12 34) scale(0.01)')
   expect(path).toMatch(/^M0,0/)
   expect(path).toContain('100,50')
-  expect(path).toContain('Q50,0')
+  expect(path).toContain('C')
   expect(container.querySelector('.builder-edge-bands')!.getAttribute('d')).toBe(path)
   fireEvent.click(screen.getByRole('button', { name: /backward gradient: -0.250/ }))
   expect(onInspect).toHaveBeenCalledWith('wire')

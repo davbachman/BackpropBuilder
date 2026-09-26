@@ -3,8 +3,7 @@ import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPo
 import { visualGroupInterface } from './grouping'
 import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
-import { routeDiagramWires, type DiagramWire, type WireEndpoint } from './wireRouting'
-import { findWireCrossings, type WireCrossings } from './wireCrossings'
+import type { WireEndpoint } from './wireRouting'
 
 export const sceneGroupId = (id: string) => `visual-group:${id}`
 export interface SceneLevel { parentId?: string; ids: string[]; scale: number; x: number; y: number }
@@ -14,7 +13,7 @@ export interface ContinuousScene extends SemanticLayout {
   levels: SceneLevel[]
   repairedOffsetIds: Set<string>
 }
-export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; crossings: WireCrossings; hidden?: boolean }
+export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; sourceSide: WireEndpoint['side']; targetSide: WireEndpoint['side']; hidden?: boolean }
 
 /** A container with exactly one child and no calculations of its own adds no
  * visual detail. Keep the most specific block and skip those empty levels.
@@ -188,13 +187,12 @@ export function cardReveal(rect: SemanticRect, zoom: number, width: number, heig
   return smooth((occupancy - .38) / .48)
 }
 
-/** Route in each level's own units, then map into the shared canvas. Boundary
- * ports join the exact same signal on both sides of a translucent card. */
+/** Join exact ports at each level without changing the curve style when a
+ * project contains groups. Boundary ports share the same world coordinate. */
 export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, positions?: Map<string, Position>): SceneWire[] {
   const groups = new Map((graph.groups ?? []).map(group => [group.id, group]))
   const nodes = new Map(graph.nodes.map(node => [node.id, node]))
   const interfaces = new Map((graph.groups ?? []).map(group => [group.id, visualGroupInterface(graph, group)]))
-  const stage = (id: string) => id.startsWith('visual-group:') && scene.parents.get(id) === undefined && (graph.groups ?? []).some(group => !group.parentId && ['cnn', 'transformer-block'].includes(group.kind ?? ''))
   const result: SceneWire[] = []
   const rectFor = (id: string) => {
     const rect = id.startsWith('visual-group:') ? scene.groups.get(id.slice(13))! : scene.nodes.get(id)!
@@ -209,8 +207,7 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const fraction = node
       ? (output ? builderOutputPortY(node, Math.max(0, index)) : builderInputPortY(node, Math.max(0, index))) / builderCardHeight(node)
       : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
-    return stage(id) ? { x: rect.x + rect.width * fraction, y: rect.y + (output ? rect.height : 0), side: output ? 'bottom' : 'top' }
-      : { x: rect.x + (output ? rect.width : 0), y: rect.y + rect.height * fraction, side: output ? 'right' : 'left' }
+    return { x: rect.x + (output ? rect.width : 0), y: rect.y + rect.height * fraction, side: output ? 'right' : 'left' }
   }
   for (const level of scene.levels) {
     const parent = level.parentId ? groups.get(level.parentId) : undefined
@@ -220,14 +217,10 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
       for (const nodeId of group?.nodeIds ?? [id]) owner.set(nodeId, id)
     }
     const boundary = parent ? sceneGroupId(parent.id) : undefined
-    const shift = boundary && positions?.get(boundary)
-    const original = parent && scene.groups.get(parent.id)
-    const origin = { x: level.x + (shift && original ? shift.x - original.x : 0), y: level.y + (shift && original ? shift.y - original.y : 0) }
-    const localPoint = (point: Position) => ({ x: (point.x - origin.x) / level.scale, y: (point.y - origin.y) / level.scale })
     const reverse = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' } as const
     const sharedInputs = new Map<string, string>()
     const hiddenAliases = new Map<string, string>()
-    const wires: DiagramWire[] = graph.edges.flatMap(edge => {
+    const wires: { id: string; source: WireEndpoint; target: WireEndpoint }[] = graph.edges.flatMap(edge => {
       const source = owner.get(edge.source), target = owner.get(edge.target)
       if ((!source && !target) || source === target || (!boundary && (!source || !target))) return []
       if (target?.startsWith('visual-group:')) {
@@ -243,18 +236,12 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
         }
       }
       const from = endpoint(source ?? boundary!, edge, Boolean(source)), to = endpoint(target ?? boundary!, edge, !target)
-      return [{ id: edge.id, source: { ...localPoint(from), side: source ? from.side : reverse[from.side] }, target: { ...localPoint(to), side: target ? to.side : reverse[to.side] } }]
+      return [{ id: edge.id, source: { ...from, side: source ? from.side : reverse[from.side] }, target: { ...to, side: target ? to.side : reverse[to.side] } }]
     })
-    const obstacles = level.ids.map(id => { const rect = rectFor(id); return { id, ...localPoint(rect), width: rect.width / level.scale, height: rect.height / level.scale } })
-    const frame = boundary ? rectFor(boundary) : undefined
-    const bounds = frame ? { ...localPoint(frame), width: frame.width / level.scale, height: frame.height / level.scale } : undefined
-    const routes = routeDiagramWires(wires, obstacles, bounds)
-    const crossings = findWireCrossings(routes)
-    const worldPoint = (point: Position) => ({ x: origin.x + point.x * level.scale, y: origin.y + point.y * level.scale })
     const levelWires = new Map<string, SceneWire>()
-    for (const [edgeId, route] of routes) {
-      const wire = { id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale, route: route.map(worldPoint),
-        crossings: { points: crossings.get(edgeId)!.points.map(worldPoint), gaps: crossings.get(edgeId)!.gaps.map(worldPoint) } }
+    for (const { id: edgeId, source, target } of wires) {
+      const wire: SceneWire = { id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale,
+        route: [{ x: source.x, y: source.y }, { x: target.x, y: target.y }], sourceSide: source.side, targetSide: target.side }
       levelWires.set(edgeId, wire)
       result.push(wire)
     }

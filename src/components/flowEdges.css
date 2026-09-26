@@ -9,6 +9,17 @@
   --edge-flow-color: #cf765c;
 }
 
+.builder-edge-flow .builder-edge-halo {
+  fill: none;
+  stroke: #f7f8fb;
+  stroke-width: var(--edge-halo-width);
+  pointer-events: none;
+}
+
+.theme-dark .builder-edge-flow .builder-edge-halo {
+  stroke: #192437;
+}
+
 .react-flow .react-flow__edge .builder-edge-flow path.builder-edge {
   stroke: var(--edge-flow-color);
   stroke-opacity: var(--edge-intensity);

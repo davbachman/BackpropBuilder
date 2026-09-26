@@ -46,7 +46,6 @@ import {
   moveVisualGroup,
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
-import { customCsvCardHeight, customCsvOutputTop } from '../domain/datasets'
 import { builderCardHeight, builderInputPortY, builderOutputPortY } from '../domain/builderGeometry'
 import { blockPalette } from '../domain/blockPalette'
 import { appendArithmeticInput } from '../domain/arithmetic'
@@ -68,10 +67,8 @@ import type {
 import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { BuilderNode, type BuilderNodeData } from './BuilderNode'
 import { GroupNode, type GroupNodeData } from './GroupNode'
-import { layoutSemanticGraph, semanticGroupDepth, semanticHasAddInput, semanticInputFraction } from '../domain/semanticLayout'
+import { layoutSemanticGraph, semanticGroupDepth } from '../domain/semanticLayout'
 import { preserveLayoutForWiring } from '../domain/layoutState'
-import { routeDiagramWires, type DiagramWire, type WireEndpoint, type WireObstacle } from '../domain/wireRouting'
-import { findWireCrossings } from '../domain/wireCrossings'
 import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds } from '../domain/continuousScene'
 import './modules.css'
 import './semanticCanvas.css'
@@ -390,7 +387,6 @@ function GraphCanvasInner({
             continuous,
             sceneScale: scene?.scales.get(groupNodeId(group.id)),
             semantic: false,
-            modelStage: !group.parentId && renderedGraph.groups?.some((candidate) => candidate.kind === 'transformer-block' || candidate.kind === 'cnn'),
             unitCount: weightValue?.shape[weightValue.shape.length - 1],
             unitValues: outputNode?.value?.data,
             attentionWeights: renderedGraph.nodes.find((node) => node.id === attentionWeightsId)?.value,
@@ -530,37 +526,8 @@ function GraphCanvasInner({
     }
     return visible
   }, [reactEdges])
-  // Cache geometry separately from numerical traces: stepping through a model
-  // changes wire values, but should not redo its routing or shuffle its lanes.
-  const routingKey = JSON.stringify(semantic && !continuous ? {
-    blocks: nodes.map(node => {
-      const group = isGroupNodeId(node.id) ? node.data as GroupNodeData : undefined
-      const operation = group ? undefined : (node.data as BuilderNodeData).graphNode
-      return { id: node.id, ...node.position, width: node.width ?? 176, height: node.height ?? 112,
-        expanded: group?.expanded ?? false, vertical: Boolean(group ? group.modelStage : node.data.vertical),
-        inputs: group?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0)),
-        addInput: !group && semanticHasAddInput(operation!, Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0))),
-        outputs: group?.outputCount ?? outputArityForNode(operation!),
-        csvOutputFractions: operation?.type === 'dataset' && operation.params.dataset === 'custom-csv'
-          ? Array.from({ length: outputArityForNode(operation) }, (_, index) => customCsvOutputTop(index, !semantic) / customCsvCardHeight(operation, !semantic))
-          : undefined,
-      }
-    }),
-    wires: edges.filter(edge => visibleEdgeIds.has(edge.id)).map(edge => ({ id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle })),
-  } : null)
-  const wireRoutes = useMemo(() => {
-    const geometry = JSON.parse(routingKey) as { blocks: RoutingBlock[]; wires: Pick<CanvasEdge, 'id' | 'source' | 'target' | 'sourceHandle' | 'targetHandle'>[] } | null
-    if (!geometry) return new Map<string, GraphPosition[]>()
-    const blocks = new Map(geometry.blocks.map(block => [block.id, block]))
-    const wires = geometry.wires.flatMap<DiagramWire>(edge => {
-      const source = blocks.get(edge.source), target = blocks.get(edge.target)
-      return source && target ? [{ id: edge.id, source: routingEndpoint(source, edge.sourceHandle, true), target: routingEndpoint(target, edge.targetHandle, false) }] : []
-    })
-    return routeDiagramWires(wires, geometry.blocks.map(block => block.expanded
-      ? { ...block, width: Math.min(block.width, 310), height: 46 }
-      : block))
-  }, [routingKey])
-  const wireCrossings = useMemo(() => findWireCrossings(wireRoutes), [wireRoutes])
+  // The scene geometry depends on node positions, not on values advancing
+  // through the model during a forward or backward step.
   const scenePositionKey = JSON.stringify(scene ? nodes.map(node => [node.id, node.position]) : [])
   const sceneRoutes = useMemo(() => scene ? routeContinuousScene(geometryGraph, scene, new Map(JSON.parse(scenePositionKey))) : [], [geometryGraph, scene, scenePositionKey])
   const routedEdges = useMemo(() => {
@@ -569,11 +536,11 @@ function GraphCanvasInner({
       return sceneRoutes.flatMap(wire => {
         if (wire.hidden) return []
         const edge = byId.get(wire.edgeId)
-        return edge ? [{ ...edge, id: wire.id, data: { ...edge.data!, route: wire.route, crossings: wire.crossings, absoluteRoute: true, sceneScale: wire.scale, parentId: wire.parentId, canonicalEdgeId: wire.edgeId } }] : []
+        return edge ? [{ ...edge, id: wire.id, data: { ...edge.data!, route: wire.route, sourceSide: wire.sourceSide, targetSide: wire.targetSide, absoluteRoute: true, sceneScale: wire.scale, parentId: wire.parentId, canonicalEdgeId: wire.edgeId } }] : []
       })
     }
-    return edges.map(edge => wireRoutes.has(edge.id) ? { ...edge, data: { ...edge.data!, route: wireRoutes.get(edge.id), crossings: wireCrossings.get(edge.id) } } : edge)
-  }, [edges, wireRoutes, wireCrossings, scene, sceneRoutes])
+    return edges
+  }, [edges, scene, sceneRoutes])
   const reveals = useMemo(() => new Map(scene ? [...scene.groups].map(([id, rect]) => [id, cardReveal(rect, cameraZoom, canvasSize.width, canvasSize.height)] as const) : []), [scene, cameraZoom, canvasSize.width, canvasSize.height])
   const accessible = useCallback((id?: string): boolean => {
     let current = id
@@ -617,7 +584,7 @@ function GraphCanvasInner({
     const operation = groupId ? undefined : (node.data as BuilderNodeData).graphNode
     const inputs = groupData?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0))
     const outputs = groupData?.outputCount ?? outputArityForNode(operation!)
-    const vertical = Boolean(groupData ? groupData.modelStage : node.data.vertical)
+    const vertical = Boolean(node.data.vertical)
     // Deeply nested nodes can be smaller than one CSS pixel in world space.
     // Keep exact dimensions/ports instead of waiting for rounded DOM measures.
     const handles = [false, true].flatMap(source => Array.from({ length: source ? outputs : inputs }, (_, index) => ({
@@ -1078,18 +1045,6 @@ function GraphCanvasInner({
       </div>
     </section>
   )
-}
-
-interface RoutingBlock extends WireObstacle { expanded: boolean; vertical: boolean; inputs: number; outputs: number; addInput?: boolean; csvOutputFractions?: number[] }
-function routingEndpoint(block: RoutingBlock, handle: string | null | undefined, source: boolean): WireEndpoint {
-  const slot = Number(handle?.match(/-(\d+)$/)?.[1] ?? 0)
-  const fraction = source && block.csvOutputFractions?.[slot] !== undefined
-    ? block.csvOutputFractions[slot]
-    : source ? (slot + 1) / (Math.max(1, block.outputs) + 1)
-      : semanticInputFraction(slot, Math.max(1, block.inputs), Boolean(block.addInput))
-  return block.vertical
-    ? { x: block.x + block.width * fraction, y: block.y + (source ? block.height : 0), side: source ? 'bottom' : 'top' }
-    : { x: block.x + (source ? block.width : 0), y: block.y + block.height * fraction, side: source ? 'right' : 'left' }
 }
 
 function canvasGroupContains(graph: GraphModel, parentId: string, childId: string): boolean {

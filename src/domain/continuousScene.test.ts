@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds, sceneGroupId } from './continuousScene'
 import { createModelPreset } from './modelPresets'
 import { LESSONS } from '../learning/presets'
-import { segmentCrossesRect } from './wireRouting'
 import { projectDenseNeurons } from './neuronProjection'
 import { parseCustomCsv } from './customCsv'
 import { customCsvCardHeight, customCsvOutputTop } from './datasets'
@@ -14,6 +13,18 @@ import type { GraphModel } from './types'
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-7
 
 describe('one continuous nested scene', () => {
+  it('lays transformer blocks left to right and connects their side ports', () => {
+    const graph = compactVisualHierarchy(createModelPreset('decoder'))
+    const scene = layoutContinuousScene(graph)
+    const first = scene.groups.get('blocks.0')!, second = scene.groups.get('blocks.1')!
+    expect(first.x + first.width).toBeLessThan(second.x)
+    const crossing = routeContinuousScene(graph, scene).find(wire => !wire.parentId &&
+      Math.abs(wire.route[0].x - first.x - first.width) < 1e-7 &&
+      Math.abs(wire.route[1].x - second.x) < 1e-7)
+    expect(crossing?.sourceSide).toBe('right')
+    expect(crossing?.targetSide).toBe('left')
+  })
+
   it.each(['linear', 'neuron'] as const)('opens %s directly from one neuron card onto its calculations', id => {
     const model = createModelPreset(id)
     const original = structuredClone(model)
@@ -140,48 +151,24 @@ describe('one continuous nested scene', () => {
       expect(endpoints.filter(point => endpoints.filter(other => close(point, other)).length === 1)).toHaveLength(2)
     }
     for (const wire of wires) {
-      const level = scene.levels.find(item => item.parentId === wire.parentId)!
       const frame = wire.parentId && scene.groups.get(wire.parentId)
+      expect(wire.route).toHaveLength(2)
+      expect(['left', 'right', 'top', 'bottom']).toContain(wire.sourceSide)
+      expect(['left', 'right', 'top', 'bottom']).toContain(wire.targetSide)
       if (frame) for (const point of wire.route) {
         expect(point.x).toBeGreaterThanOrEqual(frame.x - 1e-7)
         expect(point.y).toBeGreaterThanOrEqual(frame.y - 1e-7)
         expect(point.x).toBeLessThanOrEqual(frame.x + frame.width + 1e-7)
         expect(point.y).toBeLessThanOrEqual(frame.y + frame.height + 1e-7)
       }
-      for (const child of level.ids) {
-        const rect = scene.nodes.get(child) ?? scene.groups.get(child.slice(13))!
-        // Normalize to local units so tiny nested rectangles use the same
-        // clearance tolerance as a full-size operation.
-        const local = { id: child, x: rect.x / level.scale, y: rect.y / level.scale, width: rect.width / level.scale, height: rect.height / level.scale }
-        for (let i = 1; i < wire.route.length; i++) {
-          const a = wire.route[i - 1], b = wire.route[i]
-          expect(segmentCrossesRect({ x: a.x / level.scale, y: a.y / level.scale }, { x: b.x / level.scale, y: b.y / level.scale }, local), `${id}: ${wire.id} crosses ${child}`).toBe(false)
-        }
-      }
     }
   })
 
-  it.each(LESSONS)('keeps separate signal runs distinguishable at every level of $id', ({ id }) => {
+  it.each(LESSONS)('uses direct port-to-port connections at every level of $id', ({ id }) => {
     const graph = compactVisualHierarchy(createModelPreset(id))
     const wires = routeContinuousScene(graph, layoutContinuousScene(graph)).filter(wire => !wire.hidden)
-    const collisions: string[] = []
-    for (let i = 0; i < wires.length; i++) for (let j = 0; j < i; j++) {
-      const a = wires[i], b = wires[j]
-      if (a.parentId !== b.parentId) continue
-      const first = a.route.map(point => ({ x: point.x / a.scale, y: point.y / a.scale }))
-      const second = b.route.map(point => ({ x: point.x / b.scale, y: point.y / b.scale }))
-      for (let x = 1; x < first.length; x++) for (let y = 1; y < second.length; y++) {
-        // A real fan-out can share its short departure from the same port.
-        if (x === 1 && y === 1 && close(first[0], second[0])) continue
-        const [p, q, r, s] = [first[x - 1], first[x], second[y - 1], second[y]]
-        const horizontal = Math.abs(p.y - q.y) < .01
-        if (horizontal !== (Math.abs(r.y - s.y) < .01)) continue
-        const [along, across] = horizontal ? ['x', 'y'] as const : ['y', 'x'] as const
-        const overlap = Math.min(Math.max(p[along], q[along]), Math.max(r[along], s[along])) - Math.max(Math.min(p[along], q[along]), Math.min(r[along], s[along]))
-        if (overlap > 30 && Math.abs(p[across] - r[across]) < 8) collisions.push(`${a.id} / ${b.id}`)
-      }
-    }
-    expect(collisions).toEqual([])
+    expect(wires.length).toBeGreaterThan(0)
+    expect(wires.every(wire => wire.route.length === 2)).toBe(true)
   })
 
   it('routes distinct custom CSV columns into the correct ports of user-created groups', () => {
