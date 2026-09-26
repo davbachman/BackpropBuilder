@@ -6,6 +6,7 @@ import { segmentCrossesRect } from './wireRouting'
 import { projectDenseNeurons } from './neuronProjection'
 import { parseCustomCsv } from './customCsv'
 import { customCsvCardHeight, customCsvOutputTop } from './datasets'
+import { semanticInputFraction } from './semanticLayout'
 import { createNode } from './examples'
 import type { GraphModel } from './types'
 
@@ -220,6 +221,28 @@ describe('one continuous nested scene', () => {
     for (const id of group.nodeIds) {
       expect(after.nodes.get(id)!.x).toBeCloseTo(before.nodes.get(id)!.x + 28)
       expect(after.nodes.get(id)!.y).toBeCloseTo(before.nodes.get(id)!.y - 13)
+    }
+  })
+
+  it('routes three wires to the visible ports of a manually placed Concat card', () => {
+    const inputs = [1, 2, 3].map(index => createNode('input', index))
+    const concat = createNode('concat', 1)
+    concat.params = { axis: 1, inputCount: 3 }
+    const graph: GraphModel = {
+      nodes: [...inputs, concat],
+      edges: inputs.map((node, index) => ({ id: `input-${index}`, source: node.id, target: concat.id, inputSlot: index })),
+      learningRate: .1,
+      view: { expandedGroupIds: [], manualNodePlacements: { [concat.id]: { offset: { x: 600, y: 80 } } } },
+    }
+    const scene = layoutContinuousScene(graph)
+    const rect = scene.nodes.get(concat.id)!
+    expect(rect.height).toBe(148)
+
+    const wires = routeContinuousScene(graph, scene)
+    for (let index = 0; index < inputs.length; index++) {
+      const endpoint = wires.find(wire => wire.edgeId === `input-${index}`)!.route.at(-1)!
+      expect(endpoint.x).toBeCloseTo(rect.x)
+      expect(endpoint.y).toBeCloseTo(rect.y + rect.height * semanticInputFraction(index, 3, true))
     }
   })
 

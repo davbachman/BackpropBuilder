@@ -1,7 +1,7 @@
 import { inputArityForNode, outputArityForNode } from './engine'
 import { customCsvCardHeight, customCsvCardWidth, customCsvOutputTop } from './datasets'
 import { visualGroupInterface } from './grouping'
-import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
+import { expandedSemanticInputHeight, layoutSemanticGraph, semanticHasAddInput, semanticInputFraction, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint } from './wireRouting'
 import { findWireCrossings, type WireCrossings } from './wireCrossings'
@@ -144,7 +144,7 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
         x: (frame?.x ?? 0) + placement.offset.x + (offset?.x ?? 0),
         y: (frame?.y ?? 0) + placement.offset.y + (offset?.y ?? 0),
         width: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : 176) * nodeScale,
-        height: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : 112) * nodeScale,
+        height: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : Math.max(112, expandedSemanticInputHeight(node) ?? 0)) * nodeScale,
       })
       scene.scales.set(node.id, nodeScale)
       scene.parents.set(node.id, parent?.id)
@@ -192,7 +192,9 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const node = nodes.get(id)
     const fraction = output && node?.type === 'dataset' && node.params.dataset === 'custom-csv'
       ? customCsvOutputTop(Math.max(0, index)) / customCsvCardHeight(node)
-      : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
+      : !output && node
+        ? semanticInputFraction(Math.max(0, index), count, semanticHasAddInput(node, count))
+        : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
     return stage(id) ? { x: rect.x + rect.width * fraction, y: rect.y + (output ? rect.height : 0), side: output ? 'bottom' : 'top' }
       : { x: rect.x + (output ? rect.width : 0), y: rect.y + rect.height * fraction, side: output ? 'right' : 'left' }
   }

@@ -1143,6 +1143,21 @@ describe('Backprop Builder app', () => {
     )
   })
 
+  it('places the architecture Concat add-input control after its left-edge ports', () => {
+    const graph: GraphModel = {
+      learningRate: .1,
+      view: { expandedGroupIds: [], canvasStyle: 'architecture' },
+      nodes: [{ id: 'concat', type: 'concat', label: 'concat', position: { x: 100, y: 80 }, params: { axis: 1, inputCount: 3 } }],
+      edges: [],
+    }
+    const { container } = render(<GraphCanvas graph={graph} showMath showGradient phase="edit" onGraphChange={vi.fn()} onSelectionChange={vi.fn()} onCreateNode={vi.fn()} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()} onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()} />)
+    const card = container.querySelector('[data-id="concat"] .semantic-operation')!
+    const addInput = screen.getByRole('button', { name: 'Add input to concat' })
+    expect(card.querySelector('.semantic-operation-heading button')).toBeNull()
+    expect(addInput).toHaveStyle({ left: '0px', top: '80%' })
+    expect([...card.querySelectorAll<HTMLElement>('.node-handle.target')].map(port => port.style.top)).toEqual(['20%', '40%', '60%'])
+  })
+
   it.each([
     ['builder', 'x1 + x2', 'x1 + x2 + x3', 9],
     ['builder', 'x1 * x2', 'x1 * x2 * x3', 24],

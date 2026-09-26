@@ -67,7 +67,7 @@ import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { BuilderNode, type BuilderNodeData } from './BuilderNode'
 import { GroupNode, type GroupNodeData } from './GroupNode'
 import { SemanticNode } from './SemanticNode'
-import { layoutSemanticGraph, semanticGroupDepth } from '../domain/semanticLayout'
+import { layoutSemanticGraph, semanticGroupDepth, semanticHasAddInput, semanticInputFraction } from '../domain/semanticLayout'
 import { preserveLayoutForWiring } from '../domain/layoutState'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint, type WireObstacle } from '../domain/wireRouting'
 import { findWireCrossings } from '../domain/wireCrossings'
@@ -529,6 +529,7 @@ function GraphCanvasInner({
       return { id: node.id, ...node.position, width: node.width ?? 176, height: node.height ?? 112,
         expanded: group?.expanded ?? false, vertical: Boolean(group ? group.modelStage : node.data.vertical),
         inputs: group?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0)),
+        addInput: !group && semanticHasAddInput(operation!, Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0))),
         outputs: group?.outputCount ?? outputArityForNode(operation!),
         csvOutputFractions: operation?.type === 'dataset' && operation.params.dataset === 'custom-csv'
           ? Array.from({ length: outputArityForNode(operation) }, (_, index) => customCsvOutputTop(index, !semantic) / customCsvCardHeight(operation, !semantic))
@@ -605,6 +606,7 @@ function GraphCanvasInner({
     const operation = groupId ? undefined : (node.data as BuilderNodeData).graphNode
     const inputs = groupData?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0))
     const outputs = groupData?.outputCount ?? outputArityForNode(operation!)
+    const addInput = !groupData && semanticHasAddInput(operation!, inputs)
     const vertical = Boolean(groupData ? groupData.modelStage : node.data.vertical)
     // Deeply nested nodes can be smaller than one CSS pixel in world space.
     // Keep exact dimensions/ports instead of waiting for rounded DOM measures.
@@ -612,8 +614,8 @@ function GraphCanvasInner({
       id: source ? groupId || outputs > 1 ? `out-${index}` : 'out' : `in-${index}`,
       type: source ? 'source' as const : 'target' as const,
       position: vertical ? source ? FlowPosition.Bottom : FlowPosition.Top : source ? FlowPosition.Right : FlowPosition.Left,
-      x: vertical ? rect.width * (index + 1) / ((source ? outputs : inputs) + 1) : source ? rect.width : 0,
-      y: vertical ? source ? rect.height : 0 : rect.height * (index + 1) / ((source ? outputs : inputs) + 1),
+      x: vertical ? rect.width * (source ? (index + 1) / (outputs + 1) : semanticInputFraction(index, inputs, addInput)) : source ? rect.width : 0,
+      y: vertical ? source ? rect.height : 0 : rect.height * (source ? (index + 1) / (outputs + 1) : semanticInputFraction(index, inputs, addInput)),
       width: 0, height: 0,
     })))
     return { ...node, selectable: available && (!groupId || reveal < .95), focusable: available,
@@ -1071,12 +1073,13 @@ function GraphCanvasInner({
   )
 }
 
-interface RoutingBlock extends WireObstacle { expanded: boolean; vertical: boolean; inputs: number; outputs: number; csvOutputFractions?: number[] }
+interface RoutingBlock extends WireObstacle { expanded: boolean; vertical: boolean; inputs: number; outputs: number; addInput?: boolean; csvOutputFractions?: number[] }
 function routingEndpoint(block: RoutingBlock, handle: string | null | undefined, source: boolean): WireEndpoint {
   const slot = Number(handle?.match(/-(\d+)$/)?.[1] ?? 0)
   const fraction = source && block.csvOutputFractions?.[slot] !== undefined
     ? block.csvOutputFractions[slot]
-    : (slot + 1) / (Math.max(1, source ? block.outputs : block.inputs) + 1)
+    : source ? (slot + 1) / (Math.max(1, block.outputs) + 1)
+      : semanticInputFraction(slot, Math.max(1, block.inputs), Boolean(block.addInput))
   return block.vertical
     ? { x: block.x + block.width * fraction, y: block.y + (source ? block.height : 0), side: source ? 'bottom' : 'top' }
     : { x: block.x + (source ? block.width : 0), y: block.y + block.height * fraction, side: source ? 'right' : 'left' }

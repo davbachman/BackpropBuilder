@@ -1,6 +1,6 @@
 import type { GraphGroup, GraphModel, GraphNode } from './types'
 import { customCsvCardHeight, customCsvCardWidth } from './datasets'
-import { inputArityForNode, isFlexibleInputNodeType } from './engine'
+import { inputArityForNode, isFlexibleInputNodeType, MAX_FLEX_INPUT_COUNT } from './engine'
 
 export interface SemanticRect { x: number; y: number; width: number; height: number }
 export interface SemanticLayout {
@@ -17,6 +17,14 @@ export function expandedSemanticInputHeight(node: GraphNode): number | undefined
   const count = inputArityForNode(node)
   if (node.type === 'concat') return Math.max(148, count > 4 ? (count + 1) * 20 : 0)
   return count > 4 ? (count + 1) * 20 : undefined
+}
+
+export function semanticHasAddInput(node: GraphNode, count: number): boolean {
+  return (node.type === 'arithmetic' || isFlexibleInputNodeType(node.type)) && count < MAX_FLEX_INPUT_COUNT
+}
+
+export function semanticInputFraction(index: number, count: number, hasAddInput: boolean): number {
+  return (index + 1) / (count + 1 + Number(hasAddInput))
 }
 
 /** Layout only the currently visible hierarchy. Expansion creates room without
