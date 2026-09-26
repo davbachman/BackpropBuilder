@@ -527,6 +527,9 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-icon {
@@ -552,6 +555,8 @@
   background: var(--panel-soft);
   color: var(--muted-strong);
   font: 11px var(--font-mono);
+  max-height: 42px;
+  overflow: hidden;
 }
 
 .node-formula .tensor-hover-text {

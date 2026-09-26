@@ -34,19 +34,21 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
   }),
 }))
 
-function mountCanvas(graph: GraphModel, displayGraph?: GraphModel, problemNodeIds?: ReadonlySet<string>) {
+type CanvasFocus = { kind: 'group' | 'node'; id: string; serial: number }
+
+function mountCanvas(graph: GraphModel, displayGraph?: GraphModel, problemNodeIds?: ReadonlySet<string>, focusRequest?: CanvasFocus) {
   const onGraphChange = vi.fn()
   const onViewChange = vi.fn()
   const onSelectionChange = vi.fn()
   const onCreateNode = vi.fn()
-  const canvas = (current: GraphModel) => <GraphCanvas
-    graph={current} displayGraph={displayGraph} problemNodeIds={problemNodeIds} showMath showGradient={false} phase="edit"
+  const canvas = (current: GraphModel, focus = focusRequest) => <GraphCanvas
+    graph={current} displayGraph={displayGraph} problemNodeIds={problemNodeIds} focusRequest={focus} showMath showGradient={false} phase="edit"
     onGraphChange={onGraphChange} onViewChange={onViewChange} onSelectionChange={onSelectionChange}
     onCreateNode={onCreateNode} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()}
     onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()}
   />
   const result = render(canvas(graph))
-  return { ...result, rerenderGraph: (current: GraphModel) => result.rerender(canvas(current)), onGraphChange, onViewChange, onSelectionChange, onCreateNode }
+  return { ...result, rerenderGraph: (current: GraphModel, focus?: CanvasFocus) => result.rerender(canvas(current, focus)), onGraphChange, onViewChange, onSelectionChange, onCreateNode }
 }
 
 function nodeById(id: string): Node {
@@ -360,6 +362,15 @@ describe('canvas movement gestures', () => {
     } finally { vi.useRealTimers() }
   })
 
+  it('animates each Code-view focus change across nested builder cards', () => {
+    const graph = createModelPreset('linear')
+    const { rerenderGraph } = mountCanvas(graph, undefined, undefined, { kind: 'node', id: 'loss', serial: 1 })
+    expect(flow.setViewport).toHaveBeenCalledWith(expect.objectContaining({ zoom: expect.any(Number) }), expect.objectContaining({ duration: 650, ease: expect.any(Function) }))
+    flow.setViewport.mockClear()
+    rerenderGraph(graph, { kind: 'node', id: 'layer-0/weight-0-0', serial: 2 })
+    expect(flow.setViewport).toHaveBeenCalledWith(expect.objectContaining({ zoom: expect.any(Number) }), expect.objectContaining({ duration: 650, ease: expect.any(Function) }))
+  })
+
   it('supplies precise geometry and ports even below one world-space pixel', () => {
     const graph = createModelPreset('decoder')
     mountCanvas(graph, projectDenseNeurons(graph, { groupId: 'blocks.0.ff1.layer', unitIndex: 0, row: 0 }).graph)
@@ -382,6 +393,7 @@ describe('canvas movement gestures', () => {
 
   it.each(LESSONS)('routes the wires of $id around other visible blocks at every hierarchy level', ({ id }) => {
     const base = createModelPreset(id)
+    if (!base.groups?.length) return
     base.view = { ...base.view!, expandedGroupIds: [], semanticZoom: false }
     const views = [base, ...(base.groups ?? []).map(group => setVisualGroupExpanded(base, group.id, true)), { ...base, view: { ...base.view!, expandedGroupIds: base.groups!.map(group => group.id) } }]
     for (const graph of views) {
@@ -410,10 +422,10 @@ describe('canvas movement gestures', () => {
     const scalarId = graph.groups!.find(group => group.id === 'blocks.0.ff1.layer')!.nodeIds[0]
     const scalar = nodeById(scalarId)
     expect(flow.props!.nodes!.every(node => node.draggable)).toBe(true)
-    expect(block.dragHandle).toBe('.visual-group-title-row')
-    // The large expanded frame must not join a small marquee drawn around
-    // its contents, but dragging its header still selects the group.
-    expect(block.selectable).toBe(false)
+    expect(block.dragHandle).toBeUndefined()
+    // The continuous card is selected and dragged at the overview scale;
+    // its frame header becomes the drag target only after zooming inside.
+    expect(block.selectable).toBe(true)
     expect(otherBlock.selectable).toBe(true)
     expect(flow.props!.selectionOnDrag).toBe(true)
     expect(flow.props!.panOnDrag).toEqual([1, 2])

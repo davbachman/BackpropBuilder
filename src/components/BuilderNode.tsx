@@ -21,6 +21,7 @@ import {
   outputArityForNode,
 } from '../domain/engine'
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetTargetSlotForNode } from '../domain/datasets'
+import { builderCardHeight } from '../domain/builderGeometry'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput, toTensor } from '../domain/tensor'
 import { parseArithmetic } from '../domain/arithmetic'
 import type { DatasetKind, GraphNode, LossKind, NodeType, TensorTransformKind, TensorValue } from '../domain/types'
@@ -116,7 +117,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
     <div
       className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError ? 'has-error' : ''}`}
       aria-invalid={data.validationError || undefined}
-      style={{ ...(variableInputLayout ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
+      style={{ ...(variableInputLayout ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { height: builderCardHeight(node), transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
       {Array.from({ length: inputCount }).map((_, index) => (
         <Handle
@@ -147,7 +148,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
         <span className="node-icon" aria-hidden="true">
           <Icon size={14} />
         </span>
-        <strong>{node.label}</strong>
+        <strong title={node.label}>{node.label}</strong>
         {showTypeBadge ? <span className="node-kind">{node.type === 'weight' || node.type === 'bias' ? 'Param' : node.type}</span> : null}
       </div>
       {data.showMath && node.type === 'concat' ? (
@@ -225,7 +226,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
         <label className="node-field">
           dataset
           <select
-            aria-label="dataset"
+            aria-label={`Dataset for ${node.label}`}
             className="nodrag nowheel"
             value={selectedDataset.kind}
             onChange={(event) => data.onDatasetChange(node.id, event.target.value as DatasetKind)}
@@ -277,6 +278,10 @@ export function BuilderNode(props: NodeProps): ReactElement {
           <Handle
             key={index}
             id={sourceHandleId(index, outputCount)}
+            aria-label={node.type === 'dataset' ? customCsv
+              ? `${datasetOutputLabelForSlot(node, index)} output`
+              : `${index === datasetTargetSlotForNode(node) ? 'Target' : 'Feature'} ${datasetOutputLabelForSlot(node, index)} output`
+              : undefined}
             type="source"
             position={Position.Right}
             className={`node-handle source-handle${node.type === 'dataset' && node.params.dataset !== 'custom-csv' && index === datasetTargetSlotForNode(node) ? ' dataset-target-handle' : ''}`}

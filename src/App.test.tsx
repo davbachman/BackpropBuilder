@@ -612,7 +612,7 @@ describe('Backprop Builder app', () => {
 
     const datasetSelect = screen
       .getAllByRole('combobox', { hidden: true })
-      .find((element) => element.getAttribute('aria-label') === 'dataset')
+      .find((element) => element.getAttribute('aria-label') === 'Dataset for dataset')
     expect(datasetSelect).toBeDefined()
     expect(datasetSelect).toHaveValue('line-1d')
     expect(Array.from(datasetSelect!.querySelectorAll('option')).map((option) => option.textContent)).toEqual(
@@ -1146,7 +1146,7 @@ describe('Backprop Builder app', () => {
     )
   })
 
-  it('places the architecture Concat add-input control after its left-edge ports', () => {
+  it('places the Concat add-input control beside its left-edge ports', () => {
     const graph: GraphModel = {
       learningRate: .1,
       view: { expandedGroupIds: [], canvasStyle: 'architecture' },
@@ -1154,11 +1154,10 @@ describe('Backprop Builder app', () => {
       edges: [],
     }
     const { container } = render(<GraphCanvas graph={graph} showMath showGradient phase="edit" onGraphChange={vi.fn()} onSelectionChange={vi.fn()} onCreateNode={vi.fn()} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()} onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()} />)
-    const card = container.querySelector('[data-id="concat"] .semantic-operation')!
+    const card = container.querySelector('[data-id="concat"] .builder-node')!
     const addInput = screen.getByRole('button', { name: 'Add input to concat' })
-    expect(card.querySelector('.semantic-operation-heading button')).toBeNull()
-    expect(addInput).toHaveStyle({ left: '0px', top: '80%' })
-    expect([...card.querySelectorAll<HTMLElement>('.node-handle.target')].map(port => port.style.top)).toEqual(['20%', '40%', '60%'])
+    expect(addInput).toHaveClass('node-add-input-button')
+    expect([...card.querySelectorAll<HTMLElement>('.node-handle.target')].map(port => port.style.top)).toEqual(['32px', '64px', '96px'])
   })
 
   it.each([
@@ -1296,13 +1295,10 @@ describe('Backprop Builder app', () => {
       />,
     )
 
-    expect(screen.getByText('Group 1')).toBeInTheDocument()
-    expect(container.querySelectorAll('.builder-node')).toHaveLength(0)
-    expect(container.querySelector('.visual-group-node')).toHaveStyle({
-      width: `${NODE_WIDTH}px`,
-      height: `${MIN_NODE_HEIGHT}px`,
-    })
-    expect(container.querySelectorAll('.visual-group-node .source-handle.group-handle')).toHaveLength(2)
+    const groupCover = container.querySelector('[data-id="visual-group:group-1"] .continuous-card-cover .visual-group-node')
+    expect(groupCover).toHaveTextContent('Group 1')
+    expect(container.querySelectorAll('.builder-node')).toHaveLength(2)
+    expect(groupCover?.querySelectorAll('.source-handle.group-handle')).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: /Ungroup module/i }))
 
@@ -1356,7 +1352,7 @@ describe('Backprop Builder app', () => {
       />,
     )
 
-    const groupNode = container.querySelector('.visual-group-node')
+    const groupNode = container.querySelector('[data-id="visual-group:group-1"] .continuous-card-cover .visual-group-node')
     expect(groupNode?.querySelectorAll('.group-handle.target')).toHaveLength(3)
     expect(groupNode?.querySelectorAll('.group-handle.source')).toHaveLength(1)
     expect(container.querySelector('.react-flow__edge[data-id="mul-add"]')).not.toBeInTheDocument()
@@ -1414,8 +1410,8 @@ describe('Backprop Builder app', () => {
       />,
     )
 
-    expect(screen.getByText('out 0.700')).toBeInTheDocument()
-    expect(screen.getByText('grad -0.200')).toBeInTheDocument()
+    expect(screen.getAllByText('out 0.700').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('grad -0.200').length).toBeGreaterThan(0)
   })
 
   it('does not repeat a node type when the node title already says it', async () => {

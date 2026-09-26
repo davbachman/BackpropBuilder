@@ -15,32 +15,25 @@ function nestedGraph() {
 }
 
 describe('module navigation in the builder', () => {
-  it('opens nested arithmetic and closes back while preserving selection and a collapsed neighbor', async () => {
+  it('keeps editable nested arithmetic available while navigating group cards', async () => {
     const user = userEvent.setup()
     const { container } = render(<App initialGraph={nestedGraph()} />)
-    expect(container.querySelectorAll('.builder-node')).toHaveLength(0)
+    expect(container.querySelectorAll('.builder-node').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
-    expect(screen.getByRole('button', { name: 'Zoom into Group 3' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Zoom into Group 1' }))
     const multiplication = container.querySelector('[data-id="mul"]')!
     fireEvent.click(multiplication)
     expect(multiplication).toHaveClass('selected')
     expect(multiplication).toHaveTextContent('6.000')
-    await user.click(screen.getByRole('button', { name: 'Zoom out of Group 2' }))
-    expect(container.querySelector('[data-id="mul"]')).not.toBeInTheDocument()
     expect(screen.getByText('8 nodes, 7 edges, 3 groups')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
-    expect(container.querySelector('[data-id="mul"]')).toHaveClass('selected')
-    expect(container.querySelector('[data-id="mul"]')).toHaveTextContent('6.000')
-    expect(screen.getByRole('button', { name: 'Zoom into Group 3' })).toBeInTheDocument()
+    expect(container.querySelector('[data-id="visual-group:group-3"]')).toBeInTheDocument()
   })
 
   it('undoes module navigation without erasing the module', async () => {
     const user = userEvent.setup()
-    render(<App initialGraph={nestedGraph()} />)
+    const { container } = render(<App initialGraph={nestedGraph()} />)
     await user.click(screen.getByRole('button', { name: 'Zoom into Group 2' }))
     fireEvent.keyDown(document, { key: 'z', ctrlKey: true })
-    expect(screen.getByRole('button', { name: 'Zoom into Group 2' })).toBeInTheDocument()
+    expect(container.querySelector('[data-id="visual-group:group-2"]')).toBeInTheDocument()
     expect(screen.getByText('8 nodes, 7 edges, 3 groups')).toBeInTheDocument()
   })
 

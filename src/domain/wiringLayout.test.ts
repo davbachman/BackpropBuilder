@@ -8,11 +8,13 @@ import { preserveLayoutForWiring } from './layoutState'
 import { createModelPreset } from './modelPresets'
 import { projectDenseNeurons } from './neuronProjection'
 import { placeCanvasNode } from './nodePlacement'
-import { layoutSemanticGraph } from './semanticLayout'
+import { builderCardHeight, builderCardWidth } from './builderGeometry'
+import type { SemanticLayout } from './semanticLayout'
 import type { GraphModel } from './types'
 
-const geometry = (graph: GraphModel) => graph.view?.semanticZoom === false
-  ? layoutSemanticGraph(graph) : layoutContinuousScene(compactVisualHierarchy(graph))
+const geometry = (graph: GraphModel): SemanticLayout => graph.groups?.length
+  ? layoutContinuousScene(compactVisualHierarchy(graph))
+  : { nodes: new Map(graph.nodes.map(node => [node.id, { ...node.position, width: builderCardWidth(node), height: builderCardHeight(node) }])), groups: new Map() }
 
 describe.each([true, false])('wiring without rearrangement, continuous zoom %s', semanticZoom => {
   it.each(LESSONS)('keeps every level of $id fixed when connecting, replacing and removing wires', ({ id }) => {

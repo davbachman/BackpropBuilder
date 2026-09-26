@@ -26,7 +26,7 @@ describe('downloadable model library', () => {
     const { container } = render(<App />)
     expect(screen.getByText('0 nodes, 0 edges')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Preset gallery' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Architecture cards' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Architecture cards' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'File' }))
     expect(screen.getByRole('menuitem', { name: 'Import' })).toBeInTheDocument()
@@ -35,10 +35,9 @@ describe('downloadable model library', () => {
     })
     fireEvent.change(screen.getByLabelText('Import state file'), { target: { files: [modelFile] } })
     await waitFor(() => expect(container.querySelector('.canvas-header-actions p')?.textContent).toMatch(/^9 nodes, 9 edges, \d+ groups?$/))
-    expect(screen.getByRole('button', { name: 'Builder cards' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Builder cards' })).not.toBeInTheDocument()
     expect(container.querySelector('.react-flow__node[data-id="loss"] .builder-node.node-loss')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Builder cards' }))
-    expect(screen.getByRole('button', { name: 'Architecture cards' })).toBeInTheDocument()
+    expect(container.querySelector('.react-flow__node[data-id^="visual-group:"] .continuous-card-cover')).toBeInTheDocument()
     expect(container.querySelector('.react-flow__node[data-id="loss"] .builder-node.node-loss')).toBeInTheDocument()
   })
 

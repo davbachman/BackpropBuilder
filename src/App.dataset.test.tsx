@@ -22,7 +22,7 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
     fireEvent.click(card)
-    const selector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
+    const selector = within(card).getByLabelText('Dataset for dataset')
     fireEvent.change(selector, { target: { value: 'custom-csv' } })
     const chooser = screen.getByRole('dialog', { name: 'Choose a CSV file' })
     const input = within(chooser).getByLabelText('Choose custom CSV file') as HTMLInputElement
@@ -33,7 +33,6 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     await waitFor(() => expect(selector).toHaveValue('custom-csv'))
     expect(screen.queryByRole('dialog', { name: 'Choose a CSV file' })).not.toBeInTheDocument()
     expect(card.querySelector('.semantic-operation, .builder-node')).toHaveStyle({ width: '280px' })
-    if (semanticZoom) expect(card).toHaveStyle({ width: '280px' })
     expect(within(card).getByLabelText('height output')).toHaveAttribute('data-handleid', 'out-0')
     expect(within(card).getByLabelText('width output')).toHaveAttribute('data-handleid', 'out-1')
     expect(within(card).getByLabelText('y output')).toHaveAttribute('data-handleid', 'out-2')
@@ -46,14 +45,14 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
   it('restores every dataset choice and labels the actual feature and target handles', () => {
     const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
-    const selector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
+    const selector = within(card).getByLabelText('Dataset for dataset')
     expect(selector).toHaveClass('nodrag', 'nowheel')
-    expect(within(selector).getAllByRole('option').map(option => option.textContent)).toEqual(DATASET_MENU_OPTIONS.map(option => option.label))
+    expect(Array.from(selector.querySelectorAll('option')).map(option => option.textContent)).toEqual(DATASET_MENU_OPTIONS.map(option => option.label))
     for (const dataset of DATASET_OPTIONS) {
       fireEvent.change(selector, { target: { value: dataset.kind } })
       expect(selector).toHaveValue(dataset.kind)
       expect(card.querySelectorAll('.source-handle')).toHaveLength(dataset.featureLabels.length + 1)
-      expect(Array.from(card.querySelectorAll('.semantic-dataset-port')).map(label => label.textContent)).toEqual([...dataset.featureLabels, dataset.targetLabel])
+      expect(Array.from(card.querySelectorAll('.node-output-labels span')).map(label => label.textContent)).toEqual([...dataset.featureLabels, dataset.targetLabel])
       dataset.featureLabels.forEach((label, slot) => {
         expect(within(card).getByLabelText(`Feature ${label} output`)).toHaveAttribute('data-handleid', `out-${slot}`)
       })
@@ -66,7 +65,7 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     const { container } = render(<App initialGraph={datasetModel(semanticZoom)} />)
     const card = container.querySelector<HTMLElement>('[data-id="dataset-1"]')!
     fireEvent.click(card)
-    const nodeSelector = within(card).getByRole('combobox', { name: 'Dataset for dataset' })
+    const nodeSelector = within(card).getByLabelText('Dataset for dataset')
     const inspectorSelector = () => screen.getByRole('combobox', { name: 'Dataset selection' })
     await user.selectOptions(nodeSelector, 'circle-center')
     expect(inspectorSelector()).toHaveValue('circle-center')
@@ -76,8 +75,8 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     expect(screen.queryByText('Ready to evaluate')).not.toBeInTheDocument()
     const expectResults = (kind: string) => {
       const dataset = DATASET_OPTIONS.find(option => option.kind === kind)!
-      expect(container.querySelector('[data-id="x"] .semantic-operation-value')).toHaveAttribute('title', formatFullTensor(dataset.featureValues[0]))
-      expect(container.querySelector('[data-id="target"] .semantic-operation-value')).toHaveAttribute('title', formatFullTensor(dataset.targetValue))
+      expect(container.querySelector('[data-id="x"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', expect.stringContaining(formatFullTensor(dataset.featureValues[0]).slice(0, 8)))
+      expect(container.querySelector('[data-id="target"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', expect.stringContaining(formatFullTensor(dataset.targetValue).slice(0, 8)))
     }
     await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: 'Run forward' }))

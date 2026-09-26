@@ -1,7 +1,7 @@
 import { inputArityForNode, outputArityForNode } from './engine'
-import { customCsvCardHeight, customCsvCardWidth, customCsvOutputTop } from './datasets'
+import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPortY } from './builderGeometry'
 import { visualGroupInterface } from './grouping'
-import { expandedSemanticInputHeight, layoutSemanticGraph, semanticHasAddInput, semanticInputFraction, type SemanticLayout, type SemanticRect } from './semanticLayout'
+import { layoutSemanticGraph, type SemanticLayout, type SemanticRect } from './semanticLayout'
 import type { GraphGroup, GraphModel, Position } from './types'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint } from './wireRouting'
 import { findWireCrossings, type WireCrossings } from './wireCrossings'
@@ -159,8 +159,8 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       scene.nodes.set(node.id, {
         x: (frame?.x ?? 0) + placement.offset.x + (offset?.x ?? 0),
         y: (frame?.y ?? 0) + placement.offset.y + (offset?.y ?? 0),
-        width: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : 176) * nodeScale,
-        height: (node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : Math.max(112, expandedSemanticInputHeight(node) ?? 0)) * nodeScale,
+        width: builderCardWidth(node) * nodeScale,
+        height: builderCardHeight(node) * nodeScale,
       })
       scene.scales.set(node.id, nodeScale)
       scene.parents.set(node.id, parent?.id)
@@ -194,7 +194,7 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
   const groups = new Map((graph.groups ?? []).map(group => [group.id, group]))
   const nodes = new Map(graph.nodes.map(node => [node.id, node]))
   const interfaces = new Map((graph.groups ?? []).map(group => [group.id, visualGroupInterface(graph, group)]))
-  const stage = (id: string) => scene.parents.get(id) === undefined && (graph.groups ?? []).some(group => !group.parentId && ['cnn', 'transformer-block'].includes(group.kind ?? ''))
+  const stage = (id: string) => id.startsWith('visual-group:') && scene.parents.get(id) === undefined && (graph.groups ?? []).some(group => !group.parentId && ['cnn', 'transformer-block'].includes(group.kind ?? ''))
   const result: SceneWire[] = []
   const rectFor = (id: string) => {
     const rect = id.startsWith('visual-group:') ? scene.groups.get(id.slice(13))! : scene.nodes.get(id)!
@@ -206,11 +206,9 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const index = ports ? ports.findIndex(port => port.edgeId === edge.id || 'edgeIds' in port && port.edgeIds?.includes(edge.id)) : output ? edge.sourceSlot ?? 0 : edge.inputSlot ?? 0
     const count = ports?.length ?? (output ? outputArityForNode(nodes.get(id)!) : Math.max(inputArityForNode(nodes.get(id)!), ...graph.edges.filter(item => item.target === id).map(item => (item.inputSlot ?? 0) + 1)))
     const node = nodes.get(id)
-    const fraction = output && node?.type === 'dataset' && node.params.dataset === 'custom-csv'
-      ? customCsvOutputTop(Math.max(0, index)) / customCsvCardHeight(node)
-      : !output && node
-        ? semanticInputFraction(Math.max(0, index), count, semanticHasAddInput(node, count))
-        : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
+    const fraction = node
+      ? (output ? builderOutputPortY(node, Math.max(0, index)) : builderInputPortY(node, Math.max(0, index))) / builderCardHeight(node)
+      : (Math.max(0, index) + 1) / (Math.max(1, count) + 1)
     return stage(id) ? { x: rect.x + rect.width * fraction, y: rect.y + (output ? rect.height : 0), side: output ? 'bottom' : 'top' }
       : { x: rect.x + (output ? rect.width : 0), y: rect.y + rect.height * fraction, side: output ? 'right' : 'left' }
   }

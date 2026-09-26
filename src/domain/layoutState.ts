@@ -8,7 +8,7 @@ export function layoutConnections(edges: GraphEdge[]): NonNullable<GraphViewStat
  * remain the sole source for execution, ports and routing; only Compact layout
  * replaces this layout reference with the edited topology. */
 export function preserveLayoutForWiring(graph: GraphModel): GraphModel {
-  const semantic = graph.view?.semanticZoom !== undefined || graph.groups?.some(group => group.kind)
+  const semantic = Boolean(graph.groups?.length)
   if (!semantic || graph.view?.layoutEdges) return graph
   return { ...graph, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], layoutEdges: layoutConnections(graph.edges) } }
 }

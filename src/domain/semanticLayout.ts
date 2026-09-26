@@ -1,6 +1,6 @@
 import type { GraphGroup, GraphModel, GraphNode } from './types'
-import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 import { inputArityForNode, isFlexibleInputNodeType, MAX_FLEX_INPUT_COUNT } from './engine'
+import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPortY } from './builderGeometry'
 
 export interface SemanticRect { x: number; y: number; width: number; height: number }
 export interface SemanticLayout {
@@ -55,8 +55,7 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
       return { id: group.id, group, memberIds: group.nodeIds, nested, width, height, x: 0, y: 0 }
     })
     items.push(...ownNodes.map((node) => {
-      const baseHeight = node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112
-      return { id: node.id, node, memberIds: [node.id], width: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : coordinates ? 112 : 176, height: Math.max(baseHeight, expandedSemanticInputHeight(node) ?? 0), x: 0, y: 0 }
+      return { id: node.id, node, memberIds: [node.id], width: builderCardWidth(node), height: builderCardHeight(node), x: 0, y: 0 }
     }))
     const owner = new Map(items.flatMap((item) => item.memberIds.map((id) => [id, item.id] as const)))
     const incoming = new Map(items.map((item) => [item.id, new Set<string>()]))
@@ -102,19 +101,20 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     if (coordinates) {
       const inputPairs = items.flatMap((item) => { const match = item.id.match(/:([xw])(\d+)$/); return match ? [{ item, column: match[1] === 'x' ? 0 : 1, row: Number(match[2]) }] : [] })
       const inputRows = Math.max(1, ...inputPairs.map((pair) => pair.row + 1))
-      const height = (inputRows + 1) * 104 - 16
+      const coordinateRow = 230
+      const height = (inputRows + 1) * coordinateRow - 20
       let x = 0
       for (const [columnRank, column] of [...columns.entries()].sort(([a], [b]) => a - b)) {
         if (columnRank === 0 && inputPairs.length) {
           for (const item of column) {
             const pair = inputPairs.find((candidate) => candidate.item.id === item.id)
-            item.x = x + (pair?.column ?? 0) * 128
-            item.y = (pair?.row ?? inputRows) * 104 + (pair?.column ?? 0) * 48
+            item.x = x + (pair?.column ?? 0) * 200
+            item.y = (pair?.row ?? inputRows) * coordinateRow + (pair?.column ?? 0) * 110
           }
-          x += 304
+          x += 420
         } else {
-          column.forEach((item, index) => { item.x = x; item.y = column.length === 1 ? (height - item.height) / 2 : index * 104 })
-          x += 176
+          column.forEach((item, index) => { item.x = x; item.y = column.length === 1 ? (height - item.height) / 2 : index * coordinateRow })
+          x += 248
         }
       }
       return items
@@ -141,11 +141,12 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     const columnHeights = [...columns.values()].map((column) => column.reduce((sum, item) => sum + item.height, 0) + (column.length - 1) * ROW_GAP)
     const maxHeight = Math.max(0, ...columnHeights)
     if (tower && !parent) {
-      const maxWidth = Math.max(0, ...[...columns.values()].map((column) => column.reduce((sum, item) => sum + item.width, 0) + (column.length - 1) * 32))
+      const stageGap = 64
+      const maxWidth = Math.max(0, ...[...columns.values()].map((column) => column.reduce((sum, item) => sum + item.width, 0) + (column.length - 1) * stageGap))
       let y = 0
       for (const [, row] of ordered) {
-        let x = (maxWidth - row.reduce((sum, item) => sum + item.width, 0) - (row.length - 1) * 32) / 2
-        for (const item of row) { item.x = x; item.y = y; x += item.width + 32 }
+        let x = (maxWidth - row.reduce((sum, item) => sum + item.width, 0) - (row.length - 1) * stageGap) / 2
+        for (const item of row) { item.x = x; item.y = y; x += item.width + stageGap }
         y += Math.max(...row.map((item) => item.height)) + 48
       }
       return items
@@ -166,7 +167,8 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
     function terminalY(item: Item, nodeId: string, inputSlot?: number): number {
       const child = item.nested?.find(candidate => candidate.memberIds.includes(nodeId))
       if (child) return 66 + child.y + terminalY(child, nodeId, inputSlot)
-      if (inputSlot === undefined) return item.height / 2
+      if (inputSlot === undefined) return item.node ? builderOutputPortY(item.node, 0) : item.height / 2
+      if (item.node) return builderInputPortY(item.node, inputSlot)
       const count = item.node ? Math.max(1, ...edges.filter(edge => edge.target === nodeId).map(edge => (edge.inputSlot ?? 0) + 1)) : 2
       return item.height * (inputSlot + 1) / (count + 1)
     }

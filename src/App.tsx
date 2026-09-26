@@ -1119,11 +1119,6 @@ function App({
         openGroup(target.id)
       }
     } else {
-      const ancestors = (codeGraph.groups ?? []).filter(group => group.nodeIds.includes(target.id))
-      const realAncestors = ancestors.map(group => group.id).filter(id => graph.groups?.some(group => group.id === id))
-      if (graph.view?.semanticZoom === false && realAncestors.some(id => !graph.view?.expandedGroupIds.includes(id))) {
-        setGraph(existing => ({ ...existing, view: { ...existing.view, expandedGroupIds: [...new Set([...(existing.view?.expandedGroupIds ?? []), ...realAncestors])] } }))
-      }
       setSelectedNodeIds([target.id])
       setSelectedGroupId(undefined)
     }

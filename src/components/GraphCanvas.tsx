@@ -47,6 +47,7 @@ import {
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import { customCsvCardHeight, customCsvOutputTop } from '../domain/datasets'
+import { builderCardHeight, builderInputPortY, builderOutputPortY } from '../domain/builderGeometry'
 import { blockPalette } from '../domain/blockPalette'
 import { appendArithmeticInput } from '../domain/arithmetic'
 import { codeForGroup } from '../domain/codeOutline'
@@ -67,7 +68,6 @@ import type {
 import { BuilderEdge, type BuilderEdgeData } from './BuilderEdge'
 import { BuilderNode, type BuilderNodeData } from './BuilderNode'
 import { GroupNode, type GroupNodeData } from './GroupNode'
-import { SemanticNode } from './SemanticNode'
 import { layoutSemanticGraph, semanticGroupDepth, semanticHasAddInput, semanticInputFraction } from '../domain/semanticLayout'
 import { preserveLayoutForWiring } from '../domain/layoutState'
 import { routeDiagramWires, type DiagramWire, type WireEndpoint, type WireObstacle } from '../domain/wireRouting'
@@ -77,12 +77,13 @@ import './modules.css'
 import './semanticCanvas.css'
 import './canvasAddMenu.css'
 
-const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode, semanticNode: SemanticNode }
+const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode }
 const edgeTypes = { builderEdge: BuilderEdge }
 const GROUP_NODE_ID_PREFIX = 'visual-group:'
 const EMPTY_SELECTED_NODE_IDS: string[] = []
 const EMPTY_PROBLEM_NODE_IDS = new Set<string>()
 const INITIAL_FIT_OPTIONS = { padding: 0.2 }
+const focusEase = (progress: number) => progress * progress * (3 - 2 * progress)
 
 interface CanvasSelection {
   nodeIds: string[]
@@ -164,10 +165,8 @@ function GraphCanvasInner({
 }: GraphCanvasProps): ReactElement {
   const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
   const sourceGraph = displayGraph ?? graph
-  const semantic = sourceGraph.view?.canvasStyle === 'architecture' ||
-    (sourceGraph.view?.canvasStyle !== 'builder' &&
-      (sourceGraph.view?.semanticZoom !== undefined || Boolean(sourceGraph.groups?.some((group) => group.kind))))
-  const continuous = semantic && sourceGraph.view?.semanticZoom !== false
+  const continuous = Boolean(sourceGraph.groups?.length)
+  const semantic = continuous
   const renderedGraph = useMemo(() => continuous ? compactVisualHierarchy(sourceGraph) : sourceGraph, [sourceGraph, continuous])
   const geometryKey = JSON.stringify({
     nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, expression: params.expression, dataset: params.dataset, customCsv: params.customCsv ? csvGeometrySample(params.customCsv) : undefined } })),
@@ -208,7 +207,7 @@ function GraphCanvasInner({
     if (!rects.length) return
     const x = Math.min(...rects.map(rect => rect.x)), y = Math.min(...rects.map(rect => rect.y))
     const bounds = { x, y, width: Math.max(...rects.map(rect => rect.x + rect.width)) - x, height: Math.max(...rects.map(rect => rect.y + rect.height)) - y }
-    void setViewport(getViewportForBounds(bounds, canvasSize.width, canvasSize.height, .01, maxZoom, frame ? .08 : .2), { duration: 650 })
+    void setViewport(getViewportForBounds(bounds, canvasSize.width, canvasSize.height, .01, maxZoom, frame ? .08 : .2), { duration: 650, ease: focusEase })
   }, [scene, geometryGraph, canvasSize, maxZoom, setViewport])
   const lastCodeFocus = useRef(0)
   useEffect(() => {
@@ -221,7 +220,7 @@ function GraphCanvasInner({
     }
     const rect = scene?.nodes.get(focusRequest.id) ?? layout?.nodes.get(focusRequest.id)
     if (!rect) return
-    void setViewport(getViewportForBounds(rect, canvasSize.width, canvasSize.height, .01, maxZoom, .32), { duration: 650 })
+    void setViewport(getViewportForBounds(rect, canvasSize.width, canvasSize.height, .01, maxZoom, .32), { duration: 650, ease: focusEase })
   }, [focusRequest, scene, layout, zoomToGroup, fitView, setViewport, canvasSize, maxZoom])
   useEffect(() => { if (addMenu) addSearch.current?.focus() }, [addMenu])
   useEffect(() => {
@@ -390,7 +389,7 @@ function GraphCanvasInner({
             expanded,
             continuous,
             sceneScale: scene?.scales.get(groupNodeId(group.id)),
-            semantic,
+            semantic: false,
             modelStage: !group.parentId && renderedGraph.groups?.some((candidate) => candidate.kind === 'transformer-block' || candidate.kind === 'cnn'),
             unitCount: weightValue?.shape[weightValue.shape.length - 1],
             unitValues: outputNode?.value?.data,
@@ -404,7 +403,7 @@ function GraphCanvasInner({
               const source = renderedGraph.nodes.find((node) => node.id === output.source)
               return { forward: edge?.value ?? source?.value, gradient: edge?.grad ?? source?.grad }
             }),
-            showGradient: semantic ? showGradient && phase === 'backward' : showGradient,
+            showGradient,
             active: group.nodeIds.includes(activeStep?.nodeId ?? ''),
             validationError: group.nodeIds.some(id => problemNodeIds.has(id)),
             onToggle: toggleGroup,
@@ -416,7 +415,7 @@ function GraphCanvasInner({
         .filter((node) => !groupedNodeIds.has(node.id))
         .map<CanvasNode>((node) => ({
           id: node.id,
-          type: node.type === 'loss' ? 'builderNode' : semantic ? 'semanticNode' : 'builderNode',
+          type: 'builderNode',
           position: layout?.nodes.get(node.id) ?? node.position,
           draggable: true,
           width: semantic ? layout?.nodes.get(node.id)?.width ?? 176 : isFlexibleInputNodeType(node.type) || node.type === 'arithmetic' ? NODE_WIDTH : undefined,
@@ -429,10 +428,10 @@ function GraphCanvasInner({
             sceneScale: scene?.scales.get(node.id),
             displayInputCount: Math.max(0, ...renderedGraph.edges.filter(edge => edge.target === node.id).map(edge => (edge.inputSlot ?? 0) + 1)),
             coordinate: node.id.startsWith('inspect:'),
-            vertical: node.type !== 'loss' && node.params.dataset !== 'custom-csv' && semantic && renderedGraph.groups?.some((group) => group.kind === 'transformer-block' || group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
-            compactStage: node.params.dataset !== 'custom-csv' && semantic && renderedGraph.groups?.some((group) => group.kind === 'cnn') && !renderedGraph.groups?.some((group) => group.nodeIds.includes(node.id)),
+            vertical: false,
+            compactStage: false,
             showMath,
-            showGradient: semantic ? showGradient && phase === 'backward' : showGradient,
+            showGradient,
             formula: formulaForNode(node, renderedGraph, formatCompactTensor),
             fullFormula: formulaForNode(node, renderedGraph, formatFullTensor),
             lossKind: node.type === 'loss' ? lossKindForNode(node, renderedGraph) : undefined,
@@ -475,7 +474,6 @@ function GraphCanvasInner({
       continuous,
       scene,
       onInspectNeuron,
-      phase,
     ],
   )
 
@@ -619,7 +617,6 @@ function GraphCanvasInner({
     const operation = groupId ? undefined : (node.data as BuilderNodeData).graphNode
     const inputs = groupData?.inputCount ?? Math.max(inputArityForNode(operation!), Number(node.data.displayInputCount ?? 0))
     const outputs = groupData?.outputCount ?? outputArityForNode(operation!)
-    const addInput = !groupData && semanticHasAddInput(operation!, inputs)
     const vertical = Boolean(groupData ? groupData.modelStage : node.data.vertical)
     // Deeply nested nodes can be smaller than one CSS pixel in world space.
     // Keep exact dimensions/ports instead of waiting for rounded DOM measures.
@@ -627,8 +624,10 @@ function GraphCanvasInner({
       id: source ? groupId || outputs > 1 ? `out-${index}` : 'out' : `in-${index}`,
       type: source ? 'source' as const : 'target' as const,
       position: vertical ? source ? FlowPosition.Bottom : FlowPosition.Top : source ? FlowPosition.Right : FlowPosition.Left,
-      x: vertical ? rect.width * (source ? (index + 1) / (outputs + 1) : semanticInputFraction(index, inputs, addInput)) : source ? rect.width : 0,
-      y: vertical ? source ? rect.height : 0 : rect.height * (source ? (index + 1) / (outputs + 1) : semanticInputFraction(index, inputs, addInput)),
+      x: vertical ? rect.width * (index + 1) / ((source ? outputs : inputs) + 1) : source ? rect.width : 0,
+      y: vertical ? source ? rect.height : 0 : groupData
+        ? rect.height * (index + 1) / ((source ? outputs : inputs) + 1)
+        : rect.height * (source ? builderOutputPortY(operation!, index) : builderInputPortY(operation!, index)) / builderCardHeight(operation!),
       width: 0, height: 0,
     })))
     return { ...node, selectable: available && (!groupId || reveal < .95), focusable: available,
@@ -951,16 +950,13 @@ function GraphCanvasInner({
     <section className="canvas-panel" aria-label="Graph canvas">
       <div className="canvas-header">
         <div>
-          <h2>{semantic ? 'Follow the computation' : 'Tensor computation graph'}</h2>
-          {semantic && <div className="flow-legend"><span><i/>Forward →</span><span><i/>← Gradient</span><span>Color strength = magnitude · click a wire for values</span></div>}
+          <h2>Tensor computation graph</h2>
+          <div className="flow-legend"><span><i/>Forward →</span><span><i/>← Gradient</span><span>Color strength = magnitude · click a wire for values</span></div>
         </div>
         <div className="canvas-header-actions">
           <p>
             {graph.nodes.length} nodes, {graph.edges.length} edges{groupCount > 0 ? `, ${groupCount} ${groupCount === 1 ? 'group' : 'groups'}` : ''}
           </p>
-          <button type="button" className="canvas-action-button" onClick={() => changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], canvasStyle: semantic ? 'builder' : 'architecture', semanticZoom: graph.view?.semanticZoom ?? true })}>
-            {semantic ? 'Builder cards' : 'Architecture cards'}
-          </button>
           {selectedNodeIds.length >= 2 ? (
             <button type="button" className="canvas-action-button" onClick={onGroupCreate}>
               <Combine size={15} />
@@ -989,7 +985,6 @@ function GraphCanvasInner({
         }}><ArrowUp size={14} /> Up one level</button>
         <button type="button" onClick={() => focusGroup(undefined)}><Maximize size={14} /> Fit model</button>
         {semantic ? <button type="button" onClick={compactLayout} title="Rearrange all blocks and fit the model; keep the current weights and values"><LayoutGrid size={14} /> Compact layout</button> : null}
-        {semantic ? <label className="semantic-zoom-switch"><input type="checkbox" checked={graph.view?.semanticZoom !== false} onChange={(event) => changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: event.target.checked })}/> Zoom reveals detail</label> : null}
       </nav> : null}
       <div className={`flow-shell ${semantic ? 'semantic-flow' : ''}`} ref={shell} onPointerDownCapture={handleFlowPointerDownCapture} onDoubleClick={handlePaneDoubleClick}
         onContextMenu={(event) => event.preventDefault()}

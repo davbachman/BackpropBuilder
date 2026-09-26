@@ -5,11 +5,13 @@ import { createNode, createEmptyGraph } from './examples'
 import { createModelPreset } from './modelPresets'
 import { projectDenseNeurons } from './neuronProjection'
 import { placeCanvasNode } from './nodePlacement'
-import { layoutSemanticGraph, type SemanticLayout } from './semanticLayout'
+import type { SemanticLayout } from './semanticLayout'
+import { builderCardHeight, builderCardWidth } from './builderGeometry'
 import type { GraphModel } from './types'
 
-const geometry = (graph: GraphModel) => graph.view?.semanticZoom === false
-  ? layoutSemanticGraph(graph) : layoutContinuousScene(compactVisualHierarchy(graph))
+const geometry = (graph: GraphModel): SemanticLayout => graph.groups?.length
+  ? layoutContinuousScene(compactVisualHierarchy(graph))
+  : { nodes: new Map(graph.nodes.map(node => [node.id, { ...node.position, width: builderCardWidth(node), height: builderCardHeight(node) }])), groups: new Map() }
 
 function expectUnmoved(before: SemanticLayout, after: SemanticLayout) {
   for (const kind of ['nodes', 'groups'] as const) for (const [id, rect] of before[kind]) {
@@ -72,7 +74,7 @@ it('places a new transformer calculation at the layer-normalization scale withou
   expectUnmoved(before, after)
   expect(after.scales.get(node.id)).toBeCloseTo(scale)
   expect(after.nodes.get(node.id)!.width).toBeCloseTo(176 * scale)
-  expect(after.nodes.get(node.id)!.height).toBeCloseTo(112 * scale)
+  expect(after.nodes.get(node.id)!.height).toBeCloseTo(builderCardHeight(node) * scale)
   expect(next.groups?.find(group => group.id === groupId)?.nodeIds).toContain(node.id)
   expect(next.groups?.find(group => group.id === 'blocks.0')?.nodeIds).toContain(node.id)
   expect(after.parents.get(node.id)).toBe(groupId)
@@ -93,7 +95,7 @@ it('scales a free-canvas block to the current close-up without moving the transf
   const next = placeCanvasNode(graph, node, graph, undefined, scale)
   const after = layoutContinuousScene(compactVisualHierarchy(next))
   expectUnmoved(before, after)
-  expect(after.nodes.get(node.id)).toEqual({ ...position, width: 176 * scale, height: 112 * scale })
+  expect(after.nodes.get(node.id)).toEqual({ ...position, width: 176 * scale, height: builderCardHeight(node) * scale })
   expect(after.scales.get(node.id)).toBe(scale)
   expect(after.parents.get(node.id)).toBeUndefined()
   expect(next.groups).toBe(graph.groups)

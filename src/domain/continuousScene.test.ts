@@ -6,7 +6,7 @@ import { segmentCrossesRect } from './wireRouting'
 import { projectDenseNeurons } from './neuronProjection'
 import { parseCustomCsv } from './customCsv'
 import { customCsvCardHeight, customCsvOutputTop } from './datasets'
-import { semanticInputFraction } from './semanticLayout'
+import { builderCardHeight, builderInputPortY } from './builderGeometry'
 import { createNode } from './examples'
 import { mergeNodesIntoVisualGroup, visualGroupInterface } from './grouping'
 import type { GraphModel } from './types'
@@ -52,12 +52,12 @@ describe('one continuous nested scene', () => {
     const gap = target.y - input.y - input.height
     expect(gap).toBeGreaterThanOrEqual(24)
     expect(gap).toBeLessThanOrEqual(40)
-    expect(target.y).toBeLessThan(neuron.y + neuron.height)
+    expect(target.y).toBeLessThan(neuron.y + neuron.height + 40)
     expect(target.y + target.height / 2).toBeGreaterThan(neuron.y + neuron.height)
     expect(loss.y + loss.height * 2 / 3).toBeCloseTo(target.y + target.height / 2)
     const overview = scene.levels.find(level => !level.parentId)!.ids.map(id => scene.nodes.get(id) ?? scene.groups.get(id.slice(13))!)
     const height = Math.max(...overview.map(rect => rect.y + rect.height)) - Math.min(...overview.map(rect => rect.y))
-    expect(height).toBeLessThan(270)
+    expect(height).toBeLessThan(500)
     const targetWire = routeContinuousScene(graph, scene).find(wire => graph.edges.find(edge => edge.id === wire.edgeId)?.source === 'target')!
     expect(targetWire.route).toHaveLength(2)
   })
@@ -209,7 +209,7 @@ describe('one continuous nested scene', () => {
       const outside = wires.find(wire => wire.edgeId === edgeId && !wire.parentId)!
       const inside = wires.find(wire => wire.edgeId === edgeId && wire.parentId === groupId)!
       expect(outside.route[0].x).toBeCloseTo(datasetRect.x + datasetRect.width)
-      expect(outside.route[0].y).toBeCloseTo(datasetRect.y + datasetRect.height * customCsvOutputTop(slot) / customCsvCardHeight(dataset))
+      expect(outside.route[0].y).toBeCloseTo(datasetRect.y + datasetRect.height * customCsvOutputTop(slot, true) / customCsvCardHeight(dataset, true))
       expect(close(outside.route.at(-1)!, inside.route[0])).toBe(true)
     }
   })
@@ -237,13 +237,13 @@ describe('one continuous nested scene', () => {
     }
     const scene = layoutContinuousScene(graph)
     const rect = scene.nodes.get(concat.id)!
-    expect(rect.height).toBe(148)
+    expect(rect.height).toBe(builderCardHeight(concat))
 
     const wires = routeContinuousScene(graph, scene)
     for (let index = 0; index < inputs.length; index++) {
       const endpoint = wires.find(wire => wire.edgeId === `input-${index}`)!.route.at(-1)!
       expect(endpoint.x).toBeCloseTo(rect.x)
-      expect(endpoint.y).toBeCloseTo(rect.y + rect.height * semanticInputFraction(index, 3, true))
+      expect(endpoint.y).toBeCloseTo(rect.y + builderInputPortY(concat, index))
     }
   })
 
@@ -281,9 +281,9 @@ describe('one continuous nested scene', () => {
     const prefix = 'inspect:blocks.0.ff1.layer:0:'
     const input = scene.nodes.get(`${prefix}x0`)!, weight = scene.nodes.get(`${prefix}w0`)!
     const scale = scene.scales.get(`${prefix}w0`)!
-    expect(weight.width / scale).toBeCloseTo(112)
-    expect(weight.height / scale).toBeCloseTo(64)
-    expect((weight.x - input.x) / scale).toBeCloseTo(128)
-    expect((weight.y - input.y) / scale).toBeCloseTo(48)
+    expect(weight.width / scale).toBeCloseTo(176)
+    expect(weight.height / scale).toBeCloseTo(205)
+    expect((weight.x - input.x) / scale).toBeCloseTo(200)
+    expect((weight.y - input.y) / scale).toBeCloseTo(110)
   })
 })

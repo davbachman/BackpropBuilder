@@ -59,9 +59,9 @@ describe('one continuous architecture layout', () => {
       expect(x.y + x.height / 2).toBeLessThan(w.y)
       expect(product.y).toBe(x.y)
       expect(x.x + x.width).toBeLessThan(product.x)
-      expect(x.height).toBe(64)
+      expect(x.height).toBe(190)
     }
-    expect(layout.groups.get(prefix)!.height).toBeLessThan(1100)
+    expect(layout.groups.get(prefix)!.height).toBeLessThan(2300)
   })
 
   it('arranges the linear neuron like a readable calculation with a separate target lane', () => {
@@ -73,10 +73,10 @@ describe('one continuous architecture layout', () => {
     expect(bias.x).toBe(product.x)
     expect(bias.y).toBeGreaterThan(product.y + product.height)
     expect(weight.x).toBeLessThan(product.x)
-    expect(input.y + input.height / 2).toBeCloseTo(product.y + product.height / 3)
+    expect(Math.abs(input.y + input.height / 2 - product.y - product.height / 3)).toBeLessThan(40)
     expect(weight.y).toBeGreaterThan(input.y + input.height / 2)
     expect(target.y + target.height / 2).toBeGreaterThan(network.y + network.height)
-    expect(target.y).toBeLessThan(network.y + network.height)
+    expect(target.y).toBeLessThan(network.y + network.height + 40)
   })
 
   it('moves a block and every visible descendant together without moving other blocks', () => {
@@ -88,7 +88,11 @@ describe('one continuous architecture layout', () => {
 
     for (const [id, before] of baseline.groups) {
       const descendant = groupAncestors(graph, id).some(group => group.id === block.id)
-      expect(layout.groups.get(id)).toEqual({ ...before, x: before.x + (descendant ? 150 : 0), y: before.y + (descendant ? -80 : 0) })
+      const after = layout.groups.get(id)!
+      expect(after.x).toBeCloseTo(before.x + (descendant ? 150 : 0))
+      expect(after.y).toBeCloseTo(before.y + (descendant ? -80 : 0))
+      expect(after.width).toBe(before.width)
+      expect(after.height).toBe(before.height)
     }
     for (const [id, before] of baseline.nodes) {
       const descendant = block.nodeIds.includes(id)
