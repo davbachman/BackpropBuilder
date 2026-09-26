@@ -1,0 +1,295 @@
+/* The theme lives on the workspace so switching never changes model data. */
+.app-shell.theme-dark {
+  color-scheme: dark;
+  --page-bg: #101522;
+  --panel-bg: #1b2232;
+  --panel-soft: #242e42;
+  --text: #edf1fb;
+  --muted: #a4aec2;
+  --muted-strong: #c4ccdb;
+  --border: #364156;
+  --grid-dot: #4d5a70;
+  --shadow: 0 18px 48px #05091485;
+  --accent: #bc9bfa;
+  --accent-soft: #393052;
+  --forward: #60d9c3;
+  --forward-soft: #1f4547;
+  --backward: #ff9d83;
+  --backward-soft: #52382f;
+  --update: #c2a5ff;
+  --update-soft: #392f53;
+  --loss: #ff9b9b;
+  --loss-soft: #4a303c;
+  --trainable: #89c6f7;
+  --target: #b9d97a;
+  color: var(--text);
+  background: var(--page-bg);
+}
+
+.theme-dark .top-bar,
+.theme-dark .canvas-header,
+.theme-dark .module-navigation {
+  background: #1a2030;
+  box-shadow: none;
+}
+.theme-dark.unified-studio .left-panel,
+.theme-dark.unified-studio .right-panel,
+.theme-dark.unified-studio .control-bar,
+.theme-dark .panel-section,
+.theme-dark .inspector-card {
+  background: var(--panel-bg);
+  border-color: var(--border);
+}
+.theme-dark .sidebar-heading,
+.theme-dark .connection-inspector,
+.theme-dark .dataset-workbench,
+.theme-dark .run-section-divider,
+.theme-dark.unified-studio .inspector-card {
+  border-color: var(--border);
+}
+.theme-dark .sidebar-splitter { background: #151b29; border-color: #293449; }
+.theme-dark .run-section-divider { background: var(--border); }
+.theme-dark input[type="range"],
+.theme-dark input[type="checkbox"] { accent-color: var(--accent); }
+.theme-dark .sidebar-heading,
+.theme-dark .palette-intro,
+.theme-dark .model-title,
+.theme-dark .run-intro,
+.theme-dark .run-status,
+.theme-dark .run-field,
+.theme-dark .inspector-field,
+.theme-dark .inspector-field > span,
+.theme-dark .coordinate-note,
+.theme-dark .inspector-values > span,
+.theme-dark .heatmap-caption,
+.theme-dark .heatmap-coordinate,
+.theme-dark .heatmap-pagination,
+.theme-dark .flow-legend,
+.theme-dark .connection-inspector > p { color: var(--muted); }
+.theme-dark .inspector-values strong,
+.theme-dark .right-panel p { color: var(--muted-strong); }
+.theme-dark .palette-button { color: var(--muted-strong); }
+.theme-dark .palette-button svg,
+.theme-dark .sidebar-heading > button { color: var(--accent); }
+.theme-dark.unified-studio button:hover:not(:disabled),
+.theme-dark .sidebar-heading > button:hover { background: #312b46; border-color: #705a96; color: #decaff; }
+.theme-dark .left-sidebar-tabs button,
+.theme-dark .right-sidebar-tabs button { color: var(--muted); }
+.theme-dark .left-sidebar-tabs button[aria-selected="true"],
+.theme-dark .right-sidebar-tabs button[aria-selected="true"],
+.theme-dark.unified-studio .palette-button.is-selected {
+  color: #decaff;
+  background: #322c47;
+  border-color: #8d71bd;
+}
+.theme-dark .brand-menu-button svg { color: var(--accent); }
+.theme-dark .brand-menu-button:hover:not(:disabled),
+.theme-dark .brand-menu-button[aria-expanded="true"] { color: #decaff; background: #332b48; }
+.theme-dark .theme-toggle { margin-left: auto; color: var(--accent); }
+.theme-dark .theme-toggle[aria-pressed="true"] { background: var(--accent-soft); }
+.theme-dark .topbar-menu-panel { background: #232a3b; }
+.theme-dark .topbar-menu-panel button:hover:not(:disabled),
+.theme-dark .topbar-menu-panel a:hover { background: #393052; }
+.theme-dark .run-field input:not([type="range"]),
+.theme-dark .run-field select,
+.theme-dark .inspector-field input,
+.theme-dark .inspector-field select,
+.theme-dark .inspector-field textarea,
+.theme-dark .node-field input,
+.theme-dark .node-field select,
+.theme-dark .heatmap-coordinate input,
+.theme-dark .heatmap-pagination select,
+.theme-dark .block-detail-title input {
+  background: #121a28;
+  border-color: var(--border);
+  color: var(--text);
+}
+.theme-dark .run-metrics span,
+.theme-dark.unified-studio .metric-pill,
+.theme-dark .formula-box,
+.theme-dark.unified-studio .formula-box,
+.theme-dark .node-formula { background: var(--panel-soft); color: var(--muted-strong); }
+.theme-dark .run-metrics strong,
+.theme-dark .block-detail-title { color: var(--text); }
+.theme-dark .inspector-children button { border-color: var(--border); }
+.theme-dark .inspector-children button span,
+.theme-dark .inspector-disclosure { color: var(--accent); }
+.theme-dark .graph-issues { background: #443626; color: #f0c997; border-color: #77573a; }
+.theme-dark .node-issues { background: #49303c; color: #ffb5b5; border-color: #a45e73; }
+.theme-dark .builder-node.has-error,
+.theme-dark .visual-group-node.has-error:not(.is-expanded),
+.theme-dark .semantic-operation.has-error,
+.theme-dark .visual-group-node.semantic-group.has-error:not(.is-expanded) { background: #432b36; }
+
+/* Keep the canvas readable at every zoom level, including fading group covers. */
+.theme-dark .semantic-flow { background: radial-gradient(ellipse at 45% 32%, #202b3e 0%, #172132 68%, #121b2b 100%); }
+.theme-dark .react-flow {
+  --xy-controls-button-background-color: #253047;
+  --xy-controls-button-background-color-hover: #34415a;
+  --xy-controls-button-color: #edf1fb;
+  --xy-controls-button-color-hover: #fff;
+  --xy-controls-button-border-color: #485671;
+  --xy-attribution-background-color: #243048d9;
+}
+.theme-dark .react-flow__attribution a { color: var(--muted); }
+.theme-dark .react-flow__controls { border: 1px solid var(--border); box-shadow: 0 8px 24px #070b1980; }
+.theme-dark .react-flow__controls-button { background: #253047; color: var(--text); fill: var(--text); }
+.theme-dark .react-flow__controls-button svg { fill: var(--text); }
+.theme-dark .semantic-flow .react-flow__background { opacity: .7; }
+.theme-dark .semantic-flow .react-flow__edge-path { stroke: #71819d; }
+.theme-dark .semantic-flow .react-flow__controls { border-color: var(--border); box-shadow: 0 8px 24px #070b1980; }
+.theme-dark .semantic-flow .react-flow__controls button { background: #253047; border-color: var(--border); color: var(--text); fill: var(--text); }
+.theme-dark .semantic-flow .react-flow__controls button svg { fill: var(--text); }
+.theme-dark .semantic-zoom-switch { color: var(--muted); }
+.theme-dark .module-navigation button { background: #232d42; border-color: var(--border); color: var(--text); }
+.theme-dark .builder-node,
+.theme-dark .visual-group-node,
+.theme-dark .visual-group-node.semantic-group,
+.theme-dark .continuous-card-cover .visual-group-node.semantic-group,
+.theme-dark .semantic-operation {
+  background: #252f43;
+  border-color: #53617a;
+  color: var(--text);
+  box-shadow: 0 7px 23px #060b1a47;
+}
+.theme-dark .semantic-operation.is-parameter { background: #343329; border-color: #9c8060; }
+.theme-dark .semantic-operation.is-parameter .semantic-operation-value { color: #e5c592; }
+.theme-dark .semantic-operation.operation-activation { background: #203d3c; border-color: #5d9e91; }
+.theme-dark .semantic-operation.operation-loss { background: #3c2c39; border-color: #a76f7b; }
+.theme-dark .semantic-operation.operation-dataset { background: #263a49; border-color: #668ea3; }
+.theme-dark .visual-group-node.semantic-group { --group-ink: #9fb9f4; --group-tint: #303c57; }
+.theme-dark .semantic-group.group-kind-attention,
+.theme-dark .semantic-group.group-kind-head { --group-ink: #d2aaf4; --group-tint: #42334e; }
+.theme-dark .semantic-group.group-kind-layer,
+.theme-dark .semantic-group.group-kind-mlp,
+.theme-dark .semantic-group.group-kind-network,
+.theme-dark .semantic-group.group-kind-neuron { --group-ink: #79d8c2; --group-tint: #254341; }
+.theme-dark .semantic-group.group-kind-transformer-block { --group-ink: #a9bcfb; --group-tint: #303c5a; }
+.theme-dark .semantic-group .visual-group-title-row strong { color: var(--text); }
+.theme-dark .semantic-group .node-metrics { color: var(--muted); border-color: var(--border); }
+.theme-dark .semantic-group .group-code-line,
+.theme-dark .semantic-operation-formula { color: #c0aacd; }
+.theme-dark .semantic-operation-value,
+.theme-dark .semantic-dataset-port,
+.theme-dark .semantic-arithmetic-field,
+.theme-dark .semantic-arithmetic-field input { color: #c8d7ef; }
+.theme-dark .semantic-shape,
+.theme-dark .semantic-dataset-summary { color: var(--muted); }
+.theme-dark .semantic-dataset-select,
+.theme-dark .semantic-operation-select,
+.theme-dark .semantic-arithmetic-field input,
+.theme-dark .semantic-add-input {
+  background: #141d2d;
+  color: var(--text);
+  border-color: #52607a;
+}
+.theme-dark .semantic-operation .node-handle,
+.theme-dark .semantic-group .group-handle { border-color: #20293b; }
+.theme-dark .semantic-group.is-model-stage.is-selected:not(.is-expanded) .node-metrics { background: #222c3f; border-color: var(--border); }
+.theme-dark .continuous-group-outline { border-color: #50667a; }
+.theme-dark .continuous-group-outline.is-selected { border-color: var(--accent); background: #b995ff0b; }
+.theme-dark .visual-group-node.semantic-group.is-selected,
+.theme-dark .continuous-card-cover .visual-group-node.semantic-group.is-selected,
+.theme-dark .semantic-operation.is-selected { border-color: var(--accent); box-shadow: 0 0 0 4px #bc9bfa47, 0 8px 24px #05091470; }
+.theme-dark .builder-edge-flow { --edge-flow-color: #a78bfa; }
+.theme-dark .builder-edge-flow.is-backward { --edge-flow-color: #ff9b7b; }
+.theme-dark .react-flow .react-flow__edge .builder-edge-flow.is-unreached path.builder-edge { stroke: #7c8ca6; stroke-opacity: .5; }
+.theme-dark .builder-edge-flow .builder-edge-bands { stroke: #f4efff; stroke-opacity: .55; }
+.theme-dark .neuron-glyph circle { fill: #234540; stroke: #80cabb; }
+.theme-dark .neuron-glyph text { fill: #a6ebd6; }
+.theme-dark .neuron-glyph path { stroke: #8ac9bd; }
+.theme-dark .layer-neuron-preview > span { color: var(--muted); }
+
+/* Code and reports remain part of the same visual workspace. */
+.theme-dark .code-outline { background: #192234; }
+.theme-dark .code-outline-intro { background: #222d42; border-color: var(--border); color: var(--accent); }
+.theme-dark .code-outline-intro strong,
+.theme-dark .inference-report-panel h3,
+.theme-dark .loss-report-heading h3 { color: var(--text); }
+.theme-dark .code-outline-intro p,
+.theme-dark .code-outline-number,
+.theme-dark .code-outline-comment { color: var(--muted); }
+.theme-dark .code-outline-line { color: #d5ddea; }
+.theme-dark .code-outline-row:hover { background: #28354c; }
+.theme-dark .code-outline-row.is-selected { background: #41345b; box-shadow: inset 3px 0 var(--accent); }
+.theme-dark .code-token-variable,
+.theme-dark .code-outline-row.is-selected .code-token-variable { color: #a8c8ff; }
+.theme-dark .code-token-function { color: #d6a9f6; }
+.theme-dark .code-token-number { color: #f6b88f; }
+.theme-dark .code-token-string { color: #83ddc2; }
+.theme-dark .code-token-operator { color: #cbbbdc; }
+.theme-dark .visualization-plot,
+.theme-dark .loss-report-panel,
+.theme-dark .inference-report-panel { background: #202a3c; border-color: var(--border); }
+.theme-dark .visualization-losses > div,
+.theme-dark .inference-report-summary,
+.theme-dark .inference-predictions-heading,
+.theme-dark .csv-settings { background: #29354a; border-color: var(--border); }
+.theme-dark .visualization-target-point { stroke: #202a3c; }
+.theme-dark .visualization-heatmap-cell { stroke: #253047; }
+.theme-dark .loss-report-panel svg line { stroke: #536078; }
+.theme-dark .loss-report-panel svg path.is-train { stroke: #b99aff; }
+.theme-dark .loss-report-panel svg path.is-held-out { stroke: #ffa77e; }
+.theme-dark .loss-report-legend span.is-train::before { background: #b99aff; }
+.theme-dark .loss-report-legend span.is-held-out::before { background: #ffa77e; }
+.theme-dark .loss-report-heading > span,
+.theme-dark .loss-report-legend,
+.theme-dark .loss-report-note,
+.theme-dark .loss-report-range,
+.theme-dark .loss-report-list > div,
+.theme-dark .inference-predictions-heading span { color: var(--muted); }
+.theme-dark .loss-report-list,
+.theme-dark .loss-report-list > div,
+.theme-dark .inference-predictions,
+.theme-dark .inference-predictions th,
+.theme-dark .inference-predictions td,
+.theme-dark .inference-predictions-pages { border-color: var(--border); }
+.theme-dark .loss-report-list strong,
+.theme-dark .inference-predictions td { color: var(--text); }
+.theme-dark .inference-predictions th { color: var(--muted-strong); }
+.theme-dark .inference-report-summary strong { color: var(--accent); }
+.theme-dark .inference-report-summary strong[aria-label$="accuracy"] { color: var(--forward); }
+.theme-dark .inference-predictions tr.is-incorrect td:last-child { color: var(--loss); }
+.theme-dark .dataset-image-preview > div,
+.theme-dark .cnn-input-row,
+.theme-dark .cnn-filter-picker button,
+.theme-dark .cnn-feature-maps > div,
+.theme-dark .cnn-patch-readout { background: #263247; border-color: var(--border); }
+.theme-dark .cnn-controls,
+.theme-dark .cnn-controls h2,
+.theme-dark .cnn-section-heading h3 { color: var(--text); }
+.theme-dark .cnn-controls select,
+.theme-dark .cnn-filter-editor input,
+.theme-dark .cnn-image-grid { background: #172234; border-color: var(--border); color: var(--text); }
+.theme-dark .decoder-controls { background: linear-gradient(145deg, #213443, #1f2839 65%); border-color: #506b79; color: var(--text); }
+.theme-dark .decoder-controls textarea,
+.theme-dark .decoder-controls select,
+.theme-dark .decoder-controls input,
+.theme-dark .decoder-apply { background: #152231; border-color: #526479; color: var(--text); }
+.theme-dark .decoder-vocabulary button { background: #293b4a; border-color: #526479; color: var(--muted-strong); }
+.theme-dark .decoder-probability-track { background: #3b4a5d; }
+.theme-dark .decoder-sampling-controls,
+.theme-dark .decoder-checkpoints { border-color: var(--border); }
+.theme-dark .canvas-add-menu,
+.theme-dark .canvas-group-rename,
+.theme-dark .about-dialog,
+.theme-dark .colab-connection-dialog,
+.theme-dark .csv-picker-dialog { background: #222a3d; border-color: var(--border); color: var(--text); }
+.theme-dark .canvas-add-search,
+.theme-dark .canvas-add-hint { border-color: var(--border); }
+.theme-dark .canvas-add-search input,
+.theme-dark .canvas-group-rename input,
+.theme-dark .colab-connection-dialog input { background: #141d2d; border-color: var(--border); color: var(--text); }
+.theme-dark .canvas-add-results button,
+.theme-dark .canvas-group-rename label,
+.theme-dark .about-dialog h2,
+.theme-dark .colab-connection-dialog h2,
+.theme-dark .csv-picker-dialog h2 { color: var(--text); }
+.theme-dark .canvas-add-results button.is-active,
+.theme-dark .canvas-add-results button:hover { background: #3b3155; color: #e6d6ff; }
+.theme-dark .about-dialog p,
+.theme-dark .colab-connection-dialog p,
+.theme-dark .csv-picker-dialog p { color: var(--muted-strong); }
+.theme-dark .colab-connection-dialog label,
+.theme-dark .colab-connection-dialog .colab-connection-status { color: var(--muted-strong); }
+.theme-dark .colab-connection-dialog .colab-connection-status { background: #322c47; }
