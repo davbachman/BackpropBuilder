@@ -937,7 +937,6 @@ function GraphCanvasInner({
     <section className="canvas-panel" aria-label="Graph canvas">
       <div className="canvas-header">
         <div>
-          <p className="eyebrow">Graph canvas</p>
           <h2>{semantic ? 'Follow the computation' : 'Tensor computation graph'}</h2>
           {semantic && <div className="flow-legend"><span><i/>Forward →</span><span><i/>← Gradient</span><span>Color strength = magnitude · click a wire for values</span></div>}
         </div>
