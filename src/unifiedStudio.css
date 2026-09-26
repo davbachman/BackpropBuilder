@@ -47,6 +47,25 @@
   font-size: 11px;
   padding: 7px 9px;
 }
+.unified-studio .topbar-menu-trigger {
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.unified-studio .topbar-menu-trigger:hover:not(:disabled),
+.unified-studio .topbar-menu-trigger[aria-expanded="true"] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+.unified-studio .topbar-menu-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .unified-studio .left-panel {
   padding: 20px 12px;
   background: #fcfbfd;

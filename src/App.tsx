@@ -1430,7 +1430,7 @@ function App({
           <div className="topbar-menu">
             <button
               type="button"
-              className="topbar-button"
+              className="topbar-menu-trigger"
               aria-haspopup="menu"
               aria-expanded={isFileMenuOpen}
               onClick={() => { setIsEditMenuOpen(false); setIsAppMenuOpen(false); setIsFileMenuOpen((open) => !open) }}
@@ -1494,7 +1494,7 @@ function App({
           <div className="topbar-menu">
             <button
               type="button"
-              className="topbar-button"
+              className="topbar-menu-trigger"
               aria-haspopup="menu"
               aria-expanded={isEditMenuOpen}
               onClick={() => { setIsFileMenuOpen(false); setIsAppMenuOpen(false); setIsEditMenuOpen((open) => !open) }}

@@ -85,6 +85,7 @@
 .theme-dark .brand-menu-button svg { color: var(--accent); }
 .theme-dark .brand-menu-button:hover:not(:disabled),
 .theme-dark .brand-menu-button[aria-expanded="true"] { color: #decaff; background: #332b48; }
+.theme-dark.unified-studio .topbar-menu-trigger:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--accent); }
 .theme-dark .theme-toggle { margin-left: auto; color: var(--accent); }
 .theme-dark .theme-toggle[aria-pressed="true"] { background: var(--accent-soft); }
 .theme-dark .topbar-menu-panel { background: #232a3b; }
