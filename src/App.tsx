@@ -243,6 +243,11 @@ function App({
   const [clipboardPasteCount, setClipboardPasteCount] = useState(0)
   const [importError, setImportError] = useState<string | undefined>()
   const [exportNotice, setExportNotice] = useState<string | undefined>()
+  useEffect(() => {
+    if (!exportNotice || colabOpenUrl) return
+    const timeout = window.setTimeout(() => setExportNotice(undefined), 6000)
+    return () => window.clearTimeout(timeout)
+  }, [exportNotice, colabOpenUrl])
   const [csvPickerOpen, setCsvPickerOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)

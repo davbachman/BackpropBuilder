@@ -82,7 +82,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const isFlexibleInputNode = isFlexibleInputNodeType(node.type)
   const variableInputLayout = isFlexibleInputNode || node.type === 'arithmetic'
   const nodeHeight = node.dimensions?.height ?? heightForInputCount(inputCount)
-  const canAddInput = isFlexibleInputNode && inputCount < MAX_FLEX_INPUT_COUNT
+  const canAddInput = variableInputLayout && inputCount < MAX_FLEX_INPUT_COUNT
   const isSource = outputCount > 0
   const editableValue =
     node.type === 'weight' ||

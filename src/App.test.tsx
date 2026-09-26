@@ -1129,6 +1129,41 @@ describe('Backprop Builder app', () => {
     )
   })
 
+  it.each([
+    ['builder', 'x1 + x2', 'x1 + x2 + x3', 9],
+    ['builder', 'x1 * x2', 'x1 * x2 * x3', 24],
+    ['architecture', 'x1 + x2', 'x1 + x2 + x3', 9],
+    ['architecture', 'x1 * x2', 'x1 * x2 * x3', 24],
+  ] as const)('adds a working input to %s Arithmetic card using %s', async (canvasStyle, expression, extended, expected) => {
+    const user = userEvent.setup()
+    const onGraphChange = vi.fn()
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      view: { expandedGroupIds: [], canvasStyle },
+      nodes: [
+        { id: 'x1', type: 'input', label: 'x1', position: { x: 0, y: 0 }, params: { value: scalarValue(2) } },
+        { id: 'x2', type: 'input', label: 'x2', position: { x: 0, y: 160 }, params: { value: scalarValue(3) } },
+        { id: 'x3', type: 'input', label: 'x3', position: { x: 0, y: 320 }, params: { value: scalarValue(4) } },
+        { id: 'arithmetic', type: 'arithmetic', label: 'Arithmetic', position: { x: 240, y: 160 }, params: { expression } },
+      ],
+      edges: [
+        { id: 'first', source: 'x1', target: 'arithmetic', inputSlot: 0 },
+        { id: 'second', source: 'x2', target: 'arithmetic', inputSlot: 1 },
+      ],
+    }
+    const canvas = (model: GraphModel) => <GraphCanvas graph={model} showMath showGradient phase="edit" onGraphChange={onGraphChange} onSelectionChange={vi.fn()} onCreateNode={vi.fn()} onCancelPendingPlacement={vi.fn()} onNodeValueChange={vi.fn()} onActivationChange={vi.fn()} onGroupCreate={vi.fn()} onGroupExplode={vi.fn()} onGroupMove={vi.fn()} />
+    const { container, rerender } = render(canvas(graph))
+
+    await user.click(screen.getByRole('button', { name: 'Add input to Arithmetic' }))
+
+    const changed = onGraphChange.mock.lastCall?.[0] as GraphModel
+    expect(changed.nodes.find(node => node.id === 'arithmetic')?.params.expression).toBe(extended)
+    const connected = { ...changed, edges: [...changed.edges, { id: 'third', source: 'x3', target: 'arithmetic', inputSlot: 2 }] }
+    expect(forwardPass(connected).graph.nodes.find(node => node.id === 'arithmetic')?.value?.data).toEqual([expected])
+    rerender(canvas(changed))
+    await waitFor(() => expect(container.querySelectorAll('[data-id="arithmetic"] .node-handle.target')).toHaveLength(3))
+  })
+
   it('shows a merge action for multiple selected graph nodes', async () => {
     const user = userEvent.setup()
     const onGroupCreate = vi.fn()
@@ -1484,6 +1519,28 @@ describe('Backprop Builder app', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Upload notebook')
     } finally {
       createElementSpy.mockRestore()
+      open.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('dismisses the notebook download notice after a short delay', () => {
+    const createObjectURL = vi.fn(() => 'blob:notebook')
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    try {
+      render(<App initialGraph={createModelPreset('linear')} />)
+      vi.useFakeTimers()
+      act(() => fireEvent.click(screen.getByRole('button', { name: /^File$/i })))
+      act(() => fireEvent.click(screen.getByRole('menuitem', { name: /^Open in Colab$/i })))
+      expect(screen.getByRole('status')).toHaveTextContent('Notebook downloaded')
+
+      act(() => vi.advanceTimersByTime(6000))
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      click.mockRestore()
       open.mockRestore()
       vi.unstubAllGlobals()
     }

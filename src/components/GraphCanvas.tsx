@@ -16,7 +16,7 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
-import { ArrowUp, Combine, Maximize, Ungroup, ScanSearch, LayoutGrid, Search } from 'lucide-react'
+import { ArrowUp, Combine, Maximize, Ungroup, LayoutGrid, Search } from 'lucide-react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -47,6 +47,7 @@ import {
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import { customCsvCardHeight, customCsvOutputTop } from '../domain/datasets'
 import { blockPalette } from '../domain/blockPalette'
+import { appendArithmeticInput } from '../domain/arithmetic'
 import { codeForGroup } from '../domain/codeOutline'
 import type {
   ActivationKind,
@@ -335,9 +336,11 @@ function GraphCanvasInner({
       onGraphChange({
         ...graph,
         nodes: graph.nodes.map((node) => {
-          if (node.id !== nodeId || !isFlexibleInputNodeType(node.type)) return node
+          if (node.id !== nodeId || (!isFlexibleInputNodeType(node.type) && node.type !== 'arithmetic')) return node
 
-          const currentInputCount = Math.max(inputArityForNode(node), minimumInputCountForNode(graph, node))
+          const currentInputCount = node.type === 'arithmetic'
+            ? inputArityForNode(node)
+            : Math.max(inputArityForNode(node), minimumInputCountForNode(graph, node))
           const nextInputCount = Math.min(MAX_FLEX_INPUT_COUNT, currentInputCount + 1)
           if (nextInputCount === currentInputCount) return node
 
@@ -347,7 +350,9 @@ function GraphCanvasInner({
           return {
             ...node,
             dimensions: { ...node.dimensions, width: NODE_WIDTH, height: nextHeight },
-            params: { ...node.params, inputCount: nextInputCount },
+            params: node.type === 'arithmetic'
+              ? { ...node.params, expression: appendArithmeticInput(node.params.expression ?? 'x1 * x2') }
+              : { ...node.params, inputCount: nextInputCount },
           }
         }),
       })
@@ -1062,7 +1067,6 @@ function GraphCanvasInner({
           <label>Block name<input autoFocus aria-label="Group name" value={renameGroup.label} onChange={event => setRenameGroup({ ...renameGroup, label: event.target.value })} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setRenameGroup(undefined) } }} /></label>
           <button type="submit">Rename</button>
         </form> : null}
-        {semantic ? <div className="semantic-canvas-hint"><ScanSearch size={15}/><span>Drag to move or select · two-finger click-drag to pan · double-click blocks to explore or canvas to add</span></div> : null}
       </div>
     </section>
   )

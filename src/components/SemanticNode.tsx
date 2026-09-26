@@ -1,8 +1,9 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Sigma, SlidersHorizontal, Sparkles, ArrowRight, CirclePlus, X, Grid2X2, Database } from 'lucide-react'
-import { Fragment, useState, type ReactElement } from 'react'
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
+import { Sigma, SlidersHorizontal, Sparkles, ArrowRight, CirclePlus, X, Grid2X2, Database, Plus } from 'lucide-react'
+import { Fragment, useEffect, useState, type ReactElement } from 'react'
 import { parseArithmetic } from '../domain/arithmetic'
-import { inputArityForNode, outputArityForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
+import { inputArityForNode, isFlexibleInputNodeType, MAX_FLEX_INPUT_COUNT, outputArityForNode, TENSOR_TRANSFORM_OPTIONS } from '../domain/engine'
+import { expandedSemanticInputHeight } from '../domain/semanticLayout'
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetForNode, datasetExamples, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import type { DatasetKind, LossKind, TensorTransformKind } from '../domain/types'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
@@ -12,6 +13,7 @@ import type { BuilderNodeData } from './BuilderNode'
  * values remain the same objects used by the builder and backpropagation. */
 export function SemanticNode(props: NodeProps): ReactElement {
   const data = props.data as BuilderNodeData
+  const updateNodeInternals = useUpdateNodeInternals()
   const vertical = Boolean(props.data.vertical)
   const coordinate = Boolean(props.data.coordinate)
   const compactStage = Boolean(props.data.compactStage)
@@ -30,9 +32,14 @@ export function SemanticNode(props: NodeProps): ReactElement {
   const displayValue = formatCompactTensor(data.showGradient ? node.grad : value)
   const inputs = Math.max(inputArityForNode(node), Number(props.data.displayInputCount ?? 0))
   const outputs = outputArityForNode(node)
-  return <div aria-hidden={data.accessible === false} inert={data.accessible === false} aria-invalid={data.validationError || undefined} style={{ transform: `scale(${Number(data.sceneScale ?? 1)})`, transformOrigin: 'top left', ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node), paddingRight: customCsvLabelWidth(node) + 22 } : {}) }} className={`semantic-operation ${coordinate ? 'is-coordinate' : ''} ${vertical ? 'is-model-stage' : ''} ${compactStage ? 'is-compact-stage' : ''} ${customCsv ? 'is-custom-csv' : ''} ${imageInput ? 'is-image-input' : ''} ${parameter ? 'is-parameter' : ''} operation-${node.type} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError ? 'has-error' : ''}`}>
+  const canAddInput = (node.type === 'arithmetic' || isFlexibleInputNodeType(node.type)) && inputs < MAX_FLEX_INPUT_COUNT
+  const expandedHeight = expandedSemanticInputHeight(node)
+  useEffect(() => {
+    if (node.type === 'arithmetic' || isFlexibleInputNodeType(node.type)) updateNodeInternals(node.id)
+  }, [inputs, node.id, node.type, updateNodeInternals])
+  return <div aria-hidden={data.accessible === false} inert={data.accessible === false} aria-invalid={data.validationError || undefined} style={{ transform: `scale(${Number(data.sceneScale ?? 1)})`, transformOrigin: 'top left', ...(expandedHeight ? { height: expandedHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node), paddingRight: customCsvLabelWidth(node) + 22 } : {}) }} className={`semantic-operation ${coordinate ? 'is-coordinate' : ''} ${vertical ? 'is-model-stage' : ''} ${compactStage ? 'is-compact-stage' : ''} ${customCsv ? 'is-custom-csv' : ''} ${imageInput ? 'is-image-input' : ''} ${parameter ? 'is-parameter' : ''} operation-${node.type} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError ? 'has-error' : ''}`}>
     {Array.from({ length: inputs }, (_, index) => <Handle key={`in-${index}`} id={`in-${index}`} type="target" position={vertical ? Position.Top : Position.Left} style={vertical ? { left: `${(index + 1) * 100 / (inputs + 1)}%` } : { top: `${(index + 1) * 100 / (inputs + 1)}%` }} className="node-handle" />)}
-    <div className="semantic-operation-heading"><Icon size={14}/><span>{imageInput ? 'Digit image' : node.label}</span></div>
+    <div className="semantic-operation-heading"><Icon size={14}/><span>{imageInput ? 'Digit image' : node.label}</span>{canAddInput ? <button type="button" className="semantic-add-input nodrag nopan" aria-label={`Add input to ${node.label}`} title="Add input" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); data.onFlexibleInputAdd(node.id) }}><Plus size={13}/></button> : null}</div>
     {imageInput ? <div className="semantic-image-thumbnail" aria-label="Handwritten digit input">{value.data.map((pixel,index)=><span key={index} style={{background:`rgba(53,78,112,${.06+Math.max(0,Math.min(1,pixel))*.94})`}}/>)}</div> : null}
     {dataset ? <>
       <select aria-label={`Dataset for ${node.label}`} title={dataset.label} className="semantic-dataset-select nodrag nowheel" value={dataset.kind} onChange={event => data.onDatasetChange(node.id, event.target.value as DatasetKind)}>

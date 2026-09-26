@@ -89,6 +89,14 @@ export function parseArithmetic(source: string): ParsedArithmetic {
 
 export function arithmeticInputCount(source: string): number { return parseArithmetic(source).inputCount }
 
+/** Add a real input to an editable expression, preserving its top-level operation. */
+export function appendArithmeticInput(source: string): string {
+  const parsed = parseArithmetic(source)
+  if (parsed.inputCount >= 64) throw new Error('Arithmetic expressions support up to 64 inputs.')
+  const operator = parsed.expression.kind === 'binary' && parsed.expression.op === '*' ? '*' : '+'
+  return `${source.trim()} ${operator} x${parsed.inputCount + 1}`
+}
+
 interface Evaluated { value: TensorValue; backward: (gradient: TensorValue) => void }
 
 export function evaluateArithmetic(source: string, inputs: TensorValue[], gradient?: TensorValue): { value: TensorValue; gradients: TensorValue[] } {

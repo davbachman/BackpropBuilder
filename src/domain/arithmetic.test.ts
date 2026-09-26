@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
+import { appendArithmeticInput, arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
 import { backwardPass, forwardPass, runTrainingStep } from './engine'
 import { blockPalette } from './blockPalette'
 import { createNode } from './examples'
@@ -22,6 +22,15 @@ describe('editable arithmetic block', () => {
     expect(() => parseArithmetic('x2 + 1')).toThrow(/consecutive/)
     expect(() => parseArithmetic('x1^x2')).toThrow(/exponent must be a number/)
     expect(() => parseArithmetic('alert(x1)')).toThrow()
+  })
+
+  it('extends an additive or multiplicative expression with a working input', () => {
+    const sum = appendArithmeticInput('x1 + x2')
+    const product = appendArithmeticInput('x1 * x2')
+    expect(sum).toBe('x1 + x2 + x3')
+    expect(product).toBe('x1 * x2 * x3')
+    expect(evaluateArithmetic(sum, [scalarValue(2), scalarValue(3), scalarValue(4)]).value.data).toEqual([9])
+    expect(evaluateArithmetic(product, [scalarValue(2), scalarValue(3), scalarValue(4)]).value.data).toEqual([24])
   })
 
   it('broadcasts tensors and sums broadcast gradients back to each input shape', () => {

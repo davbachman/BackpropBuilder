@@ -1,5 +1,6 @@
 import type { GraphGroup, GraphModel, GraphNode } from './types'
 import { customCsvCardHeight, customCsvCardWidth } from './datasets'
+import { inputArityForNode, isFlexibleInputNodeType } from './engine'
 
 export interface SemanticRect { x: number; y: number; width: number; height: number }
 export interface SemanticLayout {
@@ -10,6 +11,12 @@ export interface SemanticLayout {
 const ROW_GAP = 32
 const COLUMN_GAP = 72
 const WIRE_LANE = 24
+
+export function expandedSemanticInputHeight(node: GraphNode): number | undefined {
+  if (node.type !== 'arithmetic' && !isFlexibleInputNodeType(node.type)) return undefined
+  const count = inputArityForNode(node)
+  return count > 4 ? (count + 1) * 20 : undefined
+}
 
 /** Layout only the currently visible hierarchy. Expansion creates room without
  * moving or duplicating a single parameter in the underlying model. */
@@ -38,7 +45,10 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
       const height = Math.max(130, ...nested.map((item) => item.y + item.height)) + 94
       return { id: group.id, group, memberIds: group.nodeIds, nested, width, height, x: 0, y: 0 }
     })
-    items.push(...ownNodes.map((node) => ({ id: node.id, node, memberIds: [node.id], width: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : coordinates ? 112 : 176, height: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112, x: 0, y: 0 })))
+    items.push(...ownNodes.map((node) => {
+      const baseHeight = node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardHeight(node) : node.type === 'loss' ? 176 : coordinates ? 64 : tower && !parent ? cnn ? 64 : 84 : 112
+      return { id: node.id, node, memberIds: [node.id], width: node.type === 'dataset' && node.params.dataset === 'custom-csv' ? customCsvCardWidth(node) : coordinates ? 112 : 176, height: Math.max(baseHeight, expandedSemanticInputHeight(node) ?? 0), x: 0, y: 0 }
+    }))
     const owner = new Map(items.flatMap((item) => item.memberIds.map((id) => [id, item.id] as const)))
     const incoming = new Map(items.map((item) => [item.id, new Set<string>()]))
     const outgoing = new Map(items.map((item) => [item.id, new Set<string>()]))
