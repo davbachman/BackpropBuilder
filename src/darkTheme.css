@@ -187,10 +187,18 @@
 .theme-dark .semantic-group .group-handle { border-color: #20293b; }
 .theme-dark .semantic-group.is-model-stage.is-selected:not(.is-expanded) .node-metrics { background: #222c3f; border-color: var(--border); }
 .theme-dark .continuous-group-outline { border-color: #50667a; }
-.theme-dark .continuous-group-outline.is-selected { border-color: var(--accent); background: #b995ff0b; }
-.theme-dark .visual-group-node.semantic-group.is-selected,
-.theme-dark .continuous-card-cover .visual-group-node.semantic-group.is-selected,
-.theme-dark .semantic-operation.is-selected { border-color: var(--accent); box-shadow: 0 0 0 4px #bc9bfa47, 0 8px 24px #05091470; }
+.theme-dark .continuous-group-outline.is-selected { border-color: #d9bdff; background: #b995ff0b; box-shadow: inset 0 0 0 2px #b995ff38, 0 0 0 3px #b995ff40; }
+.theme-dark .builder-node.is-selected:not(.has-error),
+.theme-dark .visual-group-node.is-selected:not(.has-error):not(.is-expanded),
+.theme-dark .continuous-card-cover .visual-group-node.is-selected:not(.has-error),
+.theme-dark .semantic-operation.is-selected:not(.has-error) {
+  background: #423656;
+  border-color: #e0c8ff;
+  box-shadow: 0 0 0 2px #d5b7ff, 0 0 0 6px #a27adc5c, 0 14px 32px #050914a6;
+}
+.theme-dark .builder-node.is-selected .node-title-row strong,
+.theme-dark .semantic-operation.is-selected .semantic-operation-heading,
+.theme-dark .visual-group-node.is-selected .visual-group-title-row strong { color: #fff; }
 .theme-dark .builder-edge-flow { --edge-flow-color: #a78bfa; }
 .theme-dark .builder-edge-flow.is-backward { --edge-flow-color: #ff9b7b; }
 .theme-dark .react-flow .react-flow__edge .builder-edge-flow.is-unreached path.builder-edge { stroke: #7c8ca6; stroke-opacity: .5; }
