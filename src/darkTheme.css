@@ -158,6 +158,12 @@
 .theme-dark .semantic-operation.operation-loss { background: #3c2c39; border-color: #a76f7b; }
 .theme-dark .semantic-operation.operation-dataset { background: #263a49; border-color: #668ea3; }
 .theme-dark .visual-group-node.semantic-group { --group-ink: #9fb9f4; --group-tint: #303c57; }
+.theme-dark .visual-group-node.is-expanded,
+.theme-dark .visual-group-node.semantic-group.is-expanded,
+.theme-dark .continuous-group-heading .visual-group-node.semantic-group.is-expanded {
+  background: transparent;
+  box-shadow: none;
+}
 .theme-dark .semantic-group.group-kind-attention,
 .theme-dark .semantic-group.group-kind-head { --group-ink: #d2aaf4; --group-tint: #42334e; }
 .theme-dark .semantic-group.group-kind-layer,
