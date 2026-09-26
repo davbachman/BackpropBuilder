@@ -2,8 +2,6 @@ import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
 import { generatePyTorchExport } from './domain/pytorchExport'
-import { activeDriveAccess, configuredGoogleClientId, loadGoogleIdentity, requestDriveAccess, revokeDriveAccess, saveGoogleClientId, uploadNotebookToDrive, validGoogleClientId, type DriveAccess } from './domain/googleColab'
-import { ColabConnectionDialog } from './components/ColabConnectionDialog'
 import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
 import {
@@ -203,15 +201,6 @@ function App({
   const [isEditMenuOpen, setIsEditMenuOpen] = useState(false)
   const [isAppMenuOpen, setIsAppMenuOpen] = useState(false)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
-  const [colabConfigOpen, setColabConfigOpen] = useState(false)
-  const [colabClientId, setColabClientId] = useState(configuredGoogleClientId)
-  const [googleReady, setGoogleReady] = useState(false)
-  const [googleLoadError, setGoogleLoadError] = useState<string>()
-  const [driveAccess, setDriveAccess] = useState<DriveAccess>()
-  const [colabConnecting, setColabConnecting] = useState(false)
-  const [colabBusy, setColabBusy] = useState(false)
-  const [colabStatus, setColabStatus] = useState<string>()
-  const [colabOpenUrl, setColabOpenUrl] = useState<string>()
   const [isPlaying, setIsPlaying] = useState(false)
   const runCanvasAction = useCallback((action: () => void) => {
     setExecutionError(undefined)
@@ -255,25 +244,14 @@ function App({
   const [importError, setImportError] = useState<string | undefined>()
   const [exportNotice, setExportNotice] = useState<string | undefined>()
   useEffect(() => {
-    if (!exportNotice || colabOpenUrl) return
+    if (!exportNotice) return
     const timeout = window.setTimeout(() => setExportNotice(undefined), 6000)
     return () => window.clearTimeout(timeout)
-  }, [exportNotice, colabOpenUrl])
+  }, [exportNotice])
   const [csvPickerOpen, setCsvPickerOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)
   const pendingCustomCsvNodeId = useRef<string | undefined>(undefined)
-
-  useEffect(() => {
-    if (!colabClientId && !colabConfigOpen) return
-    let active = true
-    void loadGoogleIdentity().then(() => {
-      if (active) { setGoogleReady(true); setGoogleLoadError(undefined) }
-    }).catch(error => {
-      if (active) { setGoogleReady(false); setGoogleLoadError(error instanceof Error ? error.message : 'Google sign-in could not load.') }
-    })
-    return () => { active = false }
-  }, [colabClientId, colabConfigOpen])
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = useMemo(() => validationIssues.filter(
@@ -1183,94 +1161,29 @@ function App({
     )
   }
 
-  const exportPyTorch = (format: 'notebook' | 'python', openColab = false) => {
+  const exportPyTorch = (format: 'notebook' | 'python') => {
     setImportError(undefined)
     setExportNotice(undefined)
-    setColabOpenUrl(undefined)
     try {
       const exported = generatePyTorchExport(graph, { batchSize: batchSizeInput === '' ? undefined : Number(batchSizeInput), shuffleEachEpoch, epochs: epochCount, reportEvery: reportInterval })
-      const blob = new Blob([format === 'notebook' ? exported.notebook : exported.script], {
-        type: format === 'notebook' ? 'application/x-ipynb+json' : 'text/x-python',
-      })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = format === 'notebook' ? 'backprop-builder-model.ipynb' : 'backprop-builder-model.py'
-      anchor.click()
-      const revoke = URL.revokeObjectURL.bind(URL)
-      window.setTimeout(() => revoke(url), 1000)
-      if (openColab) {
-        window.open('https://colab.research.google.com/', '_blank', 'noopener,noreferrer')
-        setExportNotice('Notebook downloaded. In the Colab tab, choose File → Upload notebook and select backprop-builder-model.ipynb.')
-      } else {
-        setExportNotice(`${anchor.download} downloaded.`)
+      const download = (content: string, name: string, type: string) => {
+        const url = URL.createObjectURL(new Blob([content], { type }))
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = name
+        anchor.click()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       }
+      const name = format === 'notebook' ? 'backprop-builder-model.ipynb' : 'backprop-builder-model.py'
+      download(format === 'notebook' ? exported.notebook : exported.script, name,
+        format === 'notebook' ? 'application/x-ipynb+json' : 'text/x-python')
+      if (exported.datasetFile) download(exported.datasetFile.content, exported.datasetFile.name, 'application/json')
+      setExportNotice(exported.datasetFile
+        ? `${name} and ${exported.datasetFile.name} downloaded. Keep them in the same folder.`
+        : `${name} downloaded. Keep the source CSV beside it.`)
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'Could not export this model to PyTorch.')
     }
-  }
-
-  const saveColabConnection = (clientId: string) => {
-    const normalized = clientId.trim()
-    if (!validGoogleClientId(normalized)) { setColabStatus('Enter a valid Google OAuth web client ID.'); return }
-    saveGoogleClientId(normalized)
-    setColabClientId(normalized)
-    setDriveAccess(undefined)
-    setColabStatus('Client ID saved in this browser. Connect Google Drive to authorize uploads.')
-  }
-
-  const connectColab = (clientId: string) => {
-    const normalized = clientId.trim()
-    if (!validGoogleClientId(normalized)) { setColabStatus('Enter a valid Google OAuth web client ID.'); return }
-    saveGoogleClientId(normalized)
-    setColabClientId(normalized)
-    setDriveAccess(undefined)
-    setColabConnecting(true)
-    setColabStatus(undefined)
-    void requestDriveAccess(normalized).then(access => {
-      setDriveAccess(access)
-      setColabStatus('Connected for this browser session. You can now open a generated notebook directly in Colab.')
-    }).catch(error => {
-      setColabStatus(error instanceof Error ? error.message : 'Could not connect Google Drive.')
-    }).finally(() => setColabConnecting(false))
-  }
-
-  const disconnectColab = () => {
-    if (driveAccess) revokeDriveAccess(driveAccess)
-    setDriveAccess(undefined)
-    setColabStatus('Disconnected. The client ID remains saved in this browser.')
-  }
-
-  const openInColab = () => {
-    if (!colabClientId) { exportPyTorch('notebook', true); return }
-    if (!driveAccess || !activeDriveAccess(driveAccess, colabClientId)) {
-      setColabStatus('Connect Google Drive first. Access expires after a short time and is never saved in the browser.')
-      setColabConfigOpen(true)
-      return
-    }
-    setImportError(undefined)
-    setExportNotice(undefined)
-    setColabOpenUrl(undefined)
-    let notebook: string
-    try { notebook = generatePyTorchExport(graph, { batchSize: batchSizeInput === '' ? undefined : Number(batchSizeInput), shuffleEachEpoch, epochs: epochCount, reportEvery: reportInterval }).notebook }
-    catch (error) { setImportError(error instanceof Error ? error.message : 'Could not export this model to PyTorch.'); return }
-    const colabTab = window.open('about:blank', '_blank')
-    if (colabTab) {
-      colabTab.opener = null
-      colabTab.document.title = 'Opening notebook in Colab…'
-      colabTab.document.body.textContent = 'Uploading your notebook to Google Drive…'
-    }
-    setColabBusy(true)
-    void uploadNotebookToDrive(notebook, driveAccess).then(({ colabUrl }) => {
-      setColabOpenUrl(colabUrl)
-      if (colabTab && !colabTab.closed) {
-        colabTab.location.replace(colabUrl)
-        setExportNotice('Notebook uploaded to your Google Drive and opened in Colab.')
-      } else setExportNotice('Notebook uploaded to your Google Drive. Your browser blocked the new tab; use the link below.')
-    }).catch(error => {
-      colabTab?.close()
-      setImportError(error instanceof Error ? error.message : 'Could not upload the notebook to Google Drive.')
-    }).finally(() => setColabBusy(false))
   }
 
   const chooseProjectStateFile = () => {
@@ -1467,12 +1380,6 @@ function App({
                 <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => exportPyTorch('python'))}>
                   <Download size={15} /> Export Python file
                 </button>
-                <button type="button" role="menuitem" disabled={colabBusy} onClick={() => runFileMenuAction(openInColab)}>
-                  <ExternalLink size={15} /> Open in Colab
-                </button>
-                <button type="button" role="menuitem" onClick={() => runFileMenuAction(() => setColabConfigOpen(true))}>
-                  <ExternalLink size={15} /> Colab connection…
-                </button>
                 <button
                   type="button"
                   role="menuitem"
@@ -1538,23 +1445,9 @@ function App({
               {importError}
             </p>
           ) : null}
-          {exportNotice ? <p className="export-notice" role="status">{exportNotice}{colabOpenUrl ? <> <a href={colabOpenUrl} target="_blank" rel="noopener noreferrer">Open notebook ↗</a></> : null}</p> : null}
+          {exportNotice ? <p className="export-notice" role="status">{exportNotice}</p> : null}
         </div>
       </header>
-
-      {colabConfigOpen ? <ColabConnectionDialog
-        clientId={colabClientId}
-        ready={googleReady}
-        loadError={googleLoadError}
-        connected={activeDriveAccess(driveAccess, colabClientId)}
-        connecting={colabConnecting}
-        status={colabStatus}
-        onSave={saveColabConnection}
-        onConnect={connectColab}
-        onDisconnect={disconnectColab}
-        onOpenNotebook={() => { setColabConfigOpen(false); openInColab() }}
-        onClose={() => setColabConfigOpen(false)}
-      /> : null}
 
       {isAboutOpen ? <div className="about-backdrop" onPointerDown={event => { if (event.target === event.currentTarget) closeAbout() }}>
         <section role="dialog" aria-modal="true" aria-labelledby="about-title" aria-describedby="about-description" className="about-dialog" onKeyDown={event => {

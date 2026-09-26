@@ -17,7 +17,7 @@ Backprop Builder is a visual, editable machine-learning workbench for students. 
 | [Datasets](docs/DATASETS.md) | Built-in data, custom CSVs, feature and target wiring, batches, and train/test splits |
 | [Training, testing, and reports](docs/TRAINING.md) | Backpropagation, epoch runs, inference, predictions, accuracy, and troubleshooting |
 | [Example models and lessons](docs/EXAMPLES.md) | Importable projects from a neuron through attention, a transformer, and a digit CNN |
-| [Saving and exporting](docs/FILES-AND-EXPORT.md) | Project JSON, PyTorch files and notebooks, and the Colab workflow |
+| [Saving and exporting](docs/FILES-AND-EXPORT.md) | Project JSON, PyTorch files and notebooks, and dataset files |
 | [Development](docs/DEVELOPMENT.md) | Local setup, checks, model generation, and dataset attribution |
 
 The [importable model files](public/models/README.md) are editable projects made with the same blocks as the blank canvas. The full decoder is a small synthetic sequence model, and the image classifier uses UCI 8×8 digits rather than MNIST.

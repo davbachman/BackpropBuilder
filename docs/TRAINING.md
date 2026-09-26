@@ -24,7 +24,7 @@ Open **Test**, choose **Held-out test set** or **Training set**, and click **Run
 
 The prediction table has pages for larger datasets. Testing does not change the model's parameters. You can still select a particular dataset example in **Details** to trace it on the canvas.
 
-PyTorch and Colab exports carry the chosen batch size, reshuffling setting, epoch count, and reporting interval into a `torch.utils.data.DataLoader` training loop. This gives students a concrete example of how PyTorch forms batches without adding a DataLoader block to the visual model. The notebook also plots training and held-out loss when Matplotlib is available.
+Python and notebook exports carry the chosen batch size, reshuffling setting, epoch count, and reporting interval into a `torch.utils.data.DataLoader` training loop. This gives students a concrete example of how PyTorch forms batches without adding a DataLoader block to the visual model. The notebook also plots training and held-out loss when Matplotlib is available.
 
 ## Understand Reporting
 

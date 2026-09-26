@@ -34,4 +34,4 @@ After training, open **Test**, choose **Held-out test set**, and select **Run in
 
 ## Save your work
 
-Choose **File → Save** to download an editable project JSON file. **File → Import** opens that file later; **File → New** returns to a blank canvas. Save your current work before importing another project. See [Saving and exporting](FILES-AND-EXPORT.md) for Python and Colab.
+Choose **File → Save** to download an editable project JSON file. **File → Import** opens that file later; **File → New** returns to a blank canvas. Save your current work before importing another project. See [Saving and exporting](FILES-AND-EXPORT.md) for Python and notebook exports.

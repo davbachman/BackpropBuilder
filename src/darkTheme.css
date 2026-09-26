@@ -294,23 +294,16 @@
 .theme-dark .canvas-add-menu,
 .theme-dark .canvas-group-rename,
 .theme-dark .about-dialog,
-.theme-dark .colab-connection-dialog,
 .theme-dark .csv-picker-dialog { background: #222a3d; border-color: var(--border); color: var(--text); }
 .theme-dark .canvas-add-search,
 .theme-dark .canvas-add-hint { border-color: var(--border); }
 .theme-dark .canvas-add-search input,
-.theme-dark .canvas-group-rename input,
-.theme-dark .colab-connection-dialog input { background: #141d2d; border-color: var(--border); color: var(--text); }
+.theme-dark .canvas-group-rename input { background: #141d2d; border-color: var(--border); color: var(--text); }
 .theme-dark .canvas-add-results button,
 .theme-dark .canvas-group-rename label,
 .theme-dark .about-dialog h2,
-.theme-dark .colab-connection-dialog h2,
 .theme-dark .csv-picker-dialog h2 { color: var(--text); }
 .theme-dark .canvas-add-results button.is-active,
 .theme-dark .canvas-add-results button:hover { background: #3b3155; color: #e6d6ff; }
 .theme-dark .about-dialog p,
-.theme-dark .colab-connection-dialog p,
 .theme-dark .csv-picker-dialog p { color: var(--muted-strong); }
-.theme-dark .colab-connection-dialog label,
-.theme-dark .colab-connection-dialog .colab-connection-status { color: var(--muted-strong); }
-.theme-dark .colab-connection-dialog .colab-connection-status { background: #322c47; }
