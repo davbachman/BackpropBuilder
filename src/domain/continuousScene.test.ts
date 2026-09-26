@@ -8,6 +8,7 @@ import { parseCustomCsv } from './customCsv'
 import { customCsvCardHeight, customCsvOutputTop } from './datasets'
 import { semanticInputFraction } from './semanticLayout'
 import { createNode } from './examples'
+import { mergeNodesIntoVisualGroup, visualGroupInterface } from './grouping'
 import type { GraphModel } from './types'
 
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-7
@@ -244,6 +245,34 @@ describe('one continuous nested scene', () => {
       expect(endpoint.x).toBeCloseTo(rect.x)
       expect(endpoint.y).toBeCloseTo(rect.y + rect.height * semanticInputFraction(index, 3, true))
     }
+  })
+
+  it('places a selected Concat inside its new group despite an older root placement', () => {
+    const features = [0, 1, 2].map(index => ({ ...createNode('input', index + 1), id: `feature-${index}` }))
+    const branches = [0, 1, 2].map(index => ({ ...createNode('activation', index + 1), id: `branch-${index}` }))
+    const concat = { ...createNode('concat', 1), id: 'concat' }
+    concat.params = { axis: 1, inputCount: 3 }
+    const graph: GraphModel = {
+      nodes: [...features, ...branches, concat],
+      edges: [
+        ...features.map((node, index) => ({ id: `feature-${index}-branch`, source: node.id, target: branches[index].id, inputSlot: 0 })),
+        ...branches.map((node, index) => ({ id: `branch-${index}-concat`, source: node.id, target: concat.id, inputSlot: index })),
+      ],
+      learningRate: .1,
+      view: { expandedGroupIds: [], manualNodePlacements: { [concat.id]: { offset: { x: 600, y: 80 } } } },
+    }
+    const merged = mergeNodesIntoVisualGroup(graph, [...branches.map(node => node.id), concat.id])
+    const group = merged.group!
+    const scene = layoutContinuousScene(merged.graph)
+
+    expect(group.nodeIds).toContain(concat.id)
+    expect(scene.parents.get(concat.id)).toBe(group.id)
+    expect(scene.levels.find(level => level.parentId === group.id)?.ids).toContain(concat.id)
+    expect(scene.levels.find(level => !level.parentId)?.ids).not.toContain(concat.id)
+    const frame = scene.groups.get(group.id)!, card = scene.nodes.get(concat.id)!
+    expect(card.x).toBeGreaterThan(frame.x)
+    expect(card.x + card.width).toBeLessThan(frame.x + frame.width)
+    expect(visualGroupInterface(merged.graph, group).outputs.map(port => port.source)).toEqual([concat.id])
   })
 
   it('uses the scalar card dimensions and staggered input/weight rows inside a projected neuron', () => {

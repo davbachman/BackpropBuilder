@@ -73,11 +73,27 @@ export function continuousSceneMaxZoom(scene: ContinuousScene): number {
 export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
   const scene: ContinuousScene = { nodes: new Map(), groups: new Map(), scales: new Map(), parents: new Map(), levels: [], repairedOffsetIds: new Set() }
   const groups = graph.groups ?? []
-  const groupIds = new Set(groups.map(group => group.id))
+  const groupById = new Map(groups.map(group => [group.id, group]))
+  const ownerByNode = new Map<string, { id: string; depth: number }>()
+  for (const group of groups) {
+    let depth = 0, parentId = group.parentId
+    const seen = new Set([group.id])
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId)
+      depth++
+      parentId = groupById.get(parentId)?.parentId
+    }
+    for (const nodeId of group.nodeIds) {
+      if (depth >= (ownerByNode.get(nodeId)?.depth ?? -1)) ownerByNode.set(nodeId, { id: group.id, depth })
+    }
+  }
   const manualPlacements = graph.view?.manualNodePlacements ?? {}
   const activeManualPlacement = (id: string) => {
     const placement = manualPlacements[id]
-    return placement && (!placement.parentId || groupIds.has(placement.parentId)) ? placement : undefined
+    // Grouping changes ownership, but an older manual placement can still
+    // point at the previous level. Let membership win so every selected block
+    // actually appears inside its new group, including imported projects.
+    return placement && placement.parentId === ownerByNode.get(id)?.id ? placement : undefined
   }
   function level(parent?: GraphGroup, ancestors = new Set<string>()) {
     if (parent && ancestors.has(parent.id)) return

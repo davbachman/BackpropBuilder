@@ -210,6 +210,23 @@ describe('visual graph grouping', () => {
     expect(visualGroupInterface(grouped, grouped.groups![0]).inputs.map(handle => handle.edgeId)).toEqual(['column-0', 'column-1'])
   })
 
+  it('keeps three outgoing streams separate when they feed one external Concat block', () => {
+    const branches = Array.from({ length: 3 }, (_, index) => ({
+      id: `branch-${index}`, type: 'activation' as const, label: `branch ${index + 1}`,
+      position: { x: 120, y: index * 150 }, params: { activation: 'identity' as const },
+    }))
+    const concat = { id: 'concat', type: 'concat' as const, label: 'concat',
+      position: { x: 440, y: 150 }, params: { inputCount: 3, axis: 1 } }
+    const graph: GraphModel = {
+      nodes: [...branches, concat],
+      edges: branches.map((node, index) => ({ id: `branch-${index}-concat`, source: node.id, target: concat.id, inputSlot: index })),
+      learningRate: .1,
+    }
+    const grouped = mergeNodesIntoVisualGroup(graph, branches.map(node => node.id)).graph
+
+    expect(visualGroupInterface(grouped, grouped.groups![0]).outputs.map(port => port.source)).toEqual(branches.map(node => node.id))
+  })
+
   it('exposes and resolves group outputs for internal nodes with no outgoing edge', () => {
     const graph: GraphModel = {
       learningRate: 0.1,
