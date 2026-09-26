@@ -8,7 +8,7 @@ The canvas is one executable graph at every scale. A group is a view of its cont
 
 Select a block in **Build**, then click where it should appear. Or double-click blank canvas, type part of a block name, use the arrow keys if needed, and press **Enter** to place it at that point. **Escape** closes the menu. Adding a block or connecting a wire preserves the positions of blocks already on the canvas.
 
-Drag from an output handle to an input handle. Ports on a block follow its input order; the [block reference](BLOCKS.md) lists the important ones. Click a wire to inspect its forward value and gradient contribution in **Details**. Violet carries values forward; coral shows gradients backward. Color strength reflects magnitude, and moving light bands show direction.
+Drag from an output handle to an input handle. Ports on a block follow its input order; the [block reference](BLOCKS.md) lists the important ones. Click a wire to inspect its forward value and gradient contribution in **Data**. Violet carries values forward; coral shows gradients backward. Color strength reflects magnitude, and moving light bands show direction.
 
 Drag a block to move it. Drag empty canvas to select several blocks. Two-finger click-drag or right-mouse drag pans; scroll to zoom. **Fit model** brings the graph into view. **Compact layout** reapplies an automatic arrangement when you want one; it does not change calculations or weights, and you can undo it with **Edit → Undo** or ⌘/Ctrl+Z.
 

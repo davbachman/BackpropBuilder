@@ -1,0 +1,45 @@
+.data-inspector { min-width: 0; color: var(--text); }
+.data-header { margin-bottom: 18px; }
+.data-header .eyebrow { margin: 0 0 7px; color: var(--accent); }
+.data-header h2 { margin: 0; overflow-wrap: anywhere; font-size: 17px; line-height: 1.25; }
+.data-header p:last-child, .data-no-selection > p:last-child { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.data-dataset-preview { margin: 0 0 18px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-soft); }
+.data-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 15px 0 9px; }
+.data-dataset-preview .data-section-heading { margin-top: 0; }
+.data-section-heading h3 { margin: 0; font-size: 12px; }
+.data-section-heading span { color: var(--muted); font-size: 10px; text-align: right; }
+.data-signal-select, .data-slice-control { display: grid; gap: 6px; margin: 12px 0; color: var(--muted-strong); font-size: 11px; font-weight: 650; }
+.data-signal-select select, .data-slice-control select { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg); color: var(--text); font: 11px var(--font-mono); }
+.data-view-tabs { display: flex; gap: 5px; margin: 15px 0; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-soft); }
+.data-view-tabs button { flex: 1; min-height: 30px; padding: 5px 4px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; }
+.data-view-tabs button[aria-selected="true"] { background: var(--panel-bg); color: var(--accent); box-shadow: 0 1px 5px #11182724; }
+.data-view-tabs button:disabled { opacity: .45; cursor: default; }
+.data-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.data-stats > div { display: grid; align-content: start; gap: 5px; min-width: 0; min-height: 55px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-soft); }
+.data-stats span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+.data-stats strong { overflow-wrap: anywhere; color: var(--text); font: 600 11px var(--font-mono); }
+.data-scalar { margin-top: 16px; padding: 18px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-soft); color: var(--forward); font: 600 26px var(--font-mono); overflow-wrap: anywhere; text-align: center; }
+.data-table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
+.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font: 10px var(--font-mono); }
+.data-table th, .data-table td { min-width: 60px; padding: 6px 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.data-table th:first-child { position: sticky; left: 0; z-index: 1; min-width: 36px; background: var(--panel-soft); color: var(--muted-strong); }
+.data-table thead th { background: var(--panel-soft); color: var(--muted-strong); font-weight: 700; }
+.data-table thead th:first-child { z-index: 2; }
+.data-table tr:last-child > * { border-bottom: 0; }
+.data-table tr > *:last-child { border-right: 0; }
+.data-dataset-preview .data-table th:not(:first-child) { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
+.data-dataset-preview tr.is-current > * { background: var(--accent-soft); }
+.data-current-note { margin: 9px 0 0; color: var(--muted); font-size: 10px; }
+.data-value-table td { padding: 2px; }
+.data-value-table td .data-cell { display: block; width: 100%; min-width: 58px; min-height: 28px; padding: 5px 7px; border: 1px solid transparent; border-radius: 5px; background: var(--panel-soft); color: var(--text); font: 10px var(--font-mono); text-align: right; white-space: nowrap; }
+.data-value-table td .data-cell:hover { border-color: var(--accent); }
+.data-value-table td .data-cell.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.data-page-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px; color: var(--muted); font: 10px var(--font-mono); }
+.data-page-controls > div { display: flex; gap: 4px; }
+.data-page-controls button { width: 25px; min-height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-bg); color: var(--text); }
+.data-page-controls button:disabled { opacity: .35; }
+.data-exact { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-soft); font: 11px var(--font-mono); }
+.data-exact span { color: var(--muted); white-space: nowrap; }
+.data-exact strong { overflow-wrap: anywhere; text-align: right; }
+.data-empty { padding: 18px 14px; border: 1px dashed var(--border); border-radius: 10px; background: var(--panel-soft); color: var(--muted); font-size: 11px; line-height: 1.5; }
+.data-no-selection { padding-top: 5px; }

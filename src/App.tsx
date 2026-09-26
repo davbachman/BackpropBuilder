@@ -48,6 +48,7 @@ import './unifiedStudio.css'
 import './workspacePanels.css'
 import { CodeOutline, type CodeTarget } from './components/CodeOutline'
 import { ModelInspector } from './components/ModelInspector'
+import { DataInspector } from './components/DataInspector'
 import { DecoderControls } from './components/DecoderControls'
 import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
@@ -186,7 +187,7 @@ function App({
   const [rightOpen, setRightOpen] = useState(true)
   const [leftWidth, setLeftWidth] = useState(220)
   const [rightWidth, setRightWidth] = useState(340)
-  const [rightTab, setRightTab] = useState<'details' | 'code' | 'visualization'>('details')
+  const [rightTab, setRightTab] = useState<'details' | 'data' | 'code' | 'visualization'>('details')
   const [leftTab, setLeftTab] = useState<'build' | 'train' | 'test'>('build')
   const [inferenceSplit, setInferenceSplit] = useState<'train' | 'test'>('test')
   const [inferenceResult, setInferenceResult] = useState<{ graph: GraphModel; split: 'train' | 'test'; metrics: ReturnType<typeof evaluateDataset> }>()
@@ -423,7 +424,7 @@ function App({
       const groupNodeIds = graph.groups?.find(group => group.id === selection.groupId)?.nodeIds ?? []
       if ([...selection.nodeIds, ...groupNodeIds].some(id => problemNodes.has(projection.bindings[id]?.nodeId ?? id))) {
         setRightOpen(true)
-        setRightTab('details')
+        setRightTab(current => current === 'data' ? current : 'details')
       }
     },
     [graph.groups, problemNodes, projection.bindings],
@@ -1691,7 +1692,8 @@ function App({
           setSelectedGroupId(undefined)
           setInspectorOpen(true)
           setRightOpen(true)
-          setRightTab('details')
+          setRightTab('data')
+          setRightWidth(width => Math.max(width, 390))
           setPaletteOpen(false)
         }}
         showMath={SHOW_MATH_LAYER}
@@ -1751,6 +1753,7 @@ function App({
         <div className="sidebar-heading right-sidebar-heading">
           {rightOpen ? <div className="right-sidebar-tabs" role="tablist" aria-label="Right sidebar views">
             <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
+            <button type="button" role="tab" aria-selected={rightTab === 'data'} onClick={() => { setRightTab('data'); setRightWidth(width => Math.max(width, 390)) }}>Data</button>
             <button type="button" role="tab" aria-selected={rightTab === 'code'} onClick={() => { setRightTab('code'); setRightWidth(width => Math.max(width, 390)) }}>Code</button>
             <button type="button" role="tab" aria-selected={rightTab === 'visualization'} onClick={() => { setRightTab('visualization'); setRightWidth(width => Math.max(width, 390)) }}>Reporting</button>
           </div> : null}
@@ -1879,6 +1882,9 @@ function App({
             <span>{activeStep.calculation}</span>
           </div>}
         </section>}
+        </div>
+        <div className="right-panel-scroll right-data-scroll" hidden={rightTab !== 'data'} role="tabpanel" aria-label="Model data">
+          {rightTab === 'data' ? <DataInspector key={selectedEdgeId ?? selectedGroupId ?? selectedNodeId ?? 'empty'} graph={graph} node={inspectedNode} edge={numericalEdge} group={selectedGroup} /> : null}
         </div>
         <div className="right-panel-scroll right-code-scroll" hidden={rightTab !== 'code'} role="tabpanel" aria-label="Model code">
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}

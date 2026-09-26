@@ -42,6 +42,7 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Reporting' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Data' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Show visualization|Hide visualization/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Randomize parameters/i })).not.toBeInTheDocument()
     expect(screen.getByText(/Build the model/i)).toBeInTheDocument()
@@ -235,6 +236,18 @@ describe('Backprop Builder app', () => {
 
     expect(screen.getByRole('region', { name: /Visualization panel/i })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
+  })
+
+  it('keeps Data open while selecting another block', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<App initialGraph={createStarterGraph()} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Data' }))
+    expect(screen.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(container.querySelector('.react-flow__node[data-id="w"] .node-title-row') as HTMLElement)
+    expect(screen.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel', { name: 'Model data' })).toHaveTextContent('Block data')
   })
 
   it('starts with a blank canvas instead of the starter example', () => {
