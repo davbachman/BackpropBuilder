@@ -14,7 +14,7 @@ export interface ContinuousScene extends SemanticLayout {
   levels: SceneLevel[]
   repairedOffsetIds: Set<string>
 }
-export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; crossings: WireCrossings }
+export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; crossings: WireCrossings; hidden?: boolean }
 
 /** A container with exactly one child and no calculations of its own adds no
  * visual detail. Keep the most specific block and skip those empty levels.
@@ -211,9 +211,23 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const origin = { x: level.x + (shift && original ? shift.x - original.x : 0), y: level.y + (shift && original ? shift.y - original.y : 0) }
     const localPoint = (point: Position) => ({ x: (point.x - origin.x) / level.scale, y: (point.y - origin.y) / level.scale })
     const reverse = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' } as const
+    const sharedInputs = new Map<string, string>()
+    const hiddenAliases = new Map<string, string>()
     const wires: DiagramWire[] = graph.edges.flatMap(edge => {
       const source = owner.get(edge.source), target = owner.get(edge.target)
       if ((!source && !target) || source === target || (!boundary && (!source || !target))) return []
+      if (target?.startsWith('visual-group:')) {
+        const input = interfaces.get(target.slice(13))?.inputs.find(port => port.edgeId === edge.id || port.edgeIds?.includes(edge.id))
+        if (input) {
+          const key = `${target}:${input.handleId}`
+          const representative = sharedInputs.get(key)
+          if (representative) {
+            hiddenAliases.set(edge.id, representative)
+            return []
+          }
+          sharedInputs.set(key, edge.id)
+        }
+      }
       const from = endpoint(source ?? boundary!, edge, Boolean(source)), to = endpoint(target ?? boundary!, edge, !target)
       return [{ id: edge.id, source: { ...localPoint(from), side: source ? from.side : reverse[from.side] }, target: { ...localPoint(to), side: target ? to.side : reverse[to.side] } }]
     })
@@ -223,9 +237,19 @@ export function routeContinuousScene(graph: GraphModel, scene: ContinuousScene, 
     const routes = routeDiagramWires(wires, obstacles, bounds)
     const crossings = findWireCrossings(routes)
     const worldPoint = (point: Position) => ({ x: origin.x + point.x * level.scale, y: origin.y + point.y * level.scale })
-    for (const [edgeId, route] of routes) result.push({ id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale, route: route.map(worldPoint),
-      crossings: { points: crossings.get(edgeId)!.points.map(worldPoint), gaps: crossings.get(edgeId)!.gaps.map(worldPoint) },
-    })
+    const levelWires = new Map<string, SceneWire>()
+    for (const [edgeId, route] of routes) {
+      const wire = { id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, parentId: parent?.id, scale: level.scale, route: route.map(worldPoint),
+        crossings: { points: crossings.get(edgeId)!.points.map(worldPoint), gaps: crossings.get(edgeId)!.gaps.map(worldPoint) } }
+      levelWires.set(edgeId, wire)
+      result.push(wire)
+    }
+    // Preserve each edge's continuous path for topology and inspection while
+    // drawing only one exterior wire for the shared signal.
+    for (const [edgeId, representative] of hiddenAliases) {
+      const route = levelWires.get(representative)
+      if (route) result.push({ ...route, id: `${edgeId}::${parent?.id ?? 'model'}`, edgeId, hidden: true })
+    }
   }
   return result
 }

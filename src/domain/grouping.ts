@@ -1,5 +1,6 @@
 import { denseGroupDetail } from './authoring'
 import { customCsvCardHeight, customCsvCardWidth } from './datasets'
+import { connectGraphNodes, type GraphConnection } from './graphEditing'
 import {
   MIN_NODE_HEIGHT,
   NODE_WIDTH,
@@ -183,14 +184,32 @@ export function nodeIdsInGroups(graph: GraphModel): Set<string> {
 export function visualGroupInterface(graph: GraphModel, group: GraphGroup): VisualGroupInterface {
   const nodeOrder = new Map(group.nodeIds.map((nodeId, index) => [nodeId, index]))
 
-  const inputs = exposedInputSlots(graph, group)
-    .sort((first, second) => compareInputSlots(first, second, nodeOrder))
-    .map((slot, index) => ({
-      ...(slot.edge ? { edgeId: slot.edge.id } : {}),
+  // Several members may consume the same outside signal. They share one
+  // boundary port, while their separate edges remain intact inside the group.
+  const inputSignals: { slots: ExposedInputSlot[] }[] = []
+  const connectedSignals = new Map<string, { slots: ExposedInputSlot[] }>()
+  for (const slot of exposedInputSlots(graph, group).sort((first, second) => compareInputSlots(first, second, nodeOrder))) {
+    const edge = slot.edge
+    const key = edge && JSON.stringify([edge.source, edge.sourceSlot ?? 0])
+    let signal = key ? connectedSignals.get(key) : undefined
+    if (!signal) {
+      signal = { slots: [] }
+      inputSignals.push(signal)
+      if (key) connectedSignals.set(key, signal)
+    }
+    signal.slots.push(slot)
+  }
+  const inputs = inputSignals.map(({ slots }, index) => {
+    const first = slots[0]
+    const edgeIds = slots.flatMap((slot) => slot.edge ? [slot.edge.id] : [])
+    return {
+      ...(edgeIds.length === 1 ? { edgeId: edgeIds[0] } : {}),
+      ...(edgeIds.length > 1 ? { edgeIds } : {}),
       handleId: `in-${index}`,
-      target: slot.target,
-      inputSlot: slot.inputSlot,
-    }))
+      target: first.target,
+      inputSlot: first.inputSlot,
+    }
+  })
 
   const outputs = exposedOutputHandles(graph, group)
     .sort((first, second) => compareOutputHandles(first, second, nodeOrder))
@@ -224,6 +243,36 @@ export function resolveVisualGroupInputHandle(
     target: handle.target,
     targetHandle: `in-${handle.inputSlot}`,
   }
+}
+
+/** Replacing a shared outside signal updates every internal consumer of
+ * that port, so the visible group input remains a single signal. */
+export function connectVisualGroupInput(
+  graph: GraphModel,
+  groupId: string,
+  handleId: string | undefined,
+  connection: GraphConnection,
+  createEdgeId: (source: string, target: string, inputSlot: number) => string,
+): GraphModel | undefined {
+  const group = graph.groups?.find((candidate) => candidate.id === groupId)
+  const handle = group && visualGroupInterface(graph, group).inputs.find((candidate) => candidate.handleId === handleId)
+  if (!handle?.target || handle.inputSlot === undefined) return undefined
+  const slots = edgeIdsForHandle(handle).map((id) => graph.edges.find((edge) => edge.id === id))
+    .filter((edge): edge is GraphEdge => Boolean(edge))
+    .map((edge) => ({ target: edge.target, inputSlot: edge.inputSlot ?? 0 }))
+  if (!slots.length) slots.push({ target: handle.target, inputSlot: handle.inputSlot })
+  let next = graph
+  for (const slot of slots) {
+    const connected = connectGraphNodes(next, {
+      ...connection,
+      target: slot.target,
+      targetHandle: `in-${slot.inputSlot}`,
+      replaceEdgeId: undefined,
+    }, createEdgeId)
+    if (!connected) return undefined
+    next = connected
+  }
+  return next
 }
 
 export function resolveVisualGroupOutputHandle(

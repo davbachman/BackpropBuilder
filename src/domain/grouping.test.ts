@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { MIN_NODE_HEIGHT, NODE_WIDTH } from './engine'
+import { layoutContinuousScene, routeContinuousScene } from './continuousScene'
 import { createStarterGraph } from './examples'
 import {
   deleteVisualGroup,
+  connectVisualGroupInput,
   explodeVisualGroup,
   mergeNodesIntoVisualGroup,
   moveVisualGroup,
@@ -155,6 +157,57 @@ describe('visual graph grouping', () => {
       },
     ])
     expect(resolveVisualGroupOutputHandle(graph, 'group-1', 'out-0')).toEqual({ source: 'add' })
+  })
+
+  it('uses one input handle per outside signal even when six members consume two signals', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'feature-a', type: 'input', label: 'Petal.Length', position: { x: 0, y: 0 }, params: { value: 1 } },
+        { id: 'feature-b', type: 'input', label: 'Petal.Width', position: { x: 0, y: 180 }, params: { value: 1 } },
+        ...Array.from({ length: 6 }, (_, index) => ({
+          id: `copy-${index}`, type: 'activation' as const, label: `copy ${index + 1}`,
+          position: { x: 300, y: index * 120 }, params: { activation: 'identity' as const },
+        })),
+      ],
+      edges: Array.from({ length: 6 }, (_, index) => ({
+        id: `feature-${index % 2}-copy-${index}`,
+        source: index % 2 ? 'feature-b' : 'feature-a', target: `copy-${index}`, inputSlot: 0,
+      })),
+    }
+    const grouped = mergeNodesIntoVisualGroup(graph, graph.nodes.slice(2).map(node => node.id)).graph
+    const groupInterface = visualGroupInterface(grouped, grouped.groups![0])
+
+    expect(groupInterface.inputs).toHaveLength(2)
+    expect(groupInterface.inputs[0].edgeIds).toEqual(['feature-0-copy-0', 'feature-0-copy-2', 'feature-0-copy-4'])
+    expect(groupInterface.inputs[1].edgeIds).toEqual(['feature-1-copy-1', 'feature-1-copy-3', 'feature-1-copy-5'])
+    expect(grouped.edges).toEqual(graph.edges)
+    const wires = routeContinuousScene(grouped, layoutContinuousScene(grouped))
+    expect(wires.filter(wire => !wire.parentId && !wire.hidden)).toHaveLength(2)
+    expect(wires.filter(wire => wire.parentId === grouped.groups![0].id && !wire.hidden)).toHaveLength(6)
+
+    const rewired = connectVisualGroupInput(grouped, grouped.groups![0].id, 'in-0', { source: 'feature-b' },
+      (source, target, slot) => `${source}-${target}-${slot}-new`)
+    expect(rewired?.edges.filter(edge => edge.source === 'feature-b')).toHaveLength(6)
+    expect(visualGroupInterface(rewired!, rewired!.groups![0]).inputs).toHaveLength(1)
+  })
+
+  it('does not merge different output columns from the same outside block', () => {
+    const graph: GraphModel = {
+      learningRate: 0.1,
+      nodes: [
+        { id: 'dataset', type: 'dataset', label: 'data', position: { x: 0, y: 0 }, params: { dataset: 'line-1d' } },
+        { id: 'first', type: 'activation', label: 'first', position: { x: 300, y: 0 }, params: { activation: 'identity' } },
+        { id: 'second', type: 'activation', label: 'second', position: { x: 300, y: 180 }, params: { activation: 'identity' } },
+      ],
+      edges: [
+        { id: 'column-0', source: 'dataset', sourceSlot: 0, target: 'first', inputSlot: 0 },
+        { id: 'column-1', source: 'dataset', sourceSlot: 1, target: 'second', inputSlot: 0 },
+      ],
+    }
+    const grouped = mergeNodesIntoVisualGroup(graph, ['first', 'second']).graph
+
+    expect(visualGroupInterface(grouped, grouped.groups![0]).inputs.map(handle => handle.edgeId)).toEqual(['column-0', 'column-1'])
   })
 
   it('exposes and resolves group outputs for internal nodes with no outgoing edge', () => {

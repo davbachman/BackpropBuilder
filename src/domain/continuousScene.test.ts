@@ -162,7 +162,7 @@ describe('one continuous nested scene', () => {
 
   it.each(LESSONS)('keeps separate signal runs distinguishable at every level of $id', ({ id }) => {
     const graph = compactVisualHierarchy(createModelPreset(id))
-    const wires = routeContinuousScene(graph, layoutContinuousScene(graph))
+    const wires = routeContinuousScene(graph, layoutContinuousScene(graph)).filter(wire => !wire.hidden)
     const collisions: string[] = []
     for (let i = 0; i < wires.length; i++) for (let j = 0; j < i; j++) {
       const a = wires[i], b = wires[j]

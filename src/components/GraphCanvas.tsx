@@ -30,10 +30,11 @@ import {
   lossOptionsForNode,
   outputArityForNode,
 } from '../domain/engine'
-import { canConnectGraphNodes, connectGraphNodes, type GraphConnection } from '../domain/graphEditing'
+import { connectGraphNodes, type GraphConnection } from '../domain/graphEditing'
 import {
   deleteVisualGroup,
   collapsedGroupForNode,
+  connectVisualGroupInput,
   expandedGroupRect,
   groupAncestors,
   setVisualGroupExpanded,
@@ -488,7 +489,7 @@ function GraphCanvasInner({
           ? groupInterfaces.get(sourceGroup.id)?.outputs.find((handle) => visualGroupHandleHasEdge(handle, edge.id))?.handleId
           : undefined
         const targetHandle = targetGroup
-          ? groupInterfaces.get(targetGroup.id)?.inputs.find((handle) => handle.edgeId === edge.id)?.handleId
+          ? groupInterfaces.get(targetGroup.id)?.inputs.find((handle) => visualGroupHandleHasEdge(handle, edge.id))?.handleId
           : undefined
 
         return [
@@ -520,6 +521,17 @@ function GraphCanvasInner({
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState(reactNodes)
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState(reactEdges)
+  const visibleEdgeIds = useMemo(() => {
+    const visible = new Set<string>()
+    const sharedInputs = new Set<string>()
+    for (const edge of reactEdges) {
+      const key = edge.target.startsWith(GROUP_NODE_ID_PREFIX) ? `${edge.target}:${edge.targetHandle}` : undefined
+      if (key && sharedInputs.has(key)) continue
+      if (key) sharedInputs.add(key)
+      visible.add(edge.id)
+    }
+    return visible
+  }, [reactEdges])
   // Cache geometry separately from numerical traces: stepping through a model
   // changes wire values, but should not redo its routing or shuffle its lanes.
   const routingKey = JSON.stringify(semantic && !continuous ? {
@@ -536,7 +548,7 @@ function GraphCanvasInner({
           : undefined,
       }
     }),
-    wires: edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle })),
+    wires: edges.filter(edge => visibleEdgeIds.has(edge.id)).map(edge => ({ id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle })),
   } : null)
   const wireRoutes = useMemo(() => {
     const geometry = JSON.parse(routingKey) as { blocks: RoutingBlock[]; wires: Pick<CanvasEdge, 'id' | 'source' | 'target' | 'sourceHandle' | 'targetHandle'>[] } | null
@@ -557,6 +569,7 @@ function GraphCanvasInner({
     if (scene) {
       const byId = new Map(edges.map(edge => [edge.id, edge]))
       return sceneRoutes.flatMap(wire => {
+        if (wire.hidden) return []
         const edge = byId.get(wire.edgeId)
         return edge ? [{ ...edge, id: wire.id, data: { ...edge.data!, route: wire.route, crossings: wire.crossings, absoluteRoute: true, sceneScale: wire.scale, parentId: wire.parentId, canonicalEdgeId: wire.edgeId } }] : []
       })
@@ -630,7 +643,7 @@ function GraphCanvasInner({
   }) : nodes
   const presentedEdges = scene ? routedEdges.map(edge => ({ ...edge, focusable: accessible(edge.data?.parentId as string | undefined),
     data: { ...edge.data!, cameraZoom, accessible: accessible(edge.data?.parentId as string | undefined) },
-  })) : routedEdges
+  })) : routedEdges.filter(edge => visibleEdgeIds.has(edge.id))
   const nodeSyncKey = useMemo(
     () =>
       JSON.stringify({
@@ -819,10 +832,9 @@ function GraphCanvasInner({
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const graphConnection = normalizeCanvasConnection(graph, connection)
-      const nextGraph = connectGraphNodes(
+      const nextGraph = connectCanvasNodes(
         graph,
-        graphConnection,
+        connection,
         (source, target, inputSlot) => `${source}-${target}-${inputSlot}-${Date.now()}`,
       )
       if (!nextGraph) return
@@ -833,7 +845,7 @@ function GraphCanvasInner({
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge<BuilderEdgeData>) => {
-      return canConnectGraphNodes(graph, normalizeCanvasConnection(graph, connection))
+      return Boolean(connectCanvasNodes(graph, connection, (source, target, inputSlot) => `${source}-${target}-${inputSlot}-candidate`))
     },
     [graph],
   )
@@ -1146,6 +1158,18 @@ function normalizeCanvasConnection(
     target: resolvedTarget.target,
     targetHandle: resolvedTarget.targetHandle,
   }
+}
+
+function connectCanvasNodes(
+  graph: GraphModel,
+  connection: Connection | Edge<BuilderEdgeData>,
+  createEdgeId: (source: string, target: string, inputSlot: number) => string,
+): GraphModel | undefined {
+  const normalized = normalizeCanvasConnection(graph, connection)
+  const targetGroupId = connection.target ? groupIdFromNodeId(connection.target) : undefined
+  return targetGroupId
+    ? connectVisualGroupInput(graph, targetGroupId, connection.targetHandle ?? undefined, normalized, createEdgeId)
+    : connectGraphNodes(graph, normalized, createEdgeId)
 }
 
 function groupNodeId(groupId: string): string {
