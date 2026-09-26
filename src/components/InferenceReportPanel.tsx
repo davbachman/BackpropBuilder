@@ -19,7 +19,10 @@ export function InferenceReportPanel({ metrics, split, task }: { metrics?: Datas
       </div>
       {rows.length > 0 && <div className="inference-predictions" aria-label={`${split === 'train' ? 'Training' : 'Test'} predictions`}>
         <div className="inference-predictions-heading"><h4>Predictions</h4><span>{rows.length} outputs</span></div>
-        <div className="inference-predictions-scroll"><table><thead><tr><th>Example</th><th>Actual</th><th>Predicted</th></tr></thead><tbody>{rows.slice(page * 25, (page + 1) * 25).map((row, index) => <tr key={`${page}-${index}`} className={row.correct === undefined ? '' : row.correct ? 'is-correct' : 'is-incorrect'}><td>{row.example}</td><td>{row.actual}</td><td>{row.predicted}{row.correct !== undefined && <span className="inference-prediction-result" aria-label={row.correct ? 'Correct' : 'Incorrect'}>{row.correct ? '✓' : '×'}</span>}</td></tr>)}</tbody></table></div>
+        <ol className="inference-predictions-list">{rows.slice(page * 25, (page + 1) * 25).map((row, index) => <li key={`${page}-${index}`} className={row.correct === undefined ? '' : row.correct ? 'is-correct' : 'is-incorrect'}>
+          <div className="inference-prediction-heading"><span>{row.example}</span>{row.correct !== undefined && <span className="inference-prediction-result" aria-label={row.correct ? 'Correct' : 'Incorrect'}>{row.correct ? '✓' : '×'}</span>}</div>
+          <div className="inference-prediction-comparison"><span><small>Actual</small><strong>{row.actual}</strong></span><span><small>Predicted</small><strong>{row.predicted}</strong></span></div>
+        </li>)}</ol>
         {pageCount > 1 && <div className="inference-predictions-pages"><button disabled={page === 0} onClick={() => setPredictionPage(page - 1)}>Previous</button><span>Page {page + 1} of {pageCount}</span><button disabled={page >= pageCount - 1} onClick={() => setPredictionPage(page + 1)}>Next</button></div>}
       </div>}
     </> : <p className="coordinate-note">Use Test in the left sidebar to run inference and inspect predictions.</p>}

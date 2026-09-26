@@ -222,6 +222,7 @@
 .theme-dark .code-outline-intro { background: #222d42; border-color: var(--border); color: var(--accent); }
 .theme-dark .code-outline-intro strong,
 .theme-dark .inference-report-panel h3,
+.theme-dark .inference-predictions-heading h4,
 .theme-dark .loss-report-heading h3 { color: var(--text); }
 .theme-dark .code-outline-intro p,
 .theme-dark .code-outline-number,
@@ -238,6 +239,7 @@
 .theme-dark .visualization-plot,
 .theme-dark .loss-report-panel,
 .theme-dark .inference-report-panel { background: #202a3c; border-color: var(--border); }
+.theme-dark .test-panel .inference-report-panel { background: transparent; border: 0; }
 .theme-dark .visualization-losses > div,
 .theme-dark .inference-report-summary,
 .theme-dark .inference-predictions-heading,
@@ -258,15 +260,17 @@
 .theme-dark .loss-report-list,
 .theme-dark .loss-report-list > div,
 .theme-dark .inference-predictions,
-.theme-dark .inference-predictions th,
-.theme-dark .inference-predictions td,
+.theme-dark .inference-predictions-list li,
 .theme-dark .inference-predictions-pages { border-color: var(--border); }
 .theme-dark .loss-report-list strong,
-.theme-dark .inference-predictions td { color: var(--text); }
-.theme-dark .inference-predictions th { color: var(--muted-strong); }
+.theme-dark .inference-prediction-comparison strong { color: var(--text); }
+.theme-dark .inference-prediction-heading,
+.theme-dark .inference-prediction-comparison small { color: var(--muted); }
 .theme-dark .inference-report-summary strong { color: var(--accent); }
 .theme-dark .inference-report-summary strong[aria-label$="accuracy"] { color: var(--forward); }
-.theme-dark .inference-predictions tr.is-incorrect td:last-child { color: var(--loss); }
+.theme-dark .inference-predictions-list .is-correct .inference-prediction-result { color: var(--forward); }
+.theme-dark .inference-predictions-list .is-incorrect .inference-prediction-result,
+.theme-dark .inference-predictions-list .is-incorrect .inference-prediction-comparison span:last-child strong { color: var(--loss); }
 .theme-dark .dataset-image-preview > div,
 .theme-dark .cnn-input-row,
 .theme-dark .cnn-filter-picker button,

@@ -190,7 +190,7 @@ function App({
   const [rightTab, setRightTab] = useState<'details' | 'data' | 'code' | 'visualization'>('details')
   const [leftTab, setLeftTab] = useState<'build' | 'train' | 'test'>('build')
   const [inferenceSplit, setInferenceSplit] = useState<'train' | 'test'>('test')
-  const [inferenceResult, setInferenceResult] = useState<{ graph: GraphModel; split: 'train' | 'test'; metrics: ReturnType<typeof evaluateDataset> }>()
+  const [inferenceResult, setInferenceResult] = useState<{ split: 'train' | 'test'; metrics: ReturnType<typeof evaluateDataset> }>()
   const [testStatus, setTestStatus] = useState('')
   const [codeFocus, setCodeFocus] = useState<{ kind: 'group' | 'node'; id: string; serial: number }>()
   const nextCodeFocus = useRef(0)
@@ -738,6 +738,8 @@ function App({
   const runInference = useCallback(() => {
     const dataset = graph.nodes.find(node => node.type === 'dataset')
     if (!dataset || blockingIssues.length > 0) return
+    setInferenceResult(undefined)
+    setTestStatus('')
     const examples = datasetExamplesForNode(dataset)
     const first = examples.findIndex(example => example.split === inferenceSplit)
     if (first < 0) { setTestStatus(`This dataset has no ${inferenceSplit} examples.`); return }
@@ -753,11 +755,9 @@ function App({
       setTraceSteps([])
       setTraceIndex(0)
       setPhase('forward')
-      setInferenceResult({ graph: inferred, split: inferenceSplit, metrics })
-      setTestStatus(`Evaluated ${metrics.examples} ${inferenceSplit === 'test' ? 'held-out' : 'training'} examples without updating parameters.`)
+      setInferenceResult({ split: inferenceSplit, metrics })
+      setTestStatus('')
       setExecutionError(undefined)
-      setRightOpen(true)
-      setRightTab('visualization')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Inference failed.'
       setTestStatus(message)
@@ -1665,10 +1665,11 @@ function App({
         </section>
         <section className="panel-section run-panel test-panel" role="tabpanel" aria-label="Test controls" hidden={leftTab !== 'test'}>
           <p className="eyebrow">Inference</p>
-          <p className="run-intro">Run the trained model on examples without changing its parameters. Predictions and accuracy appear in Reporting.</p>
+          <p className="run-intro">Run the trained model on examples without changing its parameters.</p>
           <label className="run-field">Examples to evaluate<select aria-label="Inference examples" value={inferenceSplit} onChange={event => setInferenceSplit(event.target.value as 'train' | 'test')}><option value="test">Held-out test set</option><option value="train">Training set</option></select></label>
           <button type="button" className="run-epochs-button primary-button" onClick={runInference} disabled={blockingIssues.length > 0 || isTraining || !graph.nodes.some(node => node.type === 'dataset')}>Run inference</button>
           {testStatus && <p className="run-status" role="status">{testStatus}</p>}
+          {inferenceResult && <InferenceReportPanel metrics={inferenceResult.metrics} split={inferenceResult.split} task={graph.nodes.find(node => node.type === 'dataset') ? datasetForNode(graph.nodes.find(node => node.type === 'dataset')!).task : undefined} />}
         </section>
       </aside>
 
@@ -1890,7 +1891,7 @@ function App({
           {rightTab === 'code' ? <CodeOutline graph={displayGraph} selected={selectedCodeTarget} active={rightOpen} onNavigate={navigateFromCode} /> : null}
         </div>
         <div className="right-panel-scroll right-visualization-scroll" hidden={rightTab !== 'visualization'} role="tabpanel" aria-label="Model reporting">
-          {rightTab === 'visualization' ? <><VisualizationPanel graph={visualizationGraph} /><LossReportPanel reports={lossReports} warning={reportingWarning} />{inferenceResult && <InferenceReportPanel metrics={inferenceResult.metrics} split={inferenceResult.split} task={graph.nodes.find(node => node.type === 'dataset') ? datasetForNode(graph.nodes.find(node => node.type === 'dataset')!).task : undefined} />}</> : null}
+          {rightTab === 'visualization' ? <><VisualizationPanel graph={visualizationGraph} /><LossReportPanel reports={lossReports} warning={reportingWarning} /></> : null}
         </div>
       </aside>
     </main>
