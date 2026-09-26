@@ -178,12 +178,14 @@
 .theme-dark .semantic-operation-value,
 .theme-dark .semantic-dataset-port,
 .theme-dark .semantic-arithmetic-field,
-.theme-dark .semantic-arithmetic-field input { color: #c8d7ef; }
+.theme-dark .semantic-arithmetic-field input,
+.theme-dark .semantic-concat-field code { color: #c8d7ef; }
 .theme-dark .semantic-shape,
 .theme-dark .semantic-dataset-summary { color: var(--muted); }
 .theme-dark .semantic-dataset-select,
 .theme-dark .semantic-operation-select,
 .theme-dark .semantic-arithmetic-field input,
+.theme-dark .semantic-concat-field code,
 .theme-dark .semantic-add-input {
   background: #141d2d;
   color: var(--text);

@@ -33,6 +33,7 @@ export function SemanticNode(props: NodeProps): ReactElement {
   const inputs = Math.max(inputArityForNode(node), Number(props.data.displayInputCount ?? 0))
   const outputs = outputArityForNode(node)
   const canAddInput = (node.type === 'arithmetic' || isFlexibleInputNodeType(node.type)) && inputs < MAX_FLEX_INPUT_COUNT
+  const [concatOutput, concatExpression] = node.type === 'concat' ? data.fullFormula.split(' = ', 2) : []
   const expandedHeight = expandedSemanticInputHeight(node)
   useEffect(() => {
     if (node.type === 'arithmetic' || isFlexibleInputNodeType(node.type)) updateNodeInternals(node.id)
@@ -58,7 +59,7 @@ export function SemanticNode(props: NodeProps): ReactElement {
         let valid = true
         try { parseArithmetic(text) } catch { valid = false }
         setExpressionDraft({ source: savedExpression, text, valid })
-      }} onBlur={() => { if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText) }} onKeyDown={event => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}/></label> : <div className="semantic-operation-formula">{data.showMath ? data.formula : parameter ? 'learned parameter' : node.type.replaceAll('-', ' ')}</div>}
+      }} onBlur={() => { if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText) }} onKeyDown={event => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}/></label> : node.type === 'concat' && data.showMath ? <div className="semantic-arithmetic-field semantic-concat-field"><span>{concatOutput} =</span><code title={data.fullFormula}>{concatExpression}</code></div> : <div className="semantic-operation-formula">{data.showMath ? data.formula : parameter ? 'learned parameter' : node.type.replaceAll('-', ' ')}</div>}
       <div className="semantic-operation-value" title={formatFullTensor(data.showGradient ? node.grad : value)}>{displayValue}</div>
       <span className="semantic-shape">{data.showGradient ? '∂L / ∂x · ' : ''}{shape}</span>
     </>}

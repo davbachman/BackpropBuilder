@@ -330,6 +330,7 @@ function fallbackInputLabels(node: GraphNode): string[] {
   if (node.type === 'embedding') return ['table', 'token_ids']
   if (node.type === 'conv2d') return ['image', 'kernel', 'bias']
   if (node.type === 'layer-norm') return ['input', 'γ', 'β']
+  if (node.type === 'concat') return Array.from({ length: inputArityForNode(node) }, (_, index) => `x${index + 1}`)
   return Array.from({ length: inputArityForNode(node) }, (_, index) => inputLabelForIndex(index))
 }
 

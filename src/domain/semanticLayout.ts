@@ -15,6 +15,7 @@ const WIRE_LANE = 24
 export function expandedSemanticInputHeight(node: GraphNode): number | undefined {
   if (node.type !== 'arithmetic' && !isFlexibleInputNodeType(node.type)) return undefined
   const count = inputArityForNode(node)
+  if (node.type === 'concat') return Math.max(148, count > 4 ? (count + 1) * 20 : 0)
   return count > 4 ? (count + 1) * 20 : undefined
 }
 

@@ -621,6 +621,8 @@
 .arithmetic-expression-field { display: flex; align-items: center; gap: 5px; color: var(--muted-strong); font: 12px var(--font-mono); }
 .arithmetic-expression-field span { flex: none; }
 .arithmetic-expression-field input { min-width: 0; font: 12px var(--font-mono); }
+.concat-expression-field { display: block; margin: 8px 0; }
+.concat-expression-field code { display: block; box-sizing: border-box; width: 100%; margin-top: 3px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-soft); color: var(--muted-strong); overflow-wrap: break-word; font: 11px var(--font-mono); }
 
 .node-metrics {
   display: grid;

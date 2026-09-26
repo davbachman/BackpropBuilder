@@ -102,6 +102,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const [expressionDraft, setExpressionDraft] = useState({ source: savedExpression, text: savedExpression, valid: true })
   const expressionText = expressionDraft.source === savedExpression ? expressionDraft.text : savedExpression
   const expressionValid = expressionDraft.source === savedExpression ? expressionDraft.valid : true
+  const [concatOutput, concatExpression] = node.type === 'concat' ? data.fullFormula.split(' = ', 2) : []
   const commitExpression = () => {
     if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText)
   }
@@ -149,7 +150,12 @@ export function BuilderNode(props: NodeProps): ReactElement {
         <strong>{node.label}</strong>
         {showTypeBadge ? <span className="node-kind">{node.type === 'weight' || node.type === 'bias' ? 'Param' : node.type}</span> : null}
       </div>
-      {data.showMath && node.type !== 'arithmetic' ? (
+      {data.showMath && node.type === 'concat' ? (
+        <div className="node-field arithmetic-expression-field concat-expression-field">
+          <span>{concatOutput} =</span>
+          <code title={data.fullFormula}>{concatExpression}</code>
+        </div>
+      ) : data.showMath && node.type !== 'arithmetic' ? (
         <div className="node-formula">
           <HoverText text={data.formula} tooltip={data.fullFormula} />
         </div>
