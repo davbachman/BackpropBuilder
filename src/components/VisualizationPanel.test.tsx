@@ -91,7 +91,53 @@ describe('VisualizationPanel', () => {
     expect(screen.getByText('versicolor')).toBeInTheDocument()
     expect(screen.getByText('virginica')).toBeInTheDocument()
   })
+
+  it('plots one decision surface when several Input blocks reuse two CSV features', () => {
+    const graph = repeatedFeatureClassifierGraph()
+    expect(forwardPass(graph).graph.nodes.find(node => node.id === 'logits')?.value?.shape).toEqual([6, 3])
+
+    const { container } = render(<VisualizationPanel graph={graph} />)
+    expect(screen.getByRole('img', { name: /Two-input prediction heatmap/i })).toBeInTheDocument()
+    expect(screen.getByText('x-axis: Petal.Length')).toBeInTheDocument()
+    expect(screen.getByText('y-axis: Petal.Width')).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(625)
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(6)
+  })
 })
+
+function repeatedFeatureClassifierGraph(): GraphModel {
+  const source = customCsvClassifierGraph()
+  const dataset = source.nodes.find(node => node.id === 'dataset')!
+  const logits = source.nodes.find(node => node.id === 'logits')!
+  const loss = source.nodes.find(node => node.id === 'loss')!
+  const inputs = Array.from({ length: 3 }, (_, classIndex) => [0, 1].map(slot => ({
+    id: `feature-${classIndex}-${slot}`,
+    type: 'input' as const,
+    label: `x${classIndex * 2 + slot + 1}`,
+    position: { x: 200, y: classIndex * 180 + slot * 70 },
+    params: {},
+  }))).flat()
+  const sums = Array.from({ length: 3 }, (_, classIndex) => ({
+    id: `sum-${classIndex}`,
+    type: 'add' as const,
+    label: `class ${classIndex}`,
+    position: { x: 400, y: classIndex * 180 },
+    params: {},
+  }))
+  return {
+    learningRate: .1,
+    nodes: [dataset, ...inputs, ...sums, logits, loss],
+    edges: [
+      ...inputs.flatMap((input, index) => [
+        { id: `dataset-${input.id}`, source: dataset.id, sourceSlot: index % 2, target: input.id, inputSlot: 0 },
+        { id: `${input.id}-sum`, source: input.id, target: sums[Math.floor(index / 2)].id, inputSlot: index % 2 },
+      ]),
+      ...sums.map((sum, index) => ({ id: `${sum.id}-logits`, source: sum.id, target: logits.id, inputSlot: index })),
+      { id: 'logits-loss', source: logits.id, target: loss.id, inputSlot: 0 },
+      { id: 'target-loss', source: dataset.id, sourceSlot: 2, target: loss.id, inputSlot: 1 },
+    ],
+  }
+}
 
 function customCsvClassifierGraph(): GraphModel {
   const customCsv = parseCustomCsv(

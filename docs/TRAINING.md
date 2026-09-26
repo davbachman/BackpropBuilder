@@ -28,6 +28,6 @@ PyTorch and Colab exports carry the chosen batch size, reshuffling setting, epoc
 
 ## Understand Reporting
 
-For a valid graph with a Loss block and one input upstream of its prediction, Reporting plots target points and the prediction function. With two inputs it can show a two-dimensional classification view. Models with more complex inputs still show recorded losses and test metrics even if a simple input-output plot is unavailable. Predictions that blow far outside the target range may fall outside the plot; the loss and selected block values help diagnose that.
+For a valid graph with a Loss block and one distinct input feature upstream of its prediction, Reporting plots target points and the prediction function. With two distinct features it can show a two-dimensional classification view, including multiclass decision regions. Several Input blocks may reuse the same Dataset column; they still count as one feature on the plot. Models with more complex inputs still show recorded losses and test metrics even if a simple input-output plot is unavailable. Predictions that blow far outside the target range may fall outside the plot; the loss and selected block values help diagnose that.
 
 If a block is red or a run button is unavailable, select the block for its validation message in **Details**. Check all required ports, expression variables, tensor dimensions, and the loss choice.

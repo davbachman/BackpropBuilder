@@ -1,6 +1,6 @@
 import { useId, useMemo, type ReactElement } from 'react'
 import { formatNumber, forwardPass, lossKindForNode } from '../domain/engine'
-import { datasetForNode, datasetTargetSlotForNode } from '../domain/datasets'
+import { datasetForNode, datasetOutputLabelForSlot, datasetTargetSlotForNode } from '../domain/datasets'
 import { evaluateDataset } from '../domain/datasetTraining'
 import { isScalarTensor, tensorValue, toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from '../domain/types'
@@ -57,6 +57,12 @@ interface PredictionSurface {
 interface NumericRange {
   min: number
   max: number
+}
+
+interface InputDimension {
+  representative: GraphNode
+  nodeIds: string[]
+  label: string
 }
 
 export function VisualizationPanel({ graph }: { graph: GraphModel }): ReactElement {
@@ -286,29 +292,47 @@ function buildVisualizationData(graph: GraphModel): VisualizationData {
     return { kind: 'unsupported', message: 'Connect prediction and target values to the loss node.' }
   }
 
-  const inputNodes = inputNodesUpstreamOf(evaluatedGraph, predictionNode.id)
+  const inputDimensions = distinctInputDimensions(evaluatedGraph, inputNodesUpstreamOf(evaluatedGraph, predictionNode.id))
 
-  if (inputNodes.length === 1) {
-    return singleInputDataFor(evaluatedGraph, inputNodes[0], predictionNode, targetNode, targetEdge!)
+  if (inputDimensions.length === 1) {
+    return singleInputDataFor(evaluatedGraph, inputDimensions[0], predictionNode, targetNode, targetEdge!)
   }
 
-  if (inputNodes.length === 2) {
-    return twoInputDataFor(evaluatedGraph, inputNodes as [GraphNode, GraphNode], predictionNode, targetNode, targetEdge!, lossKindForNode(lossNode, evaluatedGraph) === 'cross-entropy')
+  if (inputDimensions.length === 2) {
+    return twoInputDataFor(evaluatedGraph, inputDimensions as [InputDimension, InputDimension], predictionNode, targetNode, targetEdge!, lossKindForNode(lossNode, evaluatedGraph) === 'cross-entropy')
   }
 
   return {
     kind: 'unsupported',
-    message: 'Visualization supports networks with one or two input nodes connected to the prediction.',
+    message: 'Visualization supports predictions based on one or two distinct input features.',
   }
+}
+
+function distinctInputDimensions(graph: GraphModel, inputs: GraphNode[]): InputDimension[] {
+  const dimensions = new Map<string, InputDimension>()
+  for (const input of inputs) {
+    const datasetEdge = incomingEdges(graph, input.id).find(edge => nodeById(graph, edge.source)?.type === 'dataset')
+    const dataset = datasetEdge && nodeById(graph, datasetEdge.source)
+    const key = datasetEdge ? `dataset:${JSON.stringify([datasetEdge.source, datasetEdge.sourceSlot ?? 0])}` : `input:${input.id}`
+    const existing = dimensions.get(key)
+    if (existing) existing.nodeIds.push(input.id)
+    else dimensions.set(key, {
+      representative: input,
+      nodeIds: [input.id],
+      label: dataset && datasetEdge ? datasetOutputLabelForSlot(dataset, datasetEdge.sourceSlot ?? 0) : input.label,
+    })
+  }
+  return [...dimensions.values()]
 }
 
 function singleInputDataFor(
   graph: GraphModel,
-  inputNode: GraphNode,
+  dimension: InputDimension,
   predictionNode: GraphNode,
   targetNode: GraphNode,
   targetEdge: GraphEdge,
 ): VisualizationData {
+  const inputNode = dimension.representative
   const datasetBinding = fullNumericDatasetValues(graph, [inputNode], targetNode, targetEdge)
   const input = datasetBinding?.values[0] ?? toTensor(inputNode.value ?? inputNode.params.value)
   const target = datasetBinding?.values[1] ?? toTensor(targetNode.value ?? targetNode.params.value)
@@ -326,7 +350,7 @@ function singleInputDataFor(
     y: tensorEntryAt(target, index),
   }))
   const xRange = paddedRange(targetPoints.map((point) => point.x))
-  const predictionSamples = sampleSingleInputPredictions(graph, inputNode.id, predictionNode.id, xRange)
+  const predictionSamples = sampleSingleInputPredictions(graph, dimension.nodeIds, predictionNode.id, xRange)
 
   if (!predictionSamples) {
     return {
@@ -337,7 +361,7 @@ function singleInputDataFor(
 
   return {
     kind: 'single-input',
-    inputLabel: inputNode.label,
+    inputLabel: dimension.label,
     xRange,
     yRange: paddedRange(targetPoints.map(point => point.y), 0.5),
     targetPoints,
@@ -348,15 +372,17 @@ function singleInputDataFor(
 
 function twoInputDataFor(
   graph: GraphModel,
-  inputNodes: [GraphNode, GraphNode],
+  dimensions: [InputDimension, InputDimension],
   predictionNode: GraphNode,
   targetNode: GraphNode,
   targetEdge: GraphEdge,
   classification: boolean,
 ): VisualizationData {
-  const datasetBinding = fullNumericDatasetValues(graph, inputNodes, targetNode, targetEdge)
-  const firstInput = datasetBinding?.values[0] ?? toTensor(inputNodes[0].value ?? inputNodes[0].params.value)
-  const secondInput = datasetBinding?.values[1] ?? toTensor(inputNodes[1].value ?? inputNodes[1].params.value)
+  const datasetBinding = fullNumericDatasetValues(graph, dimensions.map(dimension => dimension.representative), targetNode, targetEdge)
+  const firstInputNode = dimensions[0].representative
+  const secondInputNode = dimensions[1].representative
+  const firstInput = datasetBinding?.values[0] ?? toTensor(firstInputNode.value ?? firstInputNode.params.value)
+  const secondInput = datasetBinding?.values[1] ?? toTensor(secondInputNode.value ?? secondInputNode.params.value)
   const target = datasetBinding?.values[2] ?? toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(firstInput.data.length, secondInput.data.length, target.data.length)
 
@@ -380,7 +406,7 @@ function twoInputDataFor(
   const yRange = paddedRange(targetPoints.map((point) => point.y))
   const predictionSurface = sampleTwoInputPredictions(
     graph,
-    [inputNodes[0].id, inputNodes[1].id],
+    [dimensions[0].nodeIds, dimensions[1].nodeIds],
     predictionNode.id,
     xRange,
     yRange,
@@ -400,7 +426,7 @@ function twoInputDataFor(
   ], 0)
   return {
     kind: 'two-input',
-    inputLabels: [inputNodes[0].label, inputNodes[1].label],
+    inputLabels: [dimensions[0].label, dimensions[1].label],
     xRange,
     yRange,
     targetRange: classification ? colorRange : paddedRange(targetPoints.map((point) => point.value)),
@@ -415,7 +441,7 @@ function twoInputDataFor(
 
 function sampleSingleInputPredictions(
   graph: GraphModel,
-  inputNodeId: string,
+  inputNodeIds: string[],
   predictionNodeId: string,
   xRange: NumericRange,
 ): Point2D[] | undefined {
@@ -425,7 +451,7 @@ function sampleSingleInputPredictions(
   const prediction = evaluatePredictionWithInputs(
     graph,
     predictionNodeId,
-    new Map([[inputNodeId, tensorValue([PREDICTION_SAMPLE_COUNT], sampledInputs)]]),
+    new Map(inputNodeIds.map(nodeId => [nodeId, tensorValue([PREDICTION_SAMPLE_COUNT], sampledInputs)])),
   )
 
   if (!prediction || !canExpandToSize(prediction, PREDICTION_SAMPLE_COUNT)) return undefined
@@ -434,7 +460,7 @@ function sampleSingleInputPredictions(
 
 function sampleTwoInputPredictions(
   graph: GraphModel,
-  inputNodeIds: [string, string],
+  inputNodeIds: [string[], string[]],
   predictionNodeId: string,
   xRange: NumericRange,
   yRange: NumericRange,
@@ -456,13 +482,12 @@ function sampleTwoInputPredictions(
     }
   }
 
+  const firstSamples = tensorValue([rows * columns], firstInputValues)
+  const secondSamples = tensorValue([rows * columns], secondInputValues)
   const prediction = evaluatePredictionWithInputs(
     graph,
     predictionNodeId,
-    new Map([
-      [inputNodeIds[0], tensorValue([rows * columns], firstInputValues)],
-      [inputNodeIds[1], tensorValue([rows * columns], secondInputValues)],
-    ]),
+    new Map([...inputNodeIds[0].map(nodeId => [nodeId, firstSamples] as const), ...inputNodeIds[1].map(nodeId => [nodeId, secondSamples] as const)]),
   )
 
   const size = rows * columns
