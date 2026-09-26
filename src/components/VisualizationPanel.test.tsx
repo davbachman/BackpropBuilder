@@ -75,7 +75,52 @@ describe('VisualizationPanel', () => {
     const first = render(<VisualizationPanel graph={customCsvGraph('target,feature\n10,1\n20,2\n30,3\n', 1, 0)} />)
     expect(targetPointPositions(first.container)).toEqual(expected)
   })
+
+  it('plots class predictions when CSV columns feed a multiclass model and its target feeds loss directly', () => {
+    const graph = customCsvClassifierGraph()
+    expect(forwardPass(graph).graph.nodes.find(node => node.id === 'logits')?.value?.shape).toEqual([6, 3])
+
+    const { container } = render(<VisualizationPanel graph={graph} />)
+
+    expect(screen.getByRole('img', { name: /Two-input prediction heatmap/i })).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(625)
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(6)
+    expect(screen.getByText('6 points')).toBeInTheDocument()
+    expect(screen.getByText('Circles: actual · background: predicted')).toBeInTheDocument()
+    expect(screen.getByText('setosa')).toBeInTheDocument()
+    expect(screen.getByText('versicolor')).toBeInTheDocument()
+    expect(screen.getByText('virginica')).toBeInTheDocument()
+  })
 })
+
+function customCsvClassifierGraph(): GraphModel {
+  const customCsv = parseCustomCsv(
+    'Petal.Length,Petal.Width,Species\n1,0,setosa\n2,0,setosa\n2,1,versicolor\n3,1,versicolor\n3,2,virginica\n4,2,virginica\n',
+    'iris.csv',
+  )
+  return {
+    learningRate: 0.1,
+    nodes: [
+      { id: 'dataset', type: 'dataset', label: 'dataset', position: { x: 0, y: 0 }, params: { dataset: 'custom-csv', customCsv, datasetMode: 'batch', datasetSplit: 'all' } },
+      { id: 'x1', type: 'input', label: 'x1', position: { x: 200, y: 0 }, params: {} },
+      { id: 'x2', type: 'input', label: 'x2', position: { x: 200, y: 160 }, params: {} },
+      { id: 'sum', type: 'add', label: 'sum', position: { x: 400, y: 80 }, params: {} },
+      { id: 'logits', type: 'concat', label: 'logits', position: { x: 600, y: 80 }, params: { axis: 1, inputCount: 3 } },
+      { id: 'loss', type: 'loss', label: 'loss', position: { x: 800, y: 80 }, params: { loss: 'cross-entropy' } },
+    ],
+    edges: [
+      { id: 'dataset-x1', source: 'dataset', sourceSlot: 0, target: 'x1', inputSlot: 0 },
+      { id: 'dataset-x2', source: 'dataset', sourceSlot: 1, target: 'x2', inputSlot: 0 },
+      { id: 'x1-sum', source: 'x1', target: 'sum', inputSlot: 0 },
+      { id: 'x2-sum', source: 'x2', target: 'sum', inputSlot: 1 },
+      { id: 'x1-logits', source: 'x1', target: 'logits', inputSlot: 0 },
+      { id: 'x2-logits', source: 'x2', target: 'logits', inputSlot: 1 },
+      { id: 'sum-logits', source: 'sum', target: 'logits', inputSlot: 2 },
+      { id: 'logits-loss', source: 'logits', target: 'loss', inputSlot: 0 },
+      { id: 'target-loss', source: 'dataset', sourceSlot: 2, target: 'loss', inputSlot: 1 },
+    ],
+  }
+}
 
 function customCsvGraph(csvText: string, featureSlot: number, targetSlot: number): GraphModel {
   const customCsv = parseCustomCsv(csvText, 'ordered.csv')

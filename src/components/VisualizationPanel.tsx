@@ -1,8 +1,8 @@
 import { useId, useMemo, type ReactElement } from 'react'
-import { formatNumber, forwardPass } from '../domain/engine'
+import { formatNumber, forwardPass, lossKindForNode } from '../domain/engine'
 import { datasetForNode, datasetTargetSlotForNode } from '../domain/datasets'
 import { evaluateDataset } from '../domain/datasetTraining'
-import { isScalarTensor, tensorSize, tensorValue, toTensor } from '../domain/tensor'
+import { isScalarTensor, tensorValue, toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from '../domain/types'
 
 const PLOT_WIDTH = 300
@@ -30,6 +30,8 @@ type VisualizationData =
       predictionRange: NumericRange
       targetPoints: ColoredPoint[]
       predictionSurface: PredictionSurface
+      classification: boolean
+      classLabels?: string[]
       datasetId?: string
     }
   | {
@@ -183,7 +185,7 @@ function TwoInputVisualization({
               fill={heatmapColor(cell.value, data.predictionRange)}
               fillOpacity="0.46"
             >
-              <title>{`prediction ${formatNumber(cell.value)}`}</title>
+              <title>{`prediction ${data.classLabels?.[cell.value] ?? formatNumber(cell.value)}`}</title>
             </rect>
           )
         })}
@@ -197,7 +199,7 @@ function TwoInputVisualization({
             r="5"
             fill={heatmapColor(point.value, data.targetRange)}
           >
-            <title>{`target (${formatNumber(point.x)}, ${formatNumber(point.y)}) = ${formatNumber(point.value)}`}</title>
+            <title>{`target (${formatNumber(point.x)}, ${formatNumber(point.y)}) = ${data.classLabels?.[point.value] ?? formatNumber(point.value)}`}</title>
           </circle>
         ))}
       </svg>
@@ -206,7 +208,13 @@ function TwoInputVisualization({
         <span>y-axis: {data.inputLabels[1]}</span>
         <span>{data.targetPoints.length} points</span>
       </div>
-      <VisualizationLegend />
+      {data.classification ? <div className="visualization-legend" aria-label="Class colors">
+        <span>Circles: actual · background: predicted</span>
+        {data.classLabels?.map((label, index) => <span key={label}>
+          <i className="legend-dot" style={{ backgroundColor: heatmapColor(index, data.predictionRange) }} />
+          {label}
+        </span>)}
+      </div> : <VisualizationLegend />}
     </div>
   )
 }
@@ -281,11 +289,11 @@ function buildVisualizationData(graph: GraphModel): VisualizationData {
   const inputNodes = inputNodesUpstreamOf(evaluatedGraph, predictionNode.id)
 
   if (inputNodes.length === 1) {
-    return singleInputDataFor(evaluatedGraph, inputNodes[0], predictionNode, targetNode)
+    return singleInputDataFor(evaluatedGraph, inputNodes[0], predictionNode, targetNode, targetEdge!)
   }
 
   if (inputNodes.length === 2) {
-    return twoInputDataFor(evaluatedGraph, inputNodes as [GraphNode, GraphNode], predictionNode, targetNode)
+    return twoInputDataFor(evaluatedGraph, inputNodes as [GraphNode, GraphNode], predictionNode, targetNode, targetEdge!, lossKindForNode(lossNode, evaluatedGraph) === 'cross-entropy')
   }
 
   return {
@@ -299,8 +307,9 @@ function singleInputDataFor(
   inputNode: GraphNode,
   predictionNode: GraphNode,
   targetNode: GraphNode,
+  targetEdge: GraphEdge,
 ): VisualizationData {
-  const datasetBinding = fullNumericDatasetValues(graph, [inputNode], targetNode)
+  const datasetBinding = fullNumericDatasetValues(graph, [inputNode], targetNode, targetEdge)
   const input = datasetBinding?.values[0] ?? toTensor(inputNode.value ?? inputNode.params.value)
   const target = datasetBinding?.values[1] ?? toTensor(targetNode.value ?? targetNode.params.value)
   const pointCount = Math.max(input.data.length, target.data.length)
@@ -317,7 +326,7 @@ function singleInputDataFor(
     y: tensorEntryAt(target, index),
   }))
   const xRange = paddedRange(targetPoints.map((point) => point.x))
-  const predictionSamples = sampleSingleInputPredictions(graph, inputNode.id, predictionNode.id, targetNode.id, xRange)
+  const predictionSamples = sampleSingleInputPredictions(graph, inputNode.id, predictionNode.id, xRange)
 
   if (!predictionSamples) {
     return {
@@ -342,8 +351,10 @@ function twoInputDataFor(
   inputNodes: [GraphNode, GraphNode],
   predictionNode: GraphNode,
   targetNode: GraphNode,
+  targetEdge: GraphEdge,
+  classification: boolean,
 ): VisualizationData {
-  const datasetBinding = fullNumericDatasetValues(graph, inputNodes, targetNode)
+  const datasetBinding = fullNumericDatasetValues(graph, inputNodes, targetNode, targetEdge)
   const firstInput = datasetBinding?.values[0] ?? toTensor(inputNodes[0].value ?? inputNodes[0].params.value)
   const secondInput = datasetBinding?.values[1] ?? toTensor(inputNodes[1].value ?? inputNodes[1].params.value)
   const target = datasetBinding?.values[2] ?? toTensor(targetNode.value ?? targetNode.params.value)
@@ -371,9 +382,9 @@ function twoInputDataFor(
     graph,
     [inputNodes[0].id, inputNodes[1].id],
     predictionNode.id,
-    targetNode.id,
     xRange,
     yRange,
+    classification,
   )
 
   if (!predictionSurface) {
@@ -383,15 +394,21 @@ function twoInputDataFor(
     }
   }
 
+  const colorRange = paddedRange([
+    ...targetPoints.map(point => point.value),
+    ...predictionSurface.cells.map(cell => cell.value),
+  ], 0)
   return {
     kind: 'two-input',
     inputLabels: [inputNodes[0].label, inputNodes[1].label],
     xRange,
     yRange,
-    targetRange: paddedRange(targetPoints.map((point) => point.value)),
-    predictionRange: paddedRange(predictionSurface.cells.map((point) => point.value)),
+    targetRange: classification ? colorRange : paddedRange(targetPoints.map((point) => point.value)),
+    predictionRange: classification ? colorRange : paddedRange(predictionSurface.cells.map((point) => point.value)),
     targetPoints,
     predictionSurface,
+    classification,
+    classLabels: datasetBinding?.classLabels,
     datasetId: datasetBinding?.sourceId,
   }
 }
@@ -400,7 +417,6 @@ function sampleSingleInputPredictions(
   graph: GraphModel,
   inputNodeId: string,
   predictionNodeId: string,
-  targetNodeId: string,
   xRange: NumericRange,
 ): Point2D[] | undefined {
   const sampledInputs = Array.from({ length: PREDICTION_SAMPLE_COUNT }, (_, index) =>
@@ -409,9 +425,7 @@ function sampleSingleInputPredictions(
   const prediction = evaluatePredictionWithInputs(
     graph,
     predictionNodeId,
-    targetNodeId,
     new Map([[inputNodeId, tensorValue([PREDICTION_SAMPLE_COUNT], sampledInputs)]]),
-    [PREDICTION_SAMPLE_COUNT],
   )
 
   if (!prediction || !canExpandToSize(prediction, PREDICTION_SAMPLE_COUNT)) return undefined
@@ -422,9 +436,9 @@ function sampleTwoInputPredictions(
   graph: GraphModel,
   inputNodeIds: [string, string],
   predictionNodeId: string,
-  targetNodeId: string,
   xRange: NumericRange,
   yRange: NumericRange,
+  classification: boolean,
 ): PredictionSurface | undefined {
   const rows = SURFACE_GRID_SIZE
   const columns = SURFACE_GRID_SIZE
@@ -445,43 +459,57 @@ function sampleTwoInputPredictions(
   const prediction = evaluatePredictionWithInputs(
     graph,
     predictionNodeId,
-    targetNodeId,
     new Map([
-      [inputNodeIds[0], tensorValue([rows, columns], firstInputValues)],
-      [inputNodeIds[1], tensorValue([rows, columns], secondInputValues)],
+      [inputNodeIds[0], tensorValue([rows * columns], firstInputValues)],
+      [inputNodeIds[1], tensorValue([rows * columns], secondInputValues)],
     ]),
-    [rows, columns],
   )
 
   const size = rows * columns
-  if (!prediction || !canExpandToSize(prediction, size)) return undefined
+  if (!prediction) return undefined
+  let values: number[]
+  if (classification && prediction.shape.length === 2 && prediction.shape[0] === size && prediction.shape[1] > 1) {
+    const classCount = prediction.shape[1]
+    values = Array.from({ length: size }, (_, index) => {
+      let bestClass = 0
+      for (let classIndex = 1; classIndex < classCount; classIndex += 1) {
+        if (prediction.data[index * classCount + classIndex] > prediction.data[index * classCount + bestClass]) bestClass = classIndex
+      }
+      return bestClass
+    })
+  } else if (canExpandToSize(prediction, size)) {
+    values = cells.map((_, index) => tensorEntryAt(prediction, index))
+  } else return undefined
 
   return {
     rows,
     columns,
-    cells: cells.map((cell, index) => ({ ...cell, value: tensorEntryAt(prediction, index) })),
+    cells: cells.map((cell, index) => ({ ...cell, value: values[index] })),
   }
 }
 
 function evaluatePredictionWithInputs(
   graph: GraphModel,
   predictionNodeId: string,
-  targetNodeId: string,
   inputValues: Map<string, TensorValue>,
-  sampledShape: number[],
 ): TensorValue | undefined {
-  const overriddenNodeIds = new Set([...inputValues.keys(), targetNodeId])
+  // Evaluate only the prediction's ancestors. The loss may have a different
+  // target batch size, and is irrelevant to a sampled prediction surface.
+  const ancestorIds = new Set<string>()
+  const visit = (nodeId: string) => {
+    if (ancestorIds.has(nodeId)) return
+    ancestorIds.add(nodeId)
+    if (inputValues.has(nodeId)) return
+    for (const edge of incomingEdges(graph, nodeId)) visit(edge.source)
+  }
+  visit(predictionNodeId)
   const sampledGraph: GraphModel = {
     ...graph,
-    edges: graph.edges.filter((edge) => !overriddenNodeIds.has(edge.target)),
-    nodes: graph.nodes.map((node) => {
+    edges: graph.edges.filter(edge => ancestorIds.has(edge.source) && ancestorIds.has(edge.target) && !inputValues.has(edge.target)),
+    nodes: graph.nodes.filter(node => ancestorIds.has(node.id)).map((node) => {
       const inputValue = inputValues.get(node.id)
       if (inputValue) {
         return { ...node, params: { ...node.params, value: inputValue }, value: inputValue }
-      }
-      if (node.id === targetNodeId) {
-        const targetValue = tensorValue(sampledShape, Array.from({ length: tensorSize(sampledShape) }, () => 0))
-        return { ...node, params: { ...node.params, value: targetValue }, value: targetValue }
       }
       return node
     }),
@@ -505,8 +533,10 @@ function incomingEdges(graph: GraphModel, nodeId: string): GraphEdge[] {
 /** The canvas may trace one example, but the data plot describes the whole
  * connected numeric dataset. Read its original columns instead of the
  * currently selected example flowing through the alias nodes. */
-function fullNumericDatasetValues(graph: GraphModel, inputs: GraphNode[], target: GraphNode): { values: TensorValue[]; sourceId: string } | undefined {
-  const ports = [...inputs, target].map(node => incomingEdges(graph, node.id)
+function fullNumericDatasetValues(graph: GraphModel, inputs: GraphNode[], target: GraphNode, targetEdge: GraphEdge): { values: TensorValue[]; sourceId: string; classLabels?: string[] } | undefined {
+  const ports = inputs.map(node => incomingEdges(graph, node.id)
+    .find(edge => nodeById(graph, edge.source)?.type === 'dataset'))
+  ports.push(target.type === 'dataset' ? targetEdge : incomingEdges(graph, target.id)
     .find(edge => nodeById(graph, edge.source)?.type === 'dataset'))
   if (ports.some(port => !port) || ports.some(port => port?.source !== ports[0]?.source)) return undefined
   const source = nodeById(graph, ports[0]!.source)
@@ -519,7 +549,7 @@ function fullNumericDatasetValues(graph: GraphModel, inputs: GraphNode[], target
     return slot === targetSlot ? dataset.targetValue : dataset.featureValues[slot < targetSlot ? slot : slot - 1]
   })
   if (values.some(value => !value || value.data.length !== dataset.targetValue.data.length)) return undefined
-  return { values, sourceId: source.id }
+  return { values, sourceId: source.id, classLabels: dataset.classLabels }
 }
 
 function nodeById(graph: GraphModel, nodeId: string): GraphNode | undefined {
