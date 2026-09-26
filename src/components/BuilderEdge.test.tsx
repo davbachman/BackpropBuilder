@@ -57,6 +57,18 @@ describe('clean directional connection flow', () => {
     expect(container.querySelector('.builder-edge-bands')!.getAttribute('data-direction')).toBe('backward')
   })
 
+  it('draws grouped builder wires with broad bends and readable weight at overview zoom', () => {
+    const { container } = renderEdge({ absoluteRoute: true, sceneScale: 1, cameraZoom: .6,
+      route: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 60 }, { x: 184, y: 60 }],
+      forward: { shape: [], data: [1] },
+    })
+    const wire = container.querySelector('.builder-edge-flow')!
+    expect(wire.getAttribute('style')).toContain('--edge-scale: 1.4')
+    const path = container.querySelector('path.builder-edge')!.getAttribute('d')!
+    expect(path).toContain('L44,0 Q80,0 80,30')
+    expect(container.querySelector('.builder-edge-bands')!.getAttribute('d')).toBe(path)
+  })
+
   it('masks the crossing gap on both the wire and its moving bands at deep zoom', () => {
     const { container } = renderEdge({ absoluteRoute: true, sceneScale: .01, cameraZoom: 150,
       route: [{ x: 12, y: 34 }, { x: 12, y: 35 }], crossings: { points: [{ x: 12, y: 34.5 }], gaps: [{ x: 12, y: 34.5 }] },

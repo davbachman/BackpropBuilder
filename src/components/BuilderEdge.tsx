@@ -38,7 +38,8 @@ export function BuilderEdge(props: EdgeProps): ReactElement {
   const origin = data?.absoluteRoute ? data.route?.[0] : undefined
   // Draw nested paths in their own units. Rounding microscopic world-space
   // coordinates would erase corners when the camera reaches a single neuron.
-  const scale = Math.min(1, 1.5 / (geometryScale * (data?.cameraZoom ?? 1)))
+  const screenScale = geometryScale * (data?.cameraZoom ?? 1)
+  const scale = Math.min(origin ? 1.4 : 1, 1.5 / screenScale)
   const localPoint = (point: Position) => origin ? { x: (point.x - origin.x) / geometryScale, y: (point.y - origin.y) / geometryScale } : point
   const route = origin ? data?.route?.map(localPoint) : data?.route?.length ? [
     { x: props.sourceX, y: props.sourceY }, ...data.route.slice(1, -1), { x: props.targetX, y: props.targetY },
@@ -50,7 +51,9 @@ export function BuilderEdge(props: EdgeProps): ReactElement {
     width: Math.max(...route.map(point => point.x)) - Math.min(...route.map(point => point.x)) + 32,
     height: Math.max(...route.map(point => point.y)) - Math.min(...route.map(point => point.y)) + 32,
   } : undefined
-  const edgePath = route ? roundedWirePath(route, origin ? 12 : 9, crossings) : data?.residual && props.targetX - props.sourceX > 170
+  // A continuous scene still needs routed lanes, but its bends should read
+  // like the broad curves of builder wires rather than right-angle tracks.
+  const edgePath = route ? roundedWirePath(route, origin ? 36 : 9, crossings) : data?.residual && props.targetX - props.sourceX > 170
     ? `M${props.sourceX},${props.sourceY} C${props.sourceX + 40},${props.sourceY} ${props.sourceX + 30},${top} ${props.sourceX + 60},${top} L${props.targetX - 60},${top} C${props.targetX - 30},${top} ${props.targetX - 40},${props.targetY} ${props.targetX},${props.targetY}`
     : defaultPath
   const value = isBackward ? data?.gradient : data?.forward
