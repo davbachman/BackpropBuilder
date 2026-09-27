@@ -15,6 +15,7 @@ Backprop Builder is a visual, editable machine-learning workbench for students. 
 | [Block reference](docs/BLOCKS.md) | Every block in the palette, its inputs, and common tensor shapes |
 | [Build models from scratch](docs/BUILDING-MODELS.md) | Recipes for an MLP, attention, a transformer block, and a digit CNN |
 | [Datasets](docs/DATASETS.md) | Built-in data, custom CSVs, feature and target wiring, batches, and train/test splits |
+| [Accelerated text training](docs/ACCELERATED-TEXT-TRAINING.md) | Padded batches, AdamW, WebGL, early stopping, and controlled IMDb results |
 | [Text curriculum pilot](docs/TEXT-CURRICULUM.md) | Real IMDb reviews, learned embeddings, attention, and an Alice text generator |
 | [Training, testing, and reports](docs/TRAINING.md) | Backpropagation, epoch runs, inference, predictions, accuracy, and troubleshooting |
 | [Example models and lessons](docs/EXAMPLES.md) | Importable projects from a neuron through attention, a transformer, and a digit CNN |

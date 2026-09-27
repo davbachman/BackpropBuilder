@@ -20,7 +20,7 @@ The **Train / test split** selector offers the source's default split or 60%, 70
 
 ## Import your own CSV
 
-Choose **Custom CSV…** as a Dataset source, then select a local `.csv` file. The file remains in the browser and is included in a saved project JSON; importing the saved project does not require the original CSV. The parser supports a header row, quoted fields, at least two data rows, 2–32 columns, up to 10,000 rows, and a 10 MB file. Feature columns must be numeric. A classification target may contain text labels.
+Choose **Custom CSV…** as a Dataset source, then select a local `.csv` file. The file remains in the browser and is included in a saved project JSON; importing the saved project does not require the original CSV. The parser supports a header row, quoted fields, at least two data rows, 2–129 columns, up to 10,000 rows, and a 10 MB file. Feature columns must be numeric. A classification target may contain text labels.
 
 Each output handle uses its CSV column name when headers are present. Wire the target column to **Target** or directly to the target input of **Loss**. That wiring tells the app which column is the target; until then the preview uses the last column or the sole text-label column. In Details you can change **Task** between regression, binary classification, and multiclass classification, toggle **First row contains headers**, and **Replace CSV file**. Invalid feature values or an incompatible task show an error there.
 
@@ -35,3 +35,7 @@ For source attribution and reproduction of the digit data, see [CNN data](CNN-DA
 ## Text datasets
 
 Choose **Text / reviews…** for review CSV, plain-text next-token data, or prepared JSON. The text importer fits a vocabulary on training documents, preserves explicit splits, and provides counts or token IDs plus positions and targets. See the [text curriculum guide](TEXT-CURRICULUM.md) for formats, limits, and real-data examples.
+
+An optional CSV column named `split` may contain `train` or `test` for each data row. Both splits must be present. This metadata is removed from model inputs, preserved in saved projects, and takes precedence over percentage-based splitting. If students use the held-out rows to choose settings or stop training, call that partition validation and reserve a separate final test file.
+
+For multiclass text, use `text,label,split` and select the multiclass task in the importer. For structured stories, add a `question` column and put newline-separated facts inside each quoted `text` cell. The fact representation exposes separate fact/question token tensors, fact positions, and padding masks. Vocabulary and answer classes are fitted on training examples; unknown test answer classes and overlong stories produce errors. Fixed token inputs use separate unknown and padding IDs. The inspector shows the encoded facts and question separately.

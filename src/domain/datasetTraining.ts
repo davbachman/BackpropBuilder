@@ -1,3 +1,4 @@
+import {parameterPenalty} from './regularization'
 import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputCountForNode, datasetOutputValueForSlot, datasetTargetSlotForNode } from './datasets'
 import { forwardPass, isLossNode, runTrainingStepFast, validateGraph } from './engine'
 import type { GraphModel, GraphNode } from './types'
@@ -77,7 +78,7 @@ export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 
   for (const index of batch ? indices.slice(0,1) : indices) {
     const result = forwardPass(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index), false)
     if (result.loss === undefined || !Number.isFinite(result.loss)) throw new Error('Connect predictions and dataset targets to a loss before evaluating.')
-    loss += result.loss
+    loss += result.loss - parameterPenalty(result.graph)
     count++
     const lossNode = result.graph.nodes.find(isLossNode)!
     const output = predictionNode(result.graph)?.value

@@ -46,6 +46,6 @@ export function tensorAxisLabels(graph: GraphModel, id: string, slot = 0, visite
     return input
   }
   if (kind === 'slice') { const input = [...labels(0)]; const axis = node.params.axis ?? 0; input[axis] = input[axis]?.slice(node.params.start ?? 0, node.params.end); return input }
-  if (['softmax', 'causal-mask', 'layer-norm', 'activation', 'input', 'arithmetic', 'add', 'multiply'].includes(kind ?? '')) return labels(0)
+  if (['dropout', 'softmax', 'causal-mask', 'layer-norm', 'activation', 'input', 'arithmetic', 'add', 'multiply'].includes(kind ?? '')) return labels(0)
   return []
 }

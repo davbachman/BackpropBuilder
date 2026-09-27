@@ -38,7 +38,8 @@ export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, o
       {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
     </select></label>
     {dataset.description && <p className="coordinate-note">{dataset.description}</p>}
-    {!node.params.textData && <label className="inspector-field">Train / test split<select aria-label="Train/test split" value={node.params.trainPercent ?? 'default'} onChange={event => {
+    {node.params.customCsv?.splits && <p>Training and held-out rows are fixed by the CSV split column.</p>}
+    {!node.params.textData && !node.params.customCsv?.splits && <label className="inspector-field">Train / test split<select aria-label="Train/test split" value={node.params.trainPercent ?? 'default'} onChange={event => {
       const trainPercent = event.target.value === 'default' ? undefined : Number(event.target.value)
       const nextExamples = datasetExamplesForNode({ ...node, params: { ...node.params, trainPercent } })
       setSplit('train')

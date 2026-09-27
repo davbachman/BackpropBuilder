@@ -3,7 +3,8 @@
  * shared parameter contributions add before the parameter is visited. */
 import type { TensorValue } from '../domain/types'
 
-const MAX_ELEMENTS = 200_000
+// Match the bounded parameter initializer and one-hot shape inference.
+const MAX_ELEMENTS = 1_048_576
 const size = (shape: number[]) => shape.reduce((a, b) => a * b, 1)
 function checkedSize(shape: number[]) {
   const count = size(shape)

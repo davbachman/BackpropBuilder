@@ -27,11 +27,12 @@ function predictTokenIds(graph: GraphModel, prompt: string | number[]) {
   checkInputs(output.id)
   const allIds = typeof prompt === 'string' ? encodeText(prompt, data) : prompt
   if (!allIds.length) throw new Error('Enter a nonempty prompt.')
-  const ids = allIds.slice(-data.maxLength)
+  let ids = allIds.slice(-data.maxLength)
+  if (data.fixedLength && ids.length<data.maxLength) ids=[...Array(data.maxLength-ids.length).fill(1),...ids]
   const predictionGraph: GraphModel = { ...graph, nodes: graph.nodes.filter(node => !isLossNode(node)).map(node => node.id === source.id ? {...node, params: {...node.params, datasetValues: [{shape: [ids.length], data: ids}, {shape: [ids.length], data: ids.map((_, i) => i)}]}} : node), edges: graph.edges.filter(edge => !graph.nodes.some(node => isLossNode(node) && (node.id === edge.target || node.id === edge.source))) }
   const evaluated = forwardPass(predictionGraph, false).graph
   const value = evaluated.nodes.find(node => node.id === output.id)?.value
-  if (!value || value.shape.length !== 2 || value.shape[0] !== ids.length || value.shape[1] !== data.vocabulary.length || value.data.some(n => !Number.isFinite(n))) throw new Error('Generation needs logits shaped [context tokens, vocabulary size].')
+  if (!value || value.shape.length !== 2 || value.shape[0] !== (data.targetMode==='last'?1:ids.length) || value.shape[1] !== data.vocabulary.length || value.data.some(n => !Number.isFinite(n))) throw new Error('Generation needs logits shaped [context tokens, vocabulary size].')
   return { logits: value.data.slice(-data.vocabulary.length), ids, vocabulary: data.vocabulary, data }
 }
 

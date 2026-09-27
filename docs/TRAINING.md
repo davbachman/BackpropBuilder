@@ -12,7 +12,7 @@ Open **Train**. **Run forward** computes current outputs and loss. **Step** (⇧
 
 ## Train for multiple epochs
 
-Set **Epochs per run**, **Report loss every**, and **Examples per update** in **Train**, then click **Run epochs** (⇧ Return). One example per update is stochastic gradient descent; an intermediate batch size gives mini-batch gradient descent; the full training-set size gives batch gradient descent. Leave the batch-size field blank to follow the Dataset block's output mode (one example or the full numeric batch). **Reshuffle training examples each epoch** is on by default. Each training example appears once per epoch, and the last batch may be smaller. Tensor-shaped image and sequence examples currently run one at a time unless their graph has an explicit batch dimension; the Train tab explains when a larger batch is unavailable.
+Set **Epochs per run**, **Report loss every**, and **Examples per update** in **Train**, then click **Run epochs** (⇧ Return). One example per update is stochastic gradient descent; an intermediate batch size gives mini-batch gradient descent; the full training-set size gives batch gradient descent. Leave the batch-size field blank to follow the Dataset block's output mode (one example or the full numeric batch). **Reshuffle training examples each epoch** is on by default. Each training example appears once per epoch, and the last batch may be smaller. The Trace engine uses single tensor examples unless the graph has an explicit numeric batch dimension. For supported graphs, choose **Tensor engine · minibatches** to use AdamW or SGD with automatic minibatching on WebGL or tensor CPU. Numeric, review, fixed-token and structured story graphs are supported; unsupported operations produce a message. See [accelerated training](ACCELERATED-TEXT-TRAINING.md).
 
 A run updates parameters using only the training split. **Stop training** ends an unfinished run. **Reporting** plots training and held-out loss at epoch 0 and at the chosen reporting interval. Both curves are evaluated using the same parameters; held-out evaluation never updates them. The current epoch and training loss also appear in Train. If you use the held-out curve to choose a batch size or learning rate, that split is serving as a validation set, not an independent final test set.
 
@@ -22,7 +22,7 @@ The **Learning rate** slider sets the SGD update size. If loss or weights grow r
 
 Open **Test**, choose **Held-out test set** or **Training set**, and click **Run inference**. The **Reporting** tab shows each actual and predicted value and the aggregate loss. Classification models additionally show class accuracy; sequence models show token accuracy. You do not need an Argmax or Softmax block just to obtain these reports: classification evaluation interprets the model output. To inspect probabilities explicitly on the graph, add a Softmax branch; send raw logits directly into multiclass cross entropy.
 
-The prediction table has pages for larger datasets. Testing does not change the model's parameters. You can still select a particular dataset example in **Details** to trace it on the canvas.
+With the Tensor engine selected, inference evaluates supported models in minibatches and keeps the interface responsive. The prediction table has pages for larger datasets. Testing does not change the model's parameters. You can still select a particular dataset example in **Details** to trace it on the canvas.
 
 Python and notebook exports carry the chosen batch size, reshuffling setting, epoch count, and reporting interval into a `torch.utils.data.DataLoader` training loop. This gives students a concrete example of how PyTorch forms batches without adding a DataLoader block to the visual model. The notebook also plots training and held-out loss when Matplotlib is available.
 
@@ -31,3 +31,9 @@ Python and notebook exports carry the chosen batch size, reshuffling setting, ep
 For a valid graph with a Loss block and one distinct input feature upstream of its prediction, Reporting plots target points and the prediction function. With two distinct features it can show a two-dimensional classification view, including multiclass decision regions. Several Input blocks may reuse the same Dataset column; they still count as one feature on the plot. Models with more complex inputs still show recorded losses and test metrics even if a simple input-output plot is unavailable. Predictions that blow far outside the target range may fall outside the plot; the loss and selected block values help diagnose that.
 
 If a block is red or a run button is unavailable, select the block for its validation message in **Details**. Check all required ports, expression variables, tensor dimensions, and the loss choice.
+
+## L1 and L2 regularization
+
+Select **Loss → Details → Parameter regularization**. Choose the penalty, strength λ, and parameter checkboxes. L1 adds `λ Σ |w|` to data loss; L2 adds `λ/2 Σ w²`. Each selected shared parameter is counted once. Bias blocks are excluded by default; deselect any generic Param block you use as a bias. L1 adds `λ sign(w)` to the gradient (zero at zero), and L2 adds `λ w`.
+
+The Loss block and trace show the regularized objective. Dataset reports and early stopping use data loss, so you can compare prediction quality across penalty strengths. AdamW weight decay is a separate setting; set it to zero when teaching the effect of these penalties. The [semester pilot](SEMESTER-APP-PILOT.md) provides a small MPG training set where L2 improves held-out prediction.

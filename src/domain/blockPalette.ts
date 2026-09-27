@@ -7,6 +7,7 @@ export const blockPalette: Array<{ type: NodeType; label: string }> = [
   { type: 'arithmetic', label: 'Arithmetic' },
   { type: 'matmul', label: 'Matrix product' },
   { type: 'activation', label: 'Activation' },
+  { type: 'dropout', label: 'Dropout' },
   { type: 'target', label: 'Target' },
   { type: 'loss', label: 'Loss' },
   { type: 'embedding', label: 'Embedding lookup' },

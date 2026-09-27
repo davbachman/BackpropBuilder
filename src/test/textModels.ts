@@ -101,3 +101,59 @@ export function organizeTextModel(input: GraphModel): GraphModel {
   group(input.nodes[0].params.textData?.task === 'language' ? 'Vocabulary logits' : 'Review classifier', id => id !== 'text-data' && id !== 'loss')
   return graph
 }
+
+/** Insert explicit dropout operations without changing any initial parameters. */
+export function addTransformerDropout(input: GraphModel, rate: number): GraphModel {
+  if (!Number.isFinite(rate) || rate < 0 || rate >= 1) throw Error('Dropout probability must be at least 0 and less than 1.')
+  const graph = {...input,nodes:input.nodes.map(n=>({...n,params:{...n.params}})),edges:input.edges.map(e=>({...e}))}
+  for (const source of ['attention-output','feed-forward-out-bias-add','classifier-relu']) {
+    const parent = graph.nodes.find(n=>n.id===source)
+    if(!parent) throw Error('Expected transformer operation '+source)
+    const id=source+'-dropout'
+    if(graph.nodes.some(n=>n.id===id)) throw Error('Dropout already inserted at '+source)
+    graph.edges=graph.edges.map(e=>e.source===source?{...e,source:id}:e)
+    graph.nodes.push({id,type:'dropout',label:source+' dropout',params:{dropoutRate:rate},position:{x:parent.position.x+200,y:parent.position.y}})
+    graph.edges.push({id:id+':0',source,target:id,inputSlot:0})
+  }
+  return organizeTextModel(graph)
+}
+
+/** Split a single head into two independent 16-wide heads at model width 32.
+ * Keep total width, parameter count, and all initial parameter values fixed.
+ * Each head owns ordinary projection, score, softmax and weighted-sum blocks. */
+export function withTwoAttentionHeads(input: GraphModel): GraphModel {
+  const projection = (name: string) => {
+    const value = input.nodes.find(n => n.id === name + '-weights')?.params.value
+    if (!value || typeof value === 'number' || value.shape.length !== 2 || value.shape[0] !== value.shape[1] || value.shape[1] % 2) throw Error('Two heads require square projections with an even model width.')
+    return value
+  }
+  const width = projection('query').shape[1], headWidth = width / 2
+  const source = input.edges.find(e => e.target === 'query' && e.inputSlot === 0)?.source
+  if (!source || !input.nodes.some(n => n.id === 'attended-values')) throw Error('Expected single-head attention graph.')
+  const causal = input.nodes.some(n => n.id === 'causal-scores')
+  const removed = new Set(['query','key','value','query-weights','key-weights','value-weights','key-transpose','attention-scores','scaled-scores','causal-scores','attention-probabilities','attended-values'])
+  const graph: GraphModel = {...input,nodes:input.nodes.filter(n=>!removed.has(n.id)).map(n=>({...n,params:{...n.params}})),edges:input.edges.filter(e=>!removed.has(e.target)&&(!removed.has(e.source)||e.source==='attended-values')).map(e=>({...e}))}
+  const add = (id: string, type: NodeType, params: NodeParams, sources: string[]) => {
+    graph.nodes.push({id,type,label:id.replace(/-/g,' '),params,position:{x:1300,y:graph.nodes.length*40}})
+    sources.forEach((source,inputSlot)=>graph.edges.push({id:id+':'+inputSlot,source,target:id,inputSlot}))
+    return id
+  }
+  const outputs = [0,1].map(head=>{
+    const prefix = `attention-head-${head+1}-`
+    const projected = ['query','key','value'].map(name=>{
+      const original = projection(name)
+      if (original.shape[1] !== width) throw Error('Projection widths must agree.')
+      const data = Array.from({length:width*headWidth},(_,i)=>original.data[Math.floor(i/headWidth)*width+head*headWidth+i%headWidth])
+      const weight = add(prefix+name+'-weights','weight',{value:{shape:[width,headWidth],data}},[])
+      return add(prefix+name,'matmul',{},[source,weight])
+    })
+    const transpose = add(prefix+'key-transpose','tensor-transform',{transform:'transpose',axes:[1,0]},[projected[1]])
+    let scores = add(prefix+'scores','matmul',{},[projected[0],transpose])
+    scores = add(prefix+'scaled-scores','arithmetic',{expression:'x1 / '+Math.sqrt(headWidth)},[scores])
+    if(causal) scores=add(prefix+'causal-scores','causal-mask',{},[scores])
+    const weights=add(prefix+'probabilities','softmax',{},[scores])
+    return add(prefix+'values','matmul',{},[weights,projected[2]])
+  })
+  add('attended-values','concat',{axis:1},outputs)
+  return organizeTextModel(graph)
+}

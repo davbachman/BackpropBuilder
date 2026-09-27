@@ -158,3 +158,13 @@ describe('scratch model authoring controls',()=>{
     expect(screen.queryByRole('button',{name:/Train 1 epoch|Run inference|Evaluate training/i})).not.toBeInTheDocument()
   })
 })
+
+it('offers an editable dropout probability and explains evaluation behavior',()=>{
+ const node=createNode('dropout',1),onParams=vi.fn()
+ render(<ModelInspector {...callbacks} node={node} graph={{nodes:[node],edges:[],learningRate:.01}} onParams={onParams}/>)
+ expect(blockPalette.some(item=>item.type==='dropout')).toBe(true)
+ expect(screen.getByLabelText('Dropout probability')).toHaveValue(.1)
+ fireEvent.change(screen.getByLabelText('Dropout probability'),{target:{value:'.2'}})
+ expect(onParams).toHaveBeenCalledWith(node.id,{dropoutRate:.2})
+ expect(screen.getByText(/Evaluation passes them unchanged/)).toBeInTheDocument()
+})

@@ -3,7 +3,7 @@ import type { GraphGroup, GraphModel, NodeType, TensorValue } from './types'
 export type Initializer = 'zeros' | 'ones' | 'xavier' | 'he' | 'uniform'
 export function initializeTensor(shape: number[], mode: Initializer, seed = 42): TensorValue {
   const size = shape.reduce((a, b) => a * b, 1)
-  if (shape.some(n => !Number.isInteger(n) || n < 1) || size > 65536) throw new Error('Use positive dimensions and at most 65,536 values.')
+  if (shape.some(n => !Number.isInteger(n) || n < 1) || size > 1_048_576) throw new Error('Use positive dimensions and at most 1,048,576 values.')
   let state = seed >>> 0
   const random = () => { state = (1664525 * state + 1013904223) >>> 0; return state / 4294967296 }
   const fanIn = shape.length === 4 ? shape.slice(1).reduce((a,b) => a*b,1) : shape[0] ?? 1
@@ -24,6 +24,7 @@ export const operationHelp: Partial<Record<NodeType, string>> = {
   concat: 'Axis 1 treats vectors as single columns: four [112] inputs become [112, 4]. Vectors can join matrices with the same row count. Axis 0 joins vectors end to end; higher-rank tensors keep their original shape rules.',
   softmax: 'Normalizes the last axis into probabilities. For classification training, wire logits directly to Cross-entropy.',
   'causal-mask': 'Masks positions above the diagonal of a square [tokens, tokens] score matrix before softmax.',
+  dropout: 'During training, independently drop each activation with probability p and scale survivors by 1/(1−p). Evaluation passes inputs unchanged. Backward reuses the forward mask.',
   'layer-norm': 'Ports: input [tokens, width], learned scale γ [width], learned bias β [width]. Initialize γ to ones and β to zeros.',
   reshape: 'Changes shape without changing the number of values. Use one -1 to infer a dimension (e.g. -1, 1 for numeric batches). Empty shape makes a scalar (one value only).',
   mean: 'Empty axis averages every value. Keep dimensions retains a size-1 axis for broadcasting.',

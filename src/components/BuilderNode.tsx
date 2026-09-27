@@ -66,6 +66,7 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   softmax: Sigma,
   'causal-mask': Box,
   'layer-norm': Sigma,
+  dropout: Box,
   reshape: Box,
   'tensor-transform': Box,
   mean: Sigma,

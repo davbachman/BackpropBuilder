@@ -1,3 +1,4 @@
+import {parameterPenalty,penaltyGradients} from './regularization'
 import { resolveReshape } from './reshape'
 import { arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
 import { conv2d, conv2dBackward, avgpool2d, avgpool2dBackward } from '../learning/cnnMath'
@@ -101,6 +102,7 @@ export const inputArityByType: Record<NodeType, number> = {
   add: 2,
   arithmetic: 2,
   activation: 1,
+  dropout: 1,
   target: 1,
   loss: 2,
   embedding: 2,
@@ -169,6 +171,7 @@ export function formatNumber(value: TensorValue | number | undefined, digits = 3
 type TensorFormatter = (value: TensorValue | number | undefined, digits?: number) => string
 
 export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatter: TensorFormatter = formatNumber): string {
+  if(isLossNode(node) && node.params.regularization && node.params.regularization!=='none') return formulaForNode({...node,params:{...node.params,regularization:'none'}},graph,valueFormatter) + (node.params.regularization==='l1' ? ` + ${node.params.regularizationStrength??0} Σ |w|` : ` + ${(node.params.regularizationStrength??0)/2} Σ w²`)
   const inputLabels = inputLabelsForFormula(node, graph)
   const outputLabel = outputLabelForFormula(node, graph)
   switch (node.type) {
@@ -204,6 +207,7 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
       ? `${outputLabel} = column_stack(${inputLabels.join(', ')})`
       : `${outputLabel} = concat(${inputLabels.join(', ')}, axis=${node.params.axis})`
     case 'softmax': return `${outputLabel} = softmax(${inputLabels[0]})`
+    case 'dropout': return `${outputLabel} = training ? mask · ${inputLabels[0]} / (1 − ${node.params.dropoutRate ?? 0.1}) : ${inputLabels[0]}`
     case 'causal-mask': return `${outputLabel}[i,j] = ${inputLabels[0]}[i,j] if j ≤ i; otherwise −∞`
     case 'layer-norm': return `${outputLabel} = γ · (${inputLabels[0]} − mean) / √(variance + ε) + β`
     case 'reshape': return `${outputLabel} = reshape(${inputLabels[0]}, [${node.params.shape ?? []}])`
@@ -377,6 +381,7 @@ function computedOutputLabels(graph: GraphModel): Map<string, string> {
 export function cloneGraph(graph: GraphModel): GraphModel {
   return {
     learningRate: graph.learningRate,
+    training: graph.training ? {...graph.training} : undefined,
     view: graph.view ? {
       ...graph.view,
       inspectedNeuron: graph.view.inspectedNeuron ? { ...graph.view.inspectedNeuron } : undefined,
@@ -535,6 +540,8 @@ export function validateGraph(graph: GraphModel, options: { requireLoss?: boolea
     }
   }
 
+  for (const node of graph.nodes) if (isLossNode(node) && ((!['none','l1','l2'].includes(node.params.regularization??'none')) || !Number.isFinite(node.params.regularizationStrength??0) || (node.params.regularizationStrength??0)<0 || node.params.regularizationParameterIds?.some(id=>!graph.nodes.some(n=>n.id===id&&(n.type==='weight'||n.type==='bias'))))) issues.push({code:'invalid-value',nodeId:node.id,message:'Regularization needs a nonnegative finite strength and existing parameter blocks.'})
+  for (const node of graph.nodes) if (node.type === 'dropout' && (!Number.isFinite(node.params.dropoutRate ?? 0.1) || (node.params.dropoutRate ?? 0.1) < 0 || (node.params.dropoutRate ?? 0.1) >= 1)) issues.push({code:'invalid-value',nodeId:node.id,message:'Dropout probability must be at least 0 and less than 1.'})
   issues.push(...validateTensorShapes(graph))
   issues.push(...validateDiscreteInputs(graph))
 
@@ -611,13 +618,14 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   }
   const [first, second, third] = inputShapes
   const axis = node.params.axis ?? (node.type === 'concat' ? 1 : 0)
+  if (node.type === 'dropout') return [...first]
   if (node.type === 'conv2d') return first.length === 3 && second.length === 4 && third.length === 1 && first[2] === second[3] && second[0] === third[0] && first[0] >= second[1] && first[1] >= second[2] ? [first[0] - second[1] + 1, first[1] - second[2] + 1, second[0]] : undefined
   if (node.type === 'avgpool2d') return first.length === 3 && first[0] >= 2 && first[1] >= 2 ? [Math.floor(first[0] / 2), Math.floor(first[1] / 2), first[2]] : undefined
   if (node.type === 'one-hot') {
     const width = node.params.numClasses ?? 2
-    return first.length === 1 && Number.isInteger(width) && width >= 2 && width <= 4096 && first[0] * width <= 1_048_576 ? [first[0], width] : undefined
+    return first.length === 1 && Number.isInteger(width) && width >= 2 && width <= 8192 && first[0] * width <= 1_048_576 ? [first[0], width] : undefined
   }
-  if (node.type === 'embedding') return first.length === 2 && second.length === 1 ? [second[0], first[1]] : undefined
+  if (node.type === 'embedding') return first.length === 2 && second.length >= 1 ? [...second, first[1]] : undefined
   if (operation === 'transpose') {
     const axes = node.params.axes ?? first.map((_, index) => first.length - index - 1)
     return axes.length === first.length && new Set(axes).size === axes.length && axes.every((a) => Number.isInteger(a) && a >= 0 && a < first.length) ? axes.map((a) => first[a]) : undefined
@@ -689,7 +697,9 @@ export function topologicalSort(graph: GraphModel): string[] {
   return order
 }
 
-export function forwardPass(graph: GraphModel, trace = true): EvaluationResult {
+export interface ForwardOptions { training?: boolean; random?: () => number }
+
+export function forwardPass(graph: GraphModel, trace = true, options: ForwardOptions = {}): EvaluationResult {
   assertValid(graph)
   const next = cloneGraph(graph)
   const order = topologicalSort(next)
@@ -699,8 +709,9 @@ export function forwardPass(graph: GraphModel, trace = true): EvaluationResult {
     const node = mustNode(next, nodeId)
     const incoming = incomingEdges(next, nodeId)
     const inputValues = incoming.map((edge) => valueForSourceEdge(next, edge))
-    const computed = computeForward(node, inputValues)
+    const computed = computeForward(node, inputValues, options)
 
+    if (isLossNode(node)) computed.value = scalarValue(scalarFromTensor(computed.value) + parameterPenalty(next,node))
     node.value = computed.value
     node.grad = zeroLike(computed.value)
     node.localDerivative = computed.localDerivative
@@ -742,6 +753,7 @@ export function backwardPass(graph: GraphModel): EvaluationResult {
   const lossNode = next.nodes.find(isLossNode)
   if (!lossNode) throw new Error('Cannot run backward pass without a loss node.')
   lossNode.grad = scalarValue(1)
+  for (const {node,value} of penaltyGradients(next,lossNode)) node.grad=addTensorsExact(node.grad!,value)
 
   for (const nodeId of order) {
     const node = mustNode(next, nodeId)
@@ -799,7 +811,7 @@ export function updateParameters(graph: GraphModel, learningRate = graph.learnin
 }
 
 export function runTrainingStep(graph: GraphModel, learningRate = graph.learningRate): EvaluationResult {
-  const forward = forwardPass(graph)
+  const forward = forwardPass(graph, true, {training:true})
   const backward = backwardPass(forward.graph)
   const updated = updateParameters(backward.graph, learningRate)
   const afterUpdate = forwardPass(updated.graph)
@@ -820,7 +832,8 @@ export function runTrainingStepFast(graph: GraphModel, learningRate = graph.lear
   const incoming = new Map(order.map(id => [id, incomingEdges(next, id)]))
   for (const id of order) {
     const node = byId.get(id)!
-    const computed = computeForward(node, incoming.get(id)!.map(edge => valueForSourceEdge(next, edge)))
+    const computed = computeForward(node, incoming.get(id)!.map(edge => valueForSourceEdge(next, edge)), {training:true})
+    if (isLossNode(node)) computed.value = scalarValue(scalarFromTensor(computed.value) + parameterPenalty(next,node))
     node.value = computed.value
     node.grad = zeroLike(computed.value)
     node.localDerivative = computed.localDerivative
@@ -829,6 +842,7 @@ export function runTrainingStepFast(graph: GraphModel, learningRate = graph.lear
   const loss = next.nodes.find(isLossNode)
   if (!loss) throw new Error('Training needs a loss.')
   loss.grad = scalarValue(1)
+  for (const {node,value} of penaltyGradients(next,loss)) node.grad=addTensorsExact(node.grad!,value)
   for (const id of [...order].reverse()) {
     const node = byId.get(id)!
     for (const contribution of computeBackward(node, incoming.get(id)!, next, node.grad!)) {
@@ -849,9 +863,16 @@ export function runTrainingStepFast(graph: GraphModel, learningRate = graph.lear
 function computeForward(
   node: GraphNode,
   inputs: TensorValue[],
+  options: ForwardOptions = {},
 ): { value: TensorValue; localDerivative?: TensorValue; localDerivatives: TensorValue[]; error?: TensorValue } {
   if (SOURCE_TYPES.has(node.type)) {
     return { value: sourceForwardValue(node, inputs), localDerivatives: [] }
+  }
+
+  if (node.type === 'dropout') {
+    const p = node.params.dropoutRate ?? 0.1
+    const derivative = tensorValue(inputs[0].shape, inputs[0].data.map(() => options.training && p > 0 ? ((options.random ?? Math.random)() < p ? 0 : 1 / (1 - p)) : 1))
+    return {value:multiplyTensors(inputs[0],derivative),localDerivative:derivative,localDerivatives:[derivative]}
   }
 
   if (TENSOR_OPERATION_TYPES.has(node.type)) {
@@ -1038,7 +1059,7 @@ function computeBackward(
     return incoming.map((edge, index) => ({ edgeId: edge.id, sourceId: edge.source, gradient: gradients[index] }))
   }
 
-  if (node.type === 'activation') {
+  if (node.type === 'activation' || node.type === 'dropout') {
     const derivative = node.localDerivative ?? node.cache?.localDerivatives[0] ?? oneLike(values[0])
     return [
       {
@@ -1237,7 +1258,7 @@ function forwardStep(node: GraphNode, incoming: GraphEdge[], inputValues: Tensor
         : `${node.label} receives ${isTensorStep ? 'tensor' : 'scalar'} inputs, applies its formula, and stores one ${isTensorStep ? 'tensor' : 'scalar'} output for downstream nodes.`,
     formula: formulaForNode(node, graph),
     calculation,
-    pseudocode: pseudocodeForNode(node, graph),
+    pseudocode: [...pseudocodeForNode(node, graph), ...regularizationPseudocode(node, false)],
   }
 }
 
@@ -1267,7 +1288,7 @@ function backwardStep(
     explanation: 'The incoming gradient is multiplied by local derivatives and accumulated on upstream nodes.',
     formula: derivativeFormula(node, graph),
     calculation: `incoming gradient ${formatNumber(downstreamGrad)} -> ${contributionText}`,
-    pseudocode: ['g = node.grad', ...pseudocodeForBackward(node, graph)],
+    pseudocode: ['g = node.grad', ...pseudocodeForBackward(node, graph), ...regularizationPseudocode(node, true)],
   }
 }
 
@@ -1299,6 +1320,7 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   if (node.type === 'arithmetic') {
     return `${(node.params.expression ?? 'x1 * x2').replace(/x([1-9]\d*)\b/g, (_, index: string) => formatNumber(inputs[Number(index) - 1]))} = ${formatNumber(node.value)}`
   }
+  if (node.type === 'dropout') return `${formatNumber(inputs[0])} × saved scale ${formatNumber(node.localDerivative)} = ${formatNumber(node.value)}`
   if (node.type === 'activation') {
     return `${node.params.activation ?? 'identity'}(${formatNumber(inputs[0])}) = ${formatNumber(node.value)}`
   }
@@ -1336,6 +1358,7 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
   }
   if (node.type === 'add') return inputLabels.map((label) => `dz/d${label} = 1`).join(', ')
   if (node.type === 'arithmetic') return `Apply the chain rule to ${node.params.expression ?? 'x1 * x2'} for each input.`
+  if (node.type === 'dropout') return `dOutput/dInput = saved forward mask / (1 − p) during training; 1 during evaluation`
   if (node.type === 'activation') {
     const activation = node.params.activation ?? 'identity'
     if (activation === 'sigmoid') return `dz/d${inputLabels[0]} = sigmoid'(${inputLabels[0]})`
@@ -1343,8 +1366,15 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
     if (activation === 'tanh') return `dz/d${inputLabels[0]} = 1 - tanh(${inputLabels[0]})^2`
     return `dz/d${inputLabels[0]} = 1`
   }
-  if (node.type === 'loss' && lossKindForNode(node, graph) === 'cross-entropy') return 'dLogits = (softmax(logits) − one_hot(target)) / number of examples'
-  if (node.type === 'loss') return lossDerivativeFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
+  if (node.type === 'loss') {
+    const dataDerivative = lossKindForNode(node, graph) === 'cross-entropy'
+      ? 'dLogits = (softmax(logits) − one_hot(target)) / number of examples'
+      : lossDerivativeFormula(lossKindForNode(node, graph), inputLabels, Boolean(graph && hasNonScalarIncomingValue(node, graph)))
+    const penalty = node.params.regularization
+    const strength = node.params.regularizationStrength ?? 0
+    const extra = penalty === 'l1' ? 'λ sign(w), with sign(0) = 0' : 'λ w'
+    return dataDerivative + (strength > 0 && (penalty === 'l1' || penalty === 'l2') ? `; selected parameter gradients also receive ${extra}.` : '')
+  }
   return 'Gradient accumulates here.'
 }
 
@@ -1362,6 +1392,15 @@ function lossDerivativeFormula(kind: LossKind, inputLabels: string[], isTensor: 
   return `dL/d${prediction}${suffix} = ${prediction}${suffix} - ${target}${suffix}`
 }
 
+function regularizationPseudocode(node: GraphNode, backward: boolean): string[] {
+  const kind = node.params.regularization
+  if (node.type !== 'loss' || !(node.params.regularizationStrength! > 0) || (kind !== 'l1' && kind !== 'l2')) return []
+  const expression = backward
+    ? `w.grad += lambda * ${kind === 'l1' ? 'sign(w)  # sign(0) = 0' : 'w'}`
+    : `loss += lambda * ${kind === 'l1' ? 'sum(abs(w))' : '0.5 * sum(w ** 2)'}`
+  return ['for w in selected_parameters:  # each shared parameter once', `  ${expression}`]
+}
+
 function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (TENSOR_OPERATION_TYPES.has(node.type)) return [formulaForNode(node, graph)]
   if (node.type === 'input') return [`${node.label} = ${formatNumber(node.params.value)}`]
@@ -1371,6 +1410,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
   if (node.type === 'arithmetic') return [formulaForNode(node, graph).replaceAll('^', '**')]
+  if (node.type === 'dropout') return ['mask = Bernoulli(1 - p)', 'z = input * mask / (1 - p) if training else input']
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
   const lossKind = lossKindForNode(node, graph)
   if (lossKind === 'cross-entropy') return ['loss = mean(cross_entropy_from_logits(logits, target_ids))']
@@ -1389,6 +1429,7 @@ function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['for each input i:', '  input_i.grad += g * product(other inputs)']
   if (node.type === 'add') return ['for each input:', '  input.grad += g']
   if (node.type === 'arithmetic') return ['for each input i:', '  input_i.grad += g * ∂expression/∂input_i']
+  if (node.type === 'dropout') return ['input.grad += g * saved_forward_scale']
   if (node.type === 'activation') return ['u.grad += g * local_derivative']
   if (node.type === 'loss') return lossBackwardPseudocode(lossKindForNode(node, graph))
   return ['accumulate gradient']
@@ -1441,7 +1482,7 @@ function tensorOperation(node: GraphNode, values: TensorValue[], requiresGrad = 
       }
       break
     }
-    case 'embedding': output = autograd.embedding(first, second.data); break
+    case 'embedding': output = autograd.reshape(autograd.embedding(first, second.data),[...second.shape,first.shape[1]]); break
     case 'transpose': output = autograd.transpose(first, node.params.axes); break
     case 'slice': output = autograd.slice(first, node.params.axis ?? 0, node.params.start ?? 0, node.params.end ?? first.shape[node.params.axis ?? 0]); break
     case 'concat': {

@@ -38,3 +38,7 @@ For regression, use mean squared error or mean absolute error. For a binary clas
 ## One-hot encoding
 
 **One-hot** converts integer IDs `[T]` into rows `[T,V]`. Set Vocabulary size in Details. Multiplying by a trainable `[V,d]` matrix is equivalent to Embedding lookup; only the matrix learns, not the discrete IDs. Use lookup for normal training and one-hot to inspect this equivalence.
+
+## Dropout
+
+Connect one tensor input; output shape is unchanged. Set **Dropout probability** in Details (default 0.1, valid range 0 inclusive to 1 exclusive). During training, independently zero entries with probability p and scale retained entries by 1/(1−p). The backward pass uses the same mask. Run forward, reporting, inference, and generation use the unchanged input. Step on a training example and epoch training enable dropout. A probability of zero disables the block. See the [dropout experiment](IMDB-DROPOUT-STUDY.md) for placements and results.

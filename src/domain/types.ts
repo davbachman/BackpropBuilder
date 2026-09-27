@@ -1,3 +1,4 @@
+import type {TrainingSettings} from './trainingSettings'
 export type NodeType =
   | 'dataset'
   | 'input'
@@ -18,6 +19,7 @@ export type NodeType =
   | 'softmax'
   | 'causal-mask'
   | 'layer-norm'
+  | 'dropout'
   | 'reshape'
   | 'tensor-transform'
   | 'mean'
@@ -50,6 +52,7 @@ export type DatasetTask = 'regression' | 'binary-classification' | 'classificati
 export interface CustomCsvData {
   fileName: string
   rows: string[][]
+  splits?: Array<'train' | 'test'>
   hasHeader: boolean
   targetColumn: number
   task: 'regression' | 'binary-classification' | 'classification'
@@ -57,6 +60,8 @@ export interface CustomCsvData {
 
 export interface TextDocument {
   text: string
+  facts?: string[]
+  question?: string
   label?: string
   split: 'train' | 'test'
 }
@@ -65,14 +70,19 @@ export interface TextDocument {
 export interface TextDatasetData {
   version: 1
   fileName: string
-  task: 'sentiment' | 'language'
+  task: 'sentiment' | 'classification' | 'language'
   tokenizer: 'word' | 'character'
-  representation: 'counts' | 'tokens'
+  representation: 'counts' | 'tokens' | 'facts'
   lowercase: boolean
   vocabulary: string[]
   maxLength: number
   stride: number
   documents: TextDocument[]
+  classLabels?: string[]
+  fixedLength?: boolean
+  factWords?: number
+  maxFacts?: number
+  targetMode?: 'last'
 }
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
@@ -86,6 +96,9 @@ export interface NodeParams {
   value?: TensorValue | number
   activation?: ActivationKind
   loss?: LossKind
+  regularization?: 'none' | 'l1' | 'l2'
+  regularizationStrength?: number
+  regularizationParameterIds?: string[]
   dataset?: DatasetKind
   customCsv?: CustomCsvData
   textData?: TextDatasetData
@@ -104,6 +117,7 @@ export interface NodeParams {
   end?: number
   axes?: number[]
   shape?: number[]
+  dropoutRate?: number
   epsilon?: number
   keepDims?: boolean
 }
@@ -172,6 +186,7 @@ export interface GraphViewState {
 }
 
 export interface GraphModel {
+  training?: TrainingSettings
   nodes: GraphNode[]
   edges: GraphEdge[]
   groups?: GraphGroup[]

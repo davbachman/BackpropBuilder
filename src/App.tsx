@@ -1,3 +1,4 @@
+import {DEFAULT_TRAINING, type TrainingSettings} from './domain/trainingSettings'
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
@@ -523,7 +524,7 @@ function App({
 
     if (phase === 'edit' || phase === 'update') {
       pushHistory()
-      const forward = forwardPass(graph)
+      const forward = forwardPass(graph, true, {training:hasLoss && !heldOutSample})
       setGraph(forward.graph)
       const nextIndex = nextVisibleStepEnd(graph, forward.steps, 0)
       setTraceSteps(forward.steps)
@@ -627,10 +628,13 @@ function App({
   const reportInterval = Number(reportEvery)
   const trainingDataset = graph.nodes.find(node => node.type === 'dataset')
   const trainingExampleCount = trainingDataset ? datasetExamplesForNode(trainingDataset).filter(example => example.split === 'train').length : 0
+  const training = graph.training ?? DEFAULT_TRAINING
+  const tensorTraining = training.engine === 'tensor' && !!trainingDataset
+  const setTraining = (changes:Partial<TrainingSettings>) => setGraph(existing=>({...existing,training:{...(existing.training??DEFAULT_TRAINING),...changes}}))
   const defaultBatchSize = trainingDataset && datasetMode(trainingDataset) === 'batch' ? trainingExampleCount : 1
   const batchSize = batchSizeInput === '' ? defaultBatchSize : Number(batchSizeInput)
   const validBatchSize = !trainingDataset || (Number.isInteger(batchSize) && batchSize >= 1 && batchSize <= trainingExampleCount
-    && (batchSize === 1 || supportsNumericBatches(trainingDataset)))
+    && (tensorTraining || batchSize === 1 || supportsNumericBatches(trainingDataset)))
   const validRunSettings = Number.isInteger(epochCount) && epochCount >= 1 && epochCount <= 100000
     && Number.isInteger(reportInterval) && reportInterval >= 1 && reportInterval <= 100000 && validBatchSize
   const canRunEpochs = validRunSettings && blockingIssues.length === 0 && hasLoss && !isTraining
@@ -678,6 +682,21 @@ function App({
       lastReported = completed
     }
     try {
+      if (tensorTraining && dataset) {
+        const {trainTensorGraph} = await import('./domain/tensorTraining')
+        const result = await trainTensorGraph(graph, {
+          epochs:epochCount,batchSize,settings:training,signal:controller.signal,epochOffset:startEpoch,shuffle:shuffleEachEpoch,
+          onBackend:(backend,fallback)=>{setTrainingStatus('Training on '+backend);if(fallback)setReportingWarning('Using '+backend+'. '+fallback)},
+          onProgress:(done,total)=>setTrainingStatus('Training '+done+' / '+total+' examples'),
+          onReport:report=>setLossReports(reports=>appendLossReport(reports,{epoch:report.epoch,loss:report.train.loss,heldOutLoss:report.validation.loss})),
+        })
+        const evaluated=forwardPass(result.graph)
+        setGraph(evaluated.graph);setVisualizationGraph(evaluated.graph);setCurrentLoss(evaluated.loss??null)
+        setInferenceResult(undefined);setTraceSteps([]);setTraceIndex(0);setPhase('update')
+        setEpoch(startEpoch+(training.patience>0||result.stopped?result.bestEpoch:result.completed))
+        setTrainingStatus((result.stopped?'Stopped':'Completed')+' after '+result.completed+' epochs on '+result.backend+'. '+(training.patience>0||result.stopped?'Restored best validation checkpoint at epoch '+(startEpoch+result.bestEpoch)+'.':'Kept final parameters.'))
+        return
+      }
       if (dataset) reportLosses(graph, startEpoch)
       else {
         const initialLoss = forwardPass(graph).loss
@@ -715,9 +734,9 @@ function App({
       trainingController.current = null
       setIsTraining(false)
     }
-  }, [batchSize, canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset])
+  }, [batchSize, canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset, tensorTraining, training])
 
-  const runInference = useCallback(() => {
+  const runInference = useCallback(async () => {
     const dataset = graph.nodes.find(node => node.type === 'dataset')
     if (!dataset || blockingIssues.length > 0) return
     setInferenceResult(undefined)
@@ -727,9 +746,18 @@ function App({
     if (first < 0) { setTestStatus(`This dataset has no ${inferenceSplit} examples.`); return }
     const source = { ...dataset, params: { ...dataset.params, datasetSplit: inferenceSplit, datasetIndex: first, datasetValues: undefined } }
     const testGraph = { ...graph, nodes: graph.nodes.map(node => node.id === dataset.id ? source : node) }
+    setIsTraining(true)
+    setTestStatus('Evaluating examples…')
     try {
       const inferred = forwardPass(testGraph).graph
-      const metrics = evaluateDataset(inferred, dataset.id, inferenceSplit)
+      let metrics: ReturnType<typeof evaluateDataset>
+      if (training.engine === 'tensor') {
+        const { selectTensorBackend, TensorGraph } = await import('./domain/tensorTraining')
+        await selectTensorBackend(testGraph, training.backend, training)
+        const model = new TensorGraph(testGraph)
+        try { metrics = await model.inference(model.examples.filter(row => row.split === inferenceSplit), 64) }
+        finally { model.dispose() }
+      } else metrics = evaluateDataset(inferred, dataset.id, inferenceSplit)
       pushHistory()
       setGraph(inferred)
       setVisualizationGraph(inferred)
@@ -747,7 +775,8 @@ function App({
       setRightOpen(true)
       setRightTab('details')
     }
-  }, [blockingIssues.length, graph, inferenceSplit, pushHistory])
+    finally { setIsTraining(false) }
+  }, [blockingIssues.length, graph, inferenceSplit, pushHistory, training])
 
   const openTrainTab = () => {
     setLeftTab('train')
@@ -1170,6 +1199,7 @@ function App({
     setImportError(undefined)
     setExportNotice(undefined)
     try {
+      if (tensorTraining) throw new Error('Tensor training settings are not exported yet. Save the project to keep its weights and settings, or select Trace engine and batch size 1 to export a single-example SGD program.')
       const exported = generatePyTorchExport(graph, { batchSize: batchSizeInput === '' ? undefined : Number(batchSizeInput), shuffleEachEpoch, epochs: epochCount, reportEvery: reportInterval })
       const download = (content: string, name: string, type: string) => {
         const url = URL.createObjectURL(new Blob([content], { type }))
@@ -1541,9 +1571,21 @@ function App({
           <p className="eyebrow">Train the model</p>
           <button type="button" className="run-full-step randomize-button" onClick={randomizeParameters} disabled={isTraining}><Shuffle size={15} /> Randomize parameters</button>
           <button type="button" className="run-full-step" onClick={() => runCanvasAction(runOneTrainingStep)} disabled={blockingIssues.length > 0 || !hasLoss || heldOutSample || isTraining}><FastForward size={15} /> Run one full training step</button>
+          {trainingDataset && <>
+            <label className="run-field">Training execution<select aria-label="Training execution" disabled={isTraining} value={training.engine} onChange={event=>setTraining({engine:event.target.value as TrainingSettings['engine']})}><option value="trace">Trace engine · SGD</option><option value="tensor">Tensor engine · minibatches</option></select></label>
+            {tensorTraining && <>
+              <label className="run-field">Backend<select aria-label="Training backend" disabled={isTraining} value={training.backend} onChange={event=>setTraining({backend:event.target.value as TrainingSettings['backend']})}><option value="auto">Auto · WebGL, then CPU</option><option value="webgl">WebGL</option><option value="webgpu">WebGPU (experimental)</option><option value="cpu">Tensor CPU</option></select></label>
+              <label className="run-field">Optimizer<select aria-label="Optimizer" disabled={isTraining} value={training.optimizer} onChange={event=>setTraining({optimizer:event.target.value as TrainingSettings['optimizer']})}><option value="sgd">SGD</option><option value="adam">Adam</option><option value="adamw">AdamW</option></select></label>
+              {training.optimizer==='adamw' && <label className="run-field">Weight decay<input aria-label="Weight decay" disabled={isTraining} type="number" min="0" step="0.001" value={training.weightDecay} onChange={event=>setTraining({weightDecay:Number(event.target.value)})}/></label>}
+              <label className="run-field">Gradient norm limit (0 = off)<input aria-label="Gradient norm limit" disabled={isTraining} type="number" min="0" step="0.1" value={training.clipNorm} onChange={event=>setTraining({clipNorm:Number(event.target.value)})}/></label>
+              <label className="run-field">Early stopping patience (0 = off)<input aria-label="Early stopping patience" disabled={isTraining} type="number" min="0" step="1" value={training.patience} onChange={event=>setTraining({patience:Number(event.target.value)})}/></label>
+              <label className="run-field">Minimum validation improvement<input aria-label="Minimum validation improvement" disabled={isTraining} type="number" min="0" step="0.001" value={training.minDelta} onChange={event=>setTraining({minDelta:Number(event.target.value)})}/></label>
+              <p className="run-intro">Tensor runs use padded batches and report every epoch. Early stopping uses the held-out split as validation and restores its best checkpoint. Adam moments start fresh for each run. Step remains a single-example SGD calculation.</p>
+            </>}
+          </>}
           <div className="run-number-grid">
             <label className="run-field">Epochs per run<input type="number" min="1" max="100000" step="1" value={epochsPerRun} onChange={event => setEpochsPerRun(event.target.value)} /></label>
-            <label className="run-field">Report loss every<input type="number" min="1" max="100000" step="1" value={reportEvery} onChange={event => setReportEvery(event.target.value)} /><span>epochs</span></label>
+            <label className="run-field">Report loss every<input type="number" min="1" max="100000" step="1" value={reportEvery} disabled={tensorTraining || isTraining} onChange={event => setReportEvery(event.target.value)} /><span>epochs</span></label>
           </div>
           {trainingDataset ? <>
             <label className="run-field">Examples per update<input type="number" min="1" max={trainingExampleCount} step="1" value={batchSizeInput} placeholder={String(defaultBatchSize)} onChange={event => setBatchSizeInput(event.target.value)} disabled={isTraining} /></label>
@@ -1553,7 +1595,8 @@ function App({
           </> : null}
           {isTraining ? <button type="button" className="run-epochs-button" onClick={() => trainingController.current?.abort()}>Stop training</button>
             : <button type="button" className="run-epochs-button primary-button" aria-keyshortcuts="Shift+Enter" onClick={() => void runEpochs()} disabled={!canRunEpochs}>Run {validRunSettings ? epochCount : '—'} {epochCount === 1 ? 'epoch' : 'epochs'} <kbd aria-hidden="true">⇧ Return</kbd></button>}
-          <label className="run-field">Learning rate · η = {graph.learningRate.toFixed(graph.learningRate < 0.01 ? 3 : 2)}<input type="range" min="0.001" max="0.5" step="0.001" value={graph.learningRate} onChange={event => updateLearningRate(Number(event.target.value))} disabled={isTraining} /></label>
+          {tensorTraining && <label className="run-field">Exact learning rate<input aria-label="Exact learning rate" type="number" min="0.000001" step="0.0001" disabled={isTraining} value={graph.learningRate} onChange={event=>updateLearningRate(Number(event.target.value))}/></label>}
+          <label className="run-field">Learning rate · η = {graph.learningRate.toString()}<input type="range" min={tensorTraining ? "0.0001" : "0.001"} max="0.5" step={tensorTraining ? "0.0001" : "0.001"} value={graph.learningRate} onChange={event => updateLearningRate(Number(event.target.value))} disabled={isTraining} /></label>
           <div className="run-metrics"><span>Epoch {epoch}</span><span>Current loss {formatNumber(currentLoss ?? undefined)}</span></div>
           {trainingStatus && <p className="run-status" role="status">{trainingStatus}</p>}
         </section>
@@ -1850,8 +1893,9 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
 }
 
 function appendLossReport(reports: LossReport[], next: LossReport): LossReport[] {
-  if (reports.at(-1)?.epoch === next.epoch) return [...reports.slice(0, -1), next]
-  return [...reports, next]
+  // A restored checkpoint can rewind the epoch counter. Replace its old future
+  // when a new run begins so the chart never joins incompatible trajectories.
+  return [...reports.filter(report => report.epoch < next.epoch), next]
 }
 
 function nextVisibleStepEnd(

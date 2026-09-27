@@ -189,6 +189,7 @@ const splitCache = new WeakMap<ToyDataset, Map<number, DatasetExample[]>>()
 export function datasetExamplesForNode(node: GraphNode): DatasetExample[] {
   const dataset = datasetForNode(node)
   if (node.params.dataset === 'custom-text') return datasetExamples(dataset)
+  if(node.params.customCsv?.splits) return datasetExamples(dataset).map((e,i)=>({...e,split:node.params.customCsv!.splits![i]}))
   const percent = node.params.trainPercent
   if (percent === undefined) return datasetExamples(dataset)
   const cached = !dataset.examples && splitCache.get(dataset)?.get(percent)

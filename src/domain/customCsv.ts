@@ -1,7 +1,7 @@
 import type { CustomCsvData } from './types'
 
 const MAX_ROWS = 10_000
-const MAX_COLUMNS = 32
+const MAX_COLUMNS = 129
 const MAX_FILE_CHARACTERS = 10_000_000
 
 export interface CsvColumns {
@@ -16,6 +16,12 @@ export function parseCustomCsv(text: string, fileName: string): CustomCsvData {
   if (text.length > MAX_FILE_CHARACTERS) throw new Error('CSV is too large for the browser (10 MB maximum).')
   const rows = parseRows(text.replace(/^\uFEFF/, '')).filter(row => row.some(cell => cell.trim()))
   if (rows.length < 2) throw new Error('CSV needs at least two data rows.')
+  const splitColumn=rows[0].findIndex(cell=>cell.toLowerCase().trim()==='split')
+  let splits: CustomCsvData['splits']
+  if(splitColumn>=0){
+    splits=rows.slice(1).map(row=>{const s=row[splitColumn]?.toLowerCase().trim();if(s!=='train'&&s!=='test')throw Error('CSV split must be train or test.');return s})
+    rows.forEach(row=>row.splice(splitColumn,1))
+  }
   const width = rows[0].length
   if (width < 2 || width > MAX_COLUMNS) throw new Error(`CSV needs 2–${MAX_COLUMNS} columns, including a target.`)
   if (rows.length > MAX_ROWS + 1) throw new Error(`CSV supports at most ${MAX_ROWS} data rows.`)
@@ -32,7 +38,7 @@ export function parseCustomCsv(text: string, fileName: string): CustomCsvData {
   const task = targets.every(isNumeric)
     ? distinct.size === 2 ? 'binary-classification' : 'regression'
     : distinct.size === 2 ? 'binary-classification' : 'classification'
-  const csv: CustomCsvData = { fileName: (fileName || 'data.csv').slice(0, 256), rows, hasHeader, targetColumn, task }
+  const csv: CustomCsvData = { fileName: (fileName || 'data.csv').slice(0, 256), rows, hasHeader, targetColumn, task, splits }
   analyzeCustomCsv(csv)
   return csv
 }
@@ -47,6 +53,7 @@ export function analyzeCustomCsv(csv: CustomCsvData): CsvColumns {
   }
   const dataRows = csv.rows.slice(csv.hasHeader ? 1 : 0)
   if (dataRows.length < 2 || dataRows.length > MAX_ROWS) throw new Error('CSV needs 2–10,000 data rows.')
+  if(csv.splits && (csv.splits.length!==dataRows.length || csv.splits.some(s=>s!=='train'&&s!=='test') || !csv.splits.includes('train') || !csv.splits.includes('test'))) throw Error('Explicit splits must provide train/test for every data row.')
   const rawHeaders = csv.hasHeader ? csv.rows[0] : Array.from({ length: width }, (_, index) => index === csv.targetColumn ? 'y' : `x${index + 1}`)
   const headers = rawHeaders.map((header, index) => header.trim() || `column ${index + 1}`)
   const featureColumns = Array.from({ length: width }, (_, index) => index).filter(index => index !== csv.targetColumn)

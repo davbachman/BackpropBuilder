@@ -24,3 +24,7 @@ output
 *.njsproj
 *.sln
 *.sw?
+
+# Python study runner caches
+__pycache__/
+*.pyc

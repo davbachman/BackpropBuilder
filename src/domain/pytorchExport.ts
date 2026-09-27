@@ -1,3 +1,4 @@
+import {regularizedParameters} from './regularization'
 import { parseArithmetic } from './arithmetic'
 import { datasetExamplesForNode, datasetForNode, datasetMode, datasetTargetSlotForNode } from './datasets'
 import { supportsNumericBatches } from './datasetTraining'
@@ -76,6 +77,7 @@ function operationCode(node: GraphNode, args: string[], graph: GraphModel): stri
       return `${a}.narrow(${axis}, ${start}, ${length})`
     }
     case 'concat': return `torch.cat([${args.map(value => axis === 1 ? `(${value}.reshape(-1, 1) if ${value}.ndim == 1 else ${value})` : value).join(', ')}], dim=${axis})`
+    case 'dropout': return `F.dropout(${a}, p=${node.params.dropoutRate ?? 0.1}, training=self.training)`
     case 'softmax': return `torch.softmax(${a}, dim=-1)`
     case 'causal-mask': return `${a}.masked_fill(torch.triu(torch.ones_like(${a}, dtype=torch.bool), diagonal=1), float('-inf'))`
     case 'layer-norm': return `F.layer_norm(${a}, (${a}.shape[-1],), weight=${b}, bias=${c}, eps=${node.params.epsilon ?? 1e-5})`
@@ -109,6 +111,7 @@ function notebookCell(source: string, kind: 'code' | 'markdown', id: string) {
 /** Compile the executable graph and current weights to a PyTorch program.
  * Dataset examples live in a neighboring file. Visual groups do not change computation. */
 export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportOptions = {}): PyTorchExport {
+  if(graph.training?.engine === 'tensor') throw new Error('Tensor optimizer and batching settings are not supported by Python export yet. Save the project, or select Trace training and batch size 1 to export an SGD program.')
   if (graph.nodes.filter(node => node.type === 'dataset').length !== 1) {
     throw new Error('PyTorch export needs exactly one Dataset block.')
   }
@@ -179,6 +182,10 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
       forwardLines.push(`        ${name} = ${args[0] ?? tensorCode(node.params.value)}`)
     } else {
       forwardLines.push(`        ${name} = ${operationCode(node, args, graph)}`)
+      if(isLossNode(node) && node.params.regularization && node.params.regularization!=='none') {
+        const terms=regularizedParameters(graph,node).map(n=>`self.${parameters.get(n.id)}.${node.params.regularization==='l1'?'abs()':'square() * 0.5'}`)
+        if(terms.length) forwardLines.push(`        ${name} = ${name} + ${node.params.regularizationStrength??0} * (${terms.map(t=>`(${t}).sum()`).join(' + ')})`)
+      }
     }
   }
   const lossNode = losses[0]

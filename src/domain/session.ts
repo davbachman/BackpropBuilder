@@ -1,3 +1,4 @@
+import {isTrainingSettings} from './trainingSettings'
 import { cloneGraph } from './engine'
 import { isDatasetKind } from './datasets'
 import { isCustomCsvData } from './customCsv'
@@ -38,7 +39,7 @@ const NODE_TYPES = new Set([
   'target',
   'loss',
   'one-hot', 'conv2d', 'avgpool2d',
-  'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
+  'dropout', 'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
 ])
 const ACTIVATION_KINDS = new Set<ActivationKind>(['identity', 'relu', 'sigmoid', 'tanh'])
 const LOSS_KINDS = new Set<LossKind>(['squared-error', 'mse', 'mae', 'binary-cross-entropy', 'cross-entropy'])
@@ -143,7 +144,7 @@ function isProjectStateSnapshot(value: unknown): value is ProjectStateSnapshot {
 }
 
 function isGraphModel(value: unknown): value is GraphModel {
-  if (!isRecord(value)) return false
+  if (!isRecord(value) || (value.training !== undefined && !isTrainingSettings(value.training))) return false
   return (
     Array.isArray(value.nodes) &&
     value.nodes.every(isGraphNode) &&
@@ -218,12 +219,15 @@ function isNodeParams(value: unknown): value is NodeParams {
   return (
     (value.value === undefined || isFiniteNumber(value.value) || isTensorValue(value.value)) &&
     (value.activation === undefined || ACTIVATION_KINDS.has(value.activation as ActivationKind)) &&
+    (value.regularization === undefined || ['none','l1','l2'].includes(String(value.regularization))) &&
+    (value.regularizationStrength === undefined || (isFiniteNumber(value.regularizationStrength) && value.regularizationStrength>=0)) &&
+    (value.regularizationParameterIds === undefined || (Array.isArray(value.regularizationParameterIds) && value.regularizationParameterIds.every(id=>typeof id==='string') && new Set(value.regularizationParameterIds).size===value.regularizationParameterIds.length)) &&
     (value.loss === undefined || LOSS_KINDS.has(value.loss as LossKind)) &&
     (value.dataset === undefined || isDatasetKind(value.dataset as DatasetKind)) &&
     (value.customCsv === undefined || isCustomCsvData(value.customCsv)) &&
     (value.textData === undefined || isTextDatasetData(value.textData)) &&
     (value.dataset !== 'custom-text' || isTextDatasetData(value.textData)) &&
-    (value.numClasses === undefined || (isNonNegativeInteger(value.numClasses) && Number(value.numClasses) >= 2 && Number(value.numClasses) <= 4096)) &&
+    (value.numClasses === undefined || (isNonNegativeInteger(value.numClasses) && Number(value.numClasses) >= 2 && Number(value.numClasses) <= 8192)) &&
     (value.dataset !== 'custom-csv' || isCustomCsvData(value.customCsv)) &&
     (value.datasetMode === undefined || value.datasetMode === 'sample' || value.datasetMode === 'batch') &&
     isOptionalNonNegativeInteger(value.datasetIndex) &&
@@ -238,6 +242,7 @@ function isNodeParams(value: unknown): value is NodeParams {
     isOptionalNonNegativeInteger(value.end) &&
     (value.axes === undefined || (Array.isArray(value.axes) && value.axes.every(isNonNegativeInteger))) &&
     (value.shape === undefined || (Array.isArray(value.shape) && value.shape.every(d => isNonNegativeInteger(d) || d === -1))) &&
+    (value.dropoutRate === undefined || (isFiniteNumber(value.dropoutRate) && value.dropoutRate >= 0 && value.dropoutRate < 1)) &&
     (value.epsilon === undefined || (isFiniteNumber(value.epsilon) && value.epsilon > 0)) &&
     (value.keepDims === undefined || typeof value.keepDims === 'boolean')
   )

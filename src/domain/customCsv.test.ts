@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeCustomCsv, parseCustomCsv } from './customCsv'
-import { customCsvCardWidth, datasetExamples, datasetForNode, datasetOutputValueForSlot } from './datasets'
+import { customCsvCardWidth, datasetExamples, datasetExamplesForNode, datasetForNode, datasetOutputValueForSlot } from './datasets'
 import { forwardPass, parameterValues, runTrainingStep } from './engine'
 import { createStarterGraph } from './examples'
 import { createProjectStateFile, parseProjectStateFile } from './session'
@@ -27,6 +27,26 @@ describe('custom CSV datasets', () => {
     if (!imported.ok) return
     const restored = imported.file.state.graph.nodes.find(node => node.type === 'dataset')!
     expect(datasetForNode(restored).targetValue.data).toEqual([3, 5, 7, 9])
+  })
+
+  it('preserves explicit CSV splits instead of repartitioning rows', () => {
+    const csv = parseCustomCsv('x,target,split\n1,2,train\n2,4,test\n3,6,train\n', 'fixed.csv')
+    expect(csv.rows[0]).toEqual(['x', 'target'])
+    expect(csv.splits).toEqual(['train', 'test', 'train'])
+    const node = createStarterGraph(true).nodes.find(node => node.type === 'dataset')!
+    node.params = { dataset: 'custom-csv', customCsv: csv, trainPercent: 10 }
+    expect(datasetExamplesForNode(node).map(row => row.split)).toEqual(csv.splits)
+    expect(() => parseCustomCsv('x,y,split\n1,2,train\n2,3,unknown\n', 'bad.csv')).toThrow(/split/)
+    expect(() => parseCustomCsv('x,y,split\n1,2,train\n2,3,train\n', 'bad.csv')).toThrow(/splits/)
+    expect(() => analyzeCustomCsv({ ...csv, splits: ['train', 'test'] })).toThrow(/splits/)
+  })
+
+  it('accepts all 64 digit pixels as numeric columns', () => {
+    const header = [...Array.from({ length: 64 }, (_, i) => `pixel${i}`), 'class'].join(',')
+    const row = (label: string) => [...Array.from({ length: 64 }, (_, i) => String(i % 17)), label].join(',')
+    const csv = parseCustomCsv([header, row('zero'), row('one')].join('\n'), 'digits.csv')
+    expect(csv.rows[0]).toHaveLength(65)
+    expect(analyzeCustomCsv(csv).classLabels).toEqual(['one', 'zero'])
   })
 
   it('encodes string classes, supports a headerless CSV, and rejects invalid feature cells', () => {

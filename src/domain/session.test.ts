@@ -6,6 +6,7 @@ import {
   createProjectStateFile,
   parseProjectStateFile,
 } from './session'
+import {DEFAULT_TRAINING} from './trainingSettings'
 import { scalarValue } from './tensor'
 import type { ProjectStateSnapshot } from './types'
 
@@ -168,3 +169,12 @@ describe('project state files', () => {
     ).toBe(false)
   })
 })
+
+ it('round-trips tensor training settings and rejects invalid optimizer settings',()=>{
+  const snapshot=projectSnapshot();snapshot.graph.training={...DEFAULT_TRAINING,engine:'tensor',backend:'webgl',patience:5}
+  const file=createProjectStateFile(snapshot),parsed=parseProjectStateFile(JSON.stringify(file))
+  expect(parsed.ok).toBe(true)
+  if(parsed.ok)expect(parsed.file.state.graph.training).toEqual(snapshot.graph.training)
+  file.state.graph.training!.patience=-1
+  expect(parseProjectStateFile(JSON.stringify(file)).ok).toBe(false)
+ })

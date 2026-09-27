@@ -1,5 +1,7 @@
 # Text curriculum pilot
 
+For the subsequent app integration, regularization, and browser validation, see [Semester app pilot](SEMESTER-APP-PILOT.md). The earlier study below retains its original scope and results.
+
 This is an instructor feasibility run of the sequence after MLP classification. The models were assembled from ordinary editable blocks, trained on real data, and checked against PyTorch. They are instructor reference solutions, deliberately absent from the student model menu. Student instructions and Gradescope packages remain a separate design step.
 
 The local run's datasets, trained project JSON, Python/notebook exports, measurements, and preview are in `output/text-curriculum/`. This directory is ignored by Git. Start with its `REPORT.md` for measured results; this guide explains the sequence and how to reproduce it.
@@ -66,7 +68,7 @@ Greedy decoding tends to repeat. Sampling introduces variation. A short run on a
 - Faster multi-epoch training that uses the same numerical operations and derivatives as step-by-step tracing. Fast and traced SGD match in regression tests.
 - Save/import preserves the text preprocessing recipe and vocabulary. Python/notebook export includes a sibling dataset JSON containing prepared examples and text metadata. Exports train/evaluate those numerical examples; the generated Python does not include the browser's text-generation UI.
 
-Text limits are 5 million characters, 10,000 documents/windows, vocabulary up to 4,096, and context up to 256. These are validation ceilings, not recommended transformer sizes. The existing parameter initializer supports at most 65,536 values per tensor; 1,000 × 20 fits. The pilot uses unpadded variable-length reviews and one review/window per SGD update. Numeric mini-batches do not apply to these sequence tensors. Attention costs grow quadratically with context length.
+Current limits and batched GPU/AdamW training are documented in [Accelerated text training](ACCELERATED-TEXT-TRAINING.md). The original pilot below used unpadded single-example SGD; its results and timings describe that historical configuration. Attention costs grow quadratically with context length.
 
 ## Reproduce the run
 
