@@ -1,5 +1,5 @@
 import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputCountForNode, datasetOutputValueForSlot, datasetTargetSlotForNode } from './datasets'
-import { forwardPass, isLossNode, runTrainingStep } from './engine'
+import { forwardPass, isLossNode, runTrainingStepFast, validateGraph } from './engine'
 import type { GraphModel, GraphNode } from './types'
 
 export function withDatasetExample(graph: GraphModel, id: string, index: number): GraphModel {
@@ -75,7 +75,7 @@ export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 
   let loss = 0, count = 0, correct = 0, predictions = 0
   const rows: DatasetPrediction[] = []
   for (const index of batch ? indices.slice(0,1) : indices) {
-    const result = forwardPass(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index))
+    const result = forwardPass(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index), false)
     if (result.loss === undefined || !Number.isFinite(result.loss)) throw new Error('Connect predictions and dataset targets to a loss before evaluating.')
     loss += result.loss
     count++
@@ -116,6 +116,8 @@ function displayPrediction(value: number, categorical: boolean, classLabels?: st
 /** SGD traverses training examples only and restores the inspected example.
  * Yield between chunks so the canvas remains responsive and training can stop. */
 export async function trainDataset(graph: GraphModel, id: string, epochs: number, options: { signal?: AbortSignal; progress?: (done: number, total: number) => void; epochOffset?: number; batchSize?: number; shuffleEachEpoch?: boolean } = {}): Promise<GraphModel> {
+  const issues = validateGraph(graph).filter(issue => issue.code !== 'disconnected')
+  if (issues.length) throw new Error(issues.map(issue => issue.message).join(' '))
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
   if (graph.nodes.filter(node => node.type === 'dataset').length !== 1) throw new Error('Use one dataset block to keep features and targets synchronized during training.')
@@ -131,7 +133,7 @@ export async function trainDataset(graph: GraphModel, id: string, epochs: number
       const input = batch.length === 1 && datasetMode(source) === 'sample'
         ? withDatasetExample(next, id, batch[0])
         : withDatasetIndices(next, id, batch)
-      next = runTrainingStep(input).graph
+      next = runTrainingStepFast(input)
       if (next.nodes.some(node => node.value?.data.some(value => !Number.isFinite(value)))) throw new Error('Training diverged. Lower the learning rate and try again.')
       done += batch.length
       options.progress?.(done, epochs * indices.length)

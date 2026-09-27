@@ -11,6 +11,7 @@ export type NodeType =
   | 'target'
   | 'loss'
   | 'embedding'
+  | 'one-hot'
   | 'transpose'
   | 'slice'
   | 'concat'
@@ -43,6 +44,7 @@ export type DatasetKind =
   | 'class-scores'
   | 'neuron-basics'
   | 'custom-csv'
+  | 'custom-text'
 export type DatasetTask = 'regression' | 'binary-classification' | 'classification' | 'sequence' | 'attention'
 
 export interface CustomCsvData {
@@ -51,6 +53,26 @@ export interface CustomCsvData {
   hasHeader: boolean
   targetColumn: number
   task: 'regression' | 'binary-classification' | 'classification'
+}
+
+export interface TextDocument {
+  text: string
+  label?: string
+  split: 'train' | 'test'
+}
+
+/** Immutable preparation recipe. Vocabulary is fitted on training documents only. */
+export interface TextDatasetData {
+  version: 1
+  fileName: string
+  task: 'sentiment' | 'language'
+  tokenizer: 'word' | 'character'
+  representation: 'counts' | 'tokens'
+  lowercase: boolean
+  vocabulary: string[]
+  maxLength: number
+  stride: number
+  documents: TextDocument[]
 }
 
 export type GraphPhase = 'edit' | 'forward' | 'loss' | 'backward' | 'update'
@@ -66,6 +88,8 @@ export interface NodeParams {
   loss?: LossKind
   dataset?: DatasetKind
   customCsv?: CustomCsvData
+  textData?: TextDatasetData
+  numClasses?: number
   datasetMode?: 'sample' | 'batch'
   datasetIndex?: number
   datasetSplit?: 'all' | 'train' | 'test'

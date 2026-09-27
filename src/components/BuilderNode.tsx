@@ -59,6 +59,7 @@ const ICON_BY_TYPE: Record<NodeType, typeof CircleDot> = {
   target: CircleDot,
   loss: Sigma,
   embedding: Database,
+  'one-hot': Database,
   transpose: Crosshair,
   slice: Crosshair,
   concat: Crosshair,

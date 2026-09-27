@@ -75,6 +75,7 @@ export function createNode(type: NodeType, index: number): GraphNode {
   if (type === 'activation') {
     return { ...opNode(`activation-${index}`, type, 'activation', baseX, baseY), params: { activation: 'sigmoid' } }
   }
+  if (type === 'one-hot') return { ...opNode('one-hot-' + index, type, 'One-hot', baseX, baseY), params: { numClasses: 2 } }
   if (type === 'arithmetic') return { ...opNode(`arithmetic-${index}`, type, 'Arithmetic', baseX, baseY), params: { expression: 'x1 * x2' } }
   if (type === 'tensor-transform') return { ...opNode(`tensor-transform-${index}`, type, 'Tensor transform', baseX, baseY), params: { transform: 'reshape' } }
   return opNode(`${type}-${index}`, type, type, baseX, baseY)

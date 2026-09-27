@@ -29,3 +29,6 @@
 .decoder-generate { display:flex; justify-content:center; align-items:center; gap:9px; width:100%; padding:11px 8px; border:0; border-radius:9px; background:#345e65; color:white; font-size:11px; font-weight:600; box-shadow:0 3px 8px #345e6519; cursor:pointer; }.decoder-generate:hover { background:#294f56; }.decoder-generate:disabled { opacity:.5; cursor:default; }
 .decoder-status,.decoder-error { font-size:10px; line-height:1.6; margin:9px 0 0; color:#81909c; }.decoder-error { color:#b45561; }
 .decoder-checkpoints { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin:17px 0 0; padding-top:14px; border-top:1px solid #e6edf0; }.decoder-checkpoints span { margin-right:auto; color:#8b99a3; font-size:9px; }.decoder-checkpoints button { border:0; background:transparent; color:#5d7c89; padding:2px 0; font-size:10px; text-decoration:underline; text-decoration-color:#bfced5; text-underline-offset:3px; cursor:pointer; }
+
+.text-generation-action { margin: 10px 0; }
+.decoder-probability-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

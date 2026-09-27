@@ -65,6 +65,7 @@ function operationCode(node: GraphNode, args: string[], graph: GraphModel): stri
       }
       break
     }
+    case 'one-hot': return 'F.one_hot(' + a + '.long(), num_classes=' + (node.params.numClasses ?? 2) + ').to(torch.float64)'
     case 'embedding': return `F.embedding(${b}.long(), ${a})`
     case 'transpose': return node.params.axes
       ? `${a}.permute(${node.params.axes.join(', ')})`
@@ -139,6 +140,7 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
           task: dataset.task,
           classLabels: dataset.classLabels,
           vocabulary: dataset.vocabulary,
+          textData: datasetNode.params.textData,
           examples: examples.map(example => ({ label: example.label, split: example.split, features: example.features, target: example.target })),
         }),
       }

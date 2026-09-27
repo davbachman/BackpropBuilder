@@ -10,6 +10,7 @@ export const blockPalette: Array<{ type: NodeType; label: string }> = [
   { type: 'target', label: 'Target' },
   { type: 'loss', label: 'Loss' },
   { type: 'embedding', label: 'Embedding lookup' },
+  { type: 'one-hot', label: 'One-hot' },
   { type: 'tensor-transform', label: 'Tensor transform' },
   { type: 'concat', label: 'Concatenate' },
   { type: 'softmax', label: 'Softmax' },

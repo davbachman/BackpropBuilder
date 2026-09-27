@@ -104,6 +104,7 @@ export const inputArityByType: Record<NodeType, number> = {
   target: 1,
   loss: 2,
   embedding: 2,
+  'one-hot': 1,
   transpose: 1,
   slice: 1,
   concat: 2,
@@ -195,6 +196,7 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
       return `${outputLabel} = ${node.params.activation ?? 'identity'}(${inputLabels[0]})`
     case 'conv2d': return `${outputLabel}[r,c,o] = Σ(kernel[o] · ${inputLabels[0]}[window r,c]) + bias[o]`
     case 'avgpool2d': return `${outputLabel}[r,c,k] = mean(${inputLabels[0]}[2×2 window r,c,k])`
+    case 'one-hot': return outputLabel + ' = one_hot(' + inputLabels[0] + ', ' + (node.params.numClasses ?? 2) + ')'
     case 'embedding': return `${outputLabel} = ${inputLabels[0]}[${inputLabels[1]}]`
     case 'transpose': return `${outputLabel} = transpose(${inputLabels[0]})`
     case 'slice': return `${outputLabel} = slice(${inputLabels[0]}, axis=${node.params.axis ?? 0}, ${node.params.start ?? 0}:${node.params.end ?? '?'})`
@@ -611,6 +613,10 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   const axis = node.params.axis ?? (node.type === 'concat' ? 1 : 0)
   if (node.type === 'conv2d') return first.length === 3 && second.length === 4 && third.length === 1 && first[2] === second[3] && second[0] === third[0] && first[0] >= second[1] && first[1] >= second[2] ? [first[0] - second[1] + 1, first[1] - second[2] + 1, second[0]] : undefined
   if (node.type === 'avgpool2d') return first.length === 3 && first[0] >= 2 && first[1] >= 2 ? [Math.floor(first[0] / 2), Math.floor(first[1] / 2), first[2]] : undefined
+  if (node.type === 'one-hot') {
+    const width = node.params.numClasses ?? 2
+    return first.length === 1 && Number.isInteger(width) && width >= 2 && width <= 4096 && first[0] * width <= 1_048_576 ? [first[0], width] : undefined
+  }
   if (node.type === 'embedding') return first.length === 2 && second.length === 1 ? [second[0], first[1]] : undefined
   if (operation === 'transpose') {
     const axes = node.params.axes ?? first.map((_, index) => first.length - index - 1)
@@ -683,7 +689,7 @@ export function topologicalSort(graph: GraphModel): string[] {
   return order
 }
 
-export function forwardPass(graph: GraphModel): EvaluationResult {
+export function forwardPass(graph: GraphModel, trace = true): EvaluationResult {
   assertValid(graph)
   const next = cloneGraph(graph)
   const order = topologicalSort(next)
@@ -711,7 +717,7 @@ export function forwardPass(graph: GraphModel): EvaluationResult {
       edge.grad = zeroLike(outputValue)
     }
 
-    if (!SOURCE_TYPES.has(node.type) && inputArityForNode(node) > 0) {
+    if (trace && !SOURCE_TYPES.has(node.type) && inputArityForNode(node) > 0) {
       steps.push(forwardStep(node, incoming, inputValues, next))
     }
   }
@@ -804,6 +810,42 @@ export function runTrainingStep(graph: GraphModel, learningRate = graph.learning
   }
 }
 
+/** Epoch execution uses exactly the same primitives and derivatives as Step,
+ * without copying trace caches or formatting thousands of tensor entries.
+ * The caller validates the graph before the run; inputs are never mutated. */
+export function runTrainingStepFast(graph: GraphModel, learningRate = graph.learningRate): GraphModel {
+  const next: GraphModel = { ...graph, nodes: graph.nodes.map(node => ({...node, params: {...node.params}, value: undefined, grad: undefined, cache: undefined, localDerivative: undefined})), edges: graph.edges.map(edge => ({...edge, value: undefined, grad: undefined})) }
+  const order = topologicalSort(next)
+  const byId = new Map(next.nodes.map(node => [node.id, node]))
+  const incoming = new Map(order.map(id => [id, incomingEdges(next, id)]))
+  for (const id of order) {
+    const node = byId.get(id)!
+    const computed = computeForward(node, incoming.get(id)!.map(edge => valueForSourceEdge(next, edge)))
+    node.value = computed.value
+    node.grad = zeroLike(computed.value)
+    node.localDerivative = computed.localDerivative
+    if (computed.value.data.some(value => !Number.isFinite(value))) throw new Error('Training diverged. Lower the learning rate.')
+  }
+  const loss = next.nodes.find(isLossNode)
+  if (!loss) throw new Error('Training needs a loss.')
+  loss.grad = scalarValue(1)
+  for (const id of [...order].reverse()) {
+    const node = byId.get(id)!
+    for (const contribution of computeBackward(node, incoming.get(id)!, next, node.grad!)) {
+      const source = byId.get(contribution.sourceId)!
+      if (source.type !== 'dataset') source.grad = addTensorsExact(source.grad ?? zeroLike(contribution.gradient), contribution.gradient)
+    }
+  }
+  for (const node of next.nodes) {
+    if (node.type !== 'weight' && node.type !== 'bias') continue
+    const value = addTensorsExact(toTensor(node.params.value), scaleTensor(node.grad!, -learningRate))
+    if (value.data.some(entry => !Number.isFinite(entry))) throw new Error('Training diverged. Lower the learning rate.')
+    node.params.value = value
+  }
+  // Only parameters are carried to the next update; inspect after a fresh forward pass.
+  return { ...next, nodes: next.nodes.map(node => ({...node, value: undefined, grad: undefined, localDerivative: undefined})) }
+}
+
 function computeForward(
   node: GraphNode,
   inputs: TensorValue[],
@@ -819,6 +861,14 @@ function computeForward(
     return { value, localDerivatives: [] }
   }
 
+  if (node.type === 'one-hot') {
+    const width = node.params.numClasses ?? 2
+    const ids = inputs[0].data
+    if (ids.some(id => !Number.isInteger(id) || id < 0 || id >= width)) throw new Error('One-hot needs integer IDs from 0 to vocabulary size minus 1.')
+    const data = Array(ids.length * width).fill(0) as number[]
+    ids.forEach((id, row) => { data[row * width + id] = 1 })
+    return { value: tensorValue([ids.length, width], data), localDerivatives: [] }
+  }
   if (node.type === 'matmul') {
     return { value: matrixProduct(inputs[0], inputs[1]), localDerivatives: [] }
   }
@@ -954,6 +1004,7 @@ function computeBackward(
       : []
   }
   const values = incoming.map((edge) => valueForSourceEdge(graph, edge))
+  if (node.type === 'one-hot') return incoming.map((edge, i) => ({ edgeId: edge.id, sourceId: edge.source, gradient: zeroLike(values[i]) }))
 
   if (TENSOR_OPERATION_TYPES.has(node.type)) {
     const { output, operands } = tensorOperation(node, values, true)
@@ -1273,6 +1324,7 @@ function lossCalculationForForward(node: GraphNode, inputs: TensorValue[]): stri
 }
 
 function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
+  if (node.type === 'one-hot') return 'Token IDs are discrete constants; no gradient through encoding.'
   const inputLabels = inputLabelsForFormula(node, graph)
   if (isOptionalPassThroughNode(node)) return 'dInput = gradient (identity connection)'
   if (TENSOR_OPERATION_TYPES.has(node.type)) return TENSOR_DERIVATIVE_FORMULAS[node.type === 'tensor-transform' ? selectedTensorTransform(node) : node.type] ?? 'Accumulate the vector–Jacobian product into each input.'

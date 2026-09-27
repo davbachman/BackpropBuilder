@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { datasetExampleIndex, datasetExamplesForNode, datasetMode, datasetOutputCountForNode, datasetOutputLabelForSlot, datasetOutputValueForSlot, datasetTargetSlotForNode } from '../domain/datasets'
+import { tensorAxisLabels } from '../domain/tensorLabels'
 import { toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphGroup, GraphModel, GraphNode, TensorValue } from '../domain/types'
 import './DataInspector.css'
@@ -110,7 +111,7 @@ function flatIndex(coordinates: number[], shape: number[]): number {
   return shape.reduce((index, width, axis) => index * width + coordinates[axis], 0)
 }
 
-function TensorViewer({ value }: { value: TensorValue }) {
+function TensorViewer({ value, labels = [] }: { value: TensorValue; labels?: Array<string[] | undefined> }) {
   const [rowPage, setRowPage] = useState(0)
   const [columnPage, setColumnPage] = useState(0)
   const [selectedCoordinates, setSelectedCoordinates] = useState<number[]>([])
@@ -161,10 +162,10 @@ function TensorViewer({ value }: { value: TensorValue }) {
       </label>)}
       <div className="data-section-heading"><h3>{rank === 1 ? 'Values' : 'Tensor cells'}</h3><span>Click a value for its exact number</span></div>
       <div className="data-table-scroll"><table className="data-table data-value-table">
-        <thead><tr><th scope="col">{rank === 1 ? 'Index' : 'Row'}</th>{rank === 1 ? <th scope="col">Value</th> : Array.from({ length: visibleColumns }, (_, offset) => <th scope="col" key={offset}>{firstColumn + offset}</th>)}</tr></thead>
+        <thead><tr><th scope="col">{rank === 1 ? 'Index' : 'Row'}</th>{rank === 1 ? <th scope="col">Value</th> : Array.from({ length: visibleColumns }, (_, offset) => <th scope="col" key={offset}>{labels[1]?.[firstColumn + offset] ?? firstColumn + offset}</th>)}</tr></thead>
         <tbody>{Array.from({ length: visibleRows }, (_, rowOffset) => {
           const row = firstRow + rowOffset
-          return <tr key={row}><th scope="row">{row}</th>{Array.from({ length: visibleColumns }, (_,columnOffset) => {
+          return <tr key={row}><th scope="row">{labels[0]?.[row] ?? row}</th>{Array.from({ length: visibleColumns }, (_,columnOffset) => {
             const column = firstColumn + columnOffset
             const cellCoordinates = rank === 1 ? [row] : [row, column, ...tail]
             const index = flatIndex(cellCoordinates, value.shape)
@@ -196,11 +197,16 @@ export function DataInspector({ graph, node, edge, group }: Props) {
   const shownMode = mode === 'gradient' && hasGradient || !hasValue && hasGradient ? 'gradient' : 'value'
   const tensor = shownMode === 'gradient' ? selected?.gradient : hasValue ? toTensor(selected.value) : undefined
 
+  const signalEdge = graph.edges.find(edge => edge.id === selected?.key)
+  const labelNode = signalEdge?.source ?? node?.id
+  const labelSlot = signalEdge?.sourceSlot ?? (node?.type === 'dataset' ? signalIndex : 0)
+  const axisLabels = labelNode ? tensorAxisLabels(graph, labelNode, labelSlot) : []
+
   return <section className="data-inspector">
     <header className="data-header"><p className="eyebrow">{edge ? 'Connection data' : group ? 'Group data' : node?.type === 'dataset' ? 'Dataset data' : 'Block data'}</p><h2>{title}</h2><p>{edge ? 'Forward values travel along this wire; gradient contributions return through it during backpropagation.' : group ? 'Inspect signals leaving this group.' : node?.type === 'dataset' ? 'Browse all rows, then inspect the columns currently supplied by this Dataset block.' : 'Inspect this block’s output, inputs, and gradients.'}</p></header>
     {node?.type === 'dataset' && <DatasetPreview node={node} signals={signals} />}
     {signals.length > 1 && <label className="data-signal-select">{node?.type === 'dataset' ? 'Inspect column' : 'Inspect signal'}<select aria-label={node?.type === 'dataset' ? 'Inspect column' : 'Inspect signal'} value={Math.min(signalIndex, signals.length - 1)} onChange={event => setSignalIndex(Number(event.target.value))}>{signals.map((signal, index) => <option key={signal.key} value={index}>{signal.label}</option>)}</select></label>}
     {selected && <div className="data-view-tabs" role="tablist" aria-label="Data direction"><button type="button" role="tab" aria-selected={shownMode === 'value'} disabled={!hasValue} onClick={() => setMode('value')}>Forward value</button><button type="button" role="tab" aria-selected={shownMode === 'gradient'} disabled={!hasGradient} onClick={() => setMode('gradient')}>← Gradient</button></div>}
-    {tensor ? <TensorViewer key={`${selected.key}:${shownMode}`} value={tensor} /> : <p className="data-empty">{signals.length === 0 ? 'This selection has no output signal to inspect.' : 'No value has reached this signal yet. Run forward or take a Step to calculate it.'}</p>}
+    {tensor ? <TensorViewer key={`${selected.key}:${shownMode}`} value={tensor} labels={axisLabels} /> : <p className="data-empty">{signals.length === 0 ? 'This selection has no output signal to inspect.' : 'No value has reached this signal yet. Run forward or take a Step to calculate it.'}</p>}
   </section>
 }

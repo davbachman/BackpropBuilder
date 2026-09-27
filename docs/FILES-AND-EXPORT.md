@@ -17,3 +17,5 @@ Dataset rows are not embedded in the Python file or notebook. For an imported CS
 The generated program is a starting point for experiments outside the visual app. It includes a small training loop when the graph has a loss and emits evaluation results. The current **Train** settings carry over: batch size, reshuffling, epoch count, and reporting interval. At each report it evaluates training and held-out loss without updating parameters on the held-out examples, and plots both curves when Matplotlib is available. It is not a hosted training service or an export of the canvas layout.
 
 If you only want the guide, choose **Backprop Builder → Reference** in the app's top bar. It opens the GitHub README in a new tab.
+
+Imported text projects also save their vocabulary, tokenization settings, original documents, and fixed document splits. Their Python/notebook exports include `backprop-builder-dataset.json`, with prepared numerical examples and text metadata; keep it beside the export. See [Text curriculum](TEXT-CURRICULUM.md).

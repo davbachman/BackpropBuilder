@@ -1,6 +1,9 @@
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
+import { TextGenerationControls } from './components/TextGenerationControls'
+import { TextImportDialog } from './components/TextImportDialog'
+import type { TextDatasetData } from './domain/types'
 import { generatePyTorchExport } from './domain/pytorchExport'
 import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
@@ -248,6 +251,7 @@ function App({
     const timeout = window.setTimeout(() => setExportNotice(undefined), 6000)
     return () => window.clearTimeout(timeout)
   }, [exportNotice])
+  const [textImportNode, setTextImportNode] = useState<string>()
   const [csvPickerOpen, setCsvPickerOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)
@@ -884,11 +888,11 @@ function App({
   )
 
   const applyDatasetSelection = useCallback(
-    (nodeId: string, dataset: DatasetKind, customCsv?: CustomCsvData) => {
+    (nodeId: string, dataset: DatasetKind, customCsv?: CustomCsvData, textData?: TextDatasetData) => {
       pushHistory()
       const updateNode = (node: GraphModel['nodes'][number]) => {
         if (node.id !== nodeId || node.type !== 'dataset') return node
-        const updated = { ...node, params: { ...node.params, dataset, customCsv, datasetIndex: dataset === 'custom-csv' ? 1 : 0, datasetMode: dataset === 'custom-csv' ? 'batch' as const : node.params.datasetMode, datasetSplit: dataset === 'custom-csv' ? 'train' as const : node.params.datasetSplit, datasetValues: undefined } }
+        const updated = { ...node, params: { ...node.params, dataset, customCsv, textData, trainPercent: undefined, datasetIndex: dataset === 'custom-csv' ? 1 : 0, datasetMode: dataset === 'custom-csv' ? 'batch' as const : node.params.datasetMode, datasetSplit: dataset === 'custom-csv' ? 'train' as const : node.params.datasetSplit, datasetValues: undefined } }
         const value = datasetOutputValueForSlot(updated, 0)
         return { ...updated, value, grad: zeroLike(value) }
       }
@@ -896,13 +900,13 @@ function App({
         invalidateGraphResults({
           ...existing,
           nodes: existing.nodes.map(updateNode),
-          edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv),
+          edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv, textData),
         }),
       )
       setVisualizationGraph((existing) => ({
         ...existing,
         nodes: existing.nodes.map(updateNode),
-        edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv),
+        edges: remapDatasetOutgoingEdges(existing, nodeId, dataset, customCsv, textData),
       }))
       setPhase('edit')
       setTraceSteps([])
@@ -914,6 +918,7 @@ function App({
   )
 
   const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
+    if (dataset === 'custom-text') { setTextImportNode(nodeId); return }
     if (dataset === 'custom-csv') {
       pendingCustomCsvNodeId.current = nodeId
       flushSync(() => {
@@ -1477,6 +1482,7 @@ function App({
         </section>
       </div>}
 
+      {textImportNode && <TextImportDialog onCancel={() => setTextImportNode(undefined)} onImport={data => { applyDatasetSelection(textImportNode, 'custom-text', undefined, data); setTextImportNode(undefined) }}/>}
       <aside className="left-panel" aria-label="Build, train, and test sidebar">
         <div className="sidebar-heading">
           {leftOpen ? <div className="left-sidebar-tabs" role="tablist" aria-label="Left sidebar views">
@@ -1729,7 +1735,7 @@ function App({
           !selectedGroupId &&
           !selectedEdgeId &&
           graph.nodes.some(node => node.type === 'dataset' && datasetForNode(node).task === 'sequence') && (
-            <DecoderControls
+            graph.nodes.some(node => node.params.textData?.task === 'language') ? <TextGenerationControls graph={graph}/> : <DecoderControls
               graph={graph}
               onGraphChange={(next) => {
                 pushHistory()
@@ -1935,6 +1941,7 @@ function remapDatasetOutgoingEdges(
   nodeId: string,
   dataset: DatasetKind,
   customCsv?: CustomCsvData,
+  textData?: TextDatasetData,
 ): GraphModel['edges'] {
   const existingNode = graph.nodes.find(
     (node) => node.id === nodeId && node.type === 'dataset',
@@ -1943,7 +1950,7 @@ function remapDatasetOutgoingEdges(
 
   const updatedNode = {
     ...existingNode,
-    params: { ...existingNode.params, dataset, customCsv },
+    params: { ...existingNode.params, dataset, customCsv, textData },
   }
   return graph.edges.flatMap((edge) => {
     if (edge.source !== nodeId) return [edge]

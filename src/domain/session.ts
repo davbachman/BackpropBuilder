@@ -1,6 +1,7 @@
 import { cloneGraph } from './engine'
 import { isDatasetKind } from './datasets'
 import { isCustomCsvData } from './customCsv'
+import { isTextDatasetData } from './textData'
 import { cloneTensor, isTensorValue } from './tensor'
 import type {
   ActivationKind,
@@ -36,7 +37,7 @@ const NODE_TYPES = new Set([
   'activation',
   'target',
   'loss',
-  'conv2d', 'avgpool2d',
+  'one-hot', 'conv2d', 'avgpool2d',
   'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
 ])
 const ACTIVATION_KINDS = new Set<ActivationKind>(['identity', 'relu', 'sigmoid', 'tanh'])
@@ -220,6 +221,9 @@ function isNodeParams(value: unknown): value is NodeParams {
     (value.loss === undefined || LOSS_KINDS.has(value.loss as LossKind)) &&
     (value.dataset === undefined || isDatasetKind(value.dataset as DatasetKind)) &&
     (value.customCsv === undefined || isCustomCsvData(value.customCsv)) &&
+    (value.textData === undefined || isTextDatasetData(value.textData)) &&
+    (value.dataset !== 'custom-text' || isTextDatasetData(value.textData)) &&
+    (value.numClasses === undefined || (isNonNegativeInteger(value.numClasses) && Number(value.numClasses) >= 2 && Number(value.numClasses) <= 4096)) &&
     (value.dataset !== 'custom-csv' || isCustomCsvData(value.customCsv)) &&
     (value.datasetMode === undefined || value.datasetMode === 'sample' || value.datasetMode === 'batch') &&
     isOptionalNonNegativeInteger(value.datasetIndex) &&

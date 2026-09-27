@@ -34,3 +34,7 @@ For regression, use mean squared error or mean absolute error. For a binary clas
 - Arithmetic broadcasts compatible dimensions. For example, adding a `[width]` bias to a `[batch, width]` matrix applies it to every row.
 - A Param shape creates a tensor; changing only the shape field does not imply a matrix is filled with the displayed scalar. Use the initializer or edit its values in Details. The initializer accepts positive dimensions and up to 65,536 values.
 - A convolutional filter's input channel count must match the image's channel count. Average pooling requires an image-like tensor.
+
+## One-hot encoding
+
+**One-hot** converts integer IDs `[T]` into rows `[T,V]`. Set Vocabulary size in Details. Multiplying by a trainable `[V,d]` matrix is equivalent to Embedding lookup; only the matrix learns, not the discrete IDs. Use lookup for normal training and one-hot to inspect this equivalence.

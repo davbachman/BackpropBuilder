@@ -2,8 +2,12 @@ import type { CustomCsvData, DatasetKind, DatasetTask, GraphNode, TensorValue } 
 import { tensorValue } from './tensor'
 import { analyzeCustomCsv } from './customCsv'
 import digits from '../learning/digits.json'
+import { textDataset } from './textData'
 
 export interface DatasetExample {
+  text?: string
+  documentIndex?: number
+  offset?: number
   label: string
   split: 'train' | 'test'
   features: TensorValue[]
@@ -136,6 +140,7 @@ DATASET_OPTIONS.push(tensorDataset('class-scores', 'Class scores · softmax expe
 export const DATASET_MENU_OPTIONS: { kind: DatasetKind; label: string }[] = [
   ...DATASET_OPTIONS.map(({ kind, label }) => ({ kind, label })),
   { kind: 'custom-csv', label: 'Custom CSV…' },
+  { kind: 'custom-text', label: 'Text / reviews…' },
 ]
 
 export function customCsvCardWidth(node: GraphNode): number {
@@ -155,6 +160,7 @@ export function customCsvCardHeight(node: GraphNode, detailed = false): number {
 const customDatasetCache = new WeakMap<CustomCsvData, ToyDataset>()
 
 export function datasetForNode(node: GraphNode): ToyDataset {
+  if (node.params.dataset === 'custom-text' && node.params.textData) return textDataset(node.params.textData)
   if (node.params.dataset === 'custom-csv' && node.params.customCsv) {
     const csv = node.params.customCsv
     const cached = customDatasetCache.get(csv)
@@ -182,6 +188,7 @@ const splitCache = new WeakMap<ToyDataset, Map<number, DatasetExample[]>>()
  * split. Classification examples are divided within each class. */
 export function datasetExamplesForNode(node: GraphNode): DatasetExample[] {
   const dataset = datasetForNode(node)
+  if (node.params.dataset === 'custom-text') return datasetExamples(dataset)
   const percent = node.params.trainPercent
   if (percent === undefined) return datasetExamples(dataset)
   const cached = !dataset.examples && splitCache.get(dataset)?.get(percent)
@@ -255,5 +262,5 @@ export function remapDatasetOutputSlot(fromNode: GraphNode, toNode: GraphNode, f
   return featureIndex < toTarget ? featureIndex : featureIndex + 1
 }
 export function isDatasetKind(value: string): value is DatasetKind {
-  return value === 'custom-csv' || DATASET_OPTIONS.some(dataset => dataset.kind === value)
+  return value === 'custom-csv' || value === 'custom-text' || DATASET_OPTIONS.some(dataset => dataset.kind === value)
 }

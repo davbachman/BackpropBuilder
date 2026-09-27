@@ -10,3 +10,12 @@
 .csv-header-check { display: flex; align-items: center; gap: 8px; color: #665b73; font-size: 11px; }
 .tensor-initializer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin: 10px 0; }
 .tensor-initializer button { padding: 9px; margin-bottom: 12px; }
+
+.text-dataset-panel { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.text-dataset-panel details { margin: 10px 0; }
+.text-dataset-panel summary { cursor: pointer; font-weight: 600; }
+.text-dataset-panel textarea, .text-dataset-panel input { max-width: 100%; width: 100%; box-sizing: border-box; }
+.text-original { max-height: 180px; overflow: auto; white-space: pre-wrap; }
+.text-token-list { display: flex; flex-wrap: wrap; gap: 5px; max-height: 190px; overflow: auto; padding: 8px 0; }
+.text-token-list span { border: 1px solid #87939b70; border-radius: 4px; padding: 2px 5px; white-space: pre-wrap; }
+.csv-picker-dialog { max-height: 90vh; overflow-y: auto; }

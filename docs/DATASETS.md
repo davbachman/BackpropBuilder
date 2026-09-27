@@ -31,3 +31,7 @@ For several numeric columns, connect each column to **Concatenate** with axis 1.
 The prediction input to **Loss** and its target input define the model's supervised output. **Reporting** can plot a one- or two-input prediction graph when that path is connected and valid. **Test** lists predictions for every evaluated example, reports loss, and reports class accuracy for classifiers or token accuracy for sequence tasks. For the details of training and testing, see [Training and testing](TRAINING.md).
 
 For source attribution and reproduction of the digit data, see [CNN data](CNN-DATA.md).
+
+## Text datasets
+
+Choose **Text / reviews…** for review CSV, plain-text next-token data, or prepared JSON. The text importer fits a vocabulary on training documents, preserves explicit splits, and provides counts or token IDs plus positions and targets. See the [text curriculum guide](TEXT-CURRICULUM.md) for formats, limits, and real-data examples.

@@ -82,7 +82,7 @@ function isNumeric(value: string): boolean {
   return value.trim() !== '' && Number.isFinite(Number(value))
 }
 
-function parseRows(text: string): string[][] {
+export function parseRows(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = [], cell = '', quoted = false
   for (let index = 0; index < text.length; index++) {
