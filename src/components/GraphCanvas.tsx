@@ -1141,5 +1141,7 @@ function csvGeometrySample(csv: CustomCsvData): CustomCsvData {
   const first = Array.from({ length: width }, () => '0')
   const second = [...first]
   second[csv.targetColumn] = '1'
-  return { ...csv, rows: csv.hasHeader ? [csv.rows[0], first, second] : [first, second] }
+  // These synthetic rows describe port geometry only. The real split labels
+  // belong to the full dataset and cannot be reused with this two-row sample.
+  return { ...csv, splits: undefined, rows: csv.hasHeader ? [csv.rows[0], first, second] : [first, second] }
 }
