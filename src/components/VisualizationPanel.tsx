@@ -129,6 +129,18 @@ function SingleInputVisualization({
       >
         <defs><clipPath id={clipId}><rect x={PLOT_PADDING} y={PLOT_PADDING} width={PLOT_WIDTH - 2 * PLOT_PADDING} height={PLOT_HEIGHT - 2 * PLOT_PADDING} /></clipPath></defs>
         <PlotAxes xLabel={data.inputLabel} yLabel="output" />
+        {data.targetPoints.map((point, index) => (
+          <circle
+            key={`target-${index}`}
+            className="visualization-target-point"
+            cx={plotX(point.x, bounds)}
+            cy={plotY(point.y, bounds)}
+            fill="var(--loss)"
+            r="2.5"
+          >
+            <title>{`target (${formatNumber(point.x)}, ${formatNumber(point.y)})`}</title>
+          </circle>
+        ))}
         <path
           className="visualization-prediction-line"
           data-sample-count={data.predictionSamples.length}
@@ -137,18 +149,6 @@ function SingleInputVisualization({
         >
           <title>prediction curve over sampled input range</title>
         </path>
-        {data.targetPoints.map((point, index) => (
-          <circle
-            key={`target-${index}`}
-            className="visualization-target-point"
-            cx={plotX(point.x, bounds)}
-            cy={plotY(point.y, bounds)}
-            fill="var(--loss)"
-            r="4.5"
-          >
-            <title>{`target (${formatNumber(point.x)}, ${formatNumber(point.y)})`}</title>
-          </circle>
-        ))}
       </svg>
       <div className="visualization-meta-row">
         <span>x-axis: {data.inputLabel}</span>
@@ -202,7 +202,7 @@ function TwoInputVisualization({
             className="visualization-target-point"
             cx={plotX(point.x, bounds)}
             cy={plotY(point.y, bounds)}
-            r="5"
+            r="2.5"
             fill={heatmapColor(point.value, data.targetRange)}
           >
             <title>{`target (${formatNumber(point.x)}, ${formatNumber(point.y)}) = ${data.classLabels?.[point.value] ?? formatNumber(point.value)}`}</title>
