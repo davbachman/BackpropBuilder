@@ -46,3 +46,7 @@ Connect one tensor input; output shape is unchanged. Set **Dropout probability**
 ## Standardize features
 
 Fixed feature preprocessing: (x − training mean) / training standard deviation. Fit explicitly in the inspector after connecting inputs. Uses only training examples, treats constant columns with scale 1, and saves statistics for inference and export. Supports scalars or feature vectors on the last tensor axis. This is dataset feature scaling, distinct from Layer norm. See [housing exercise](STANDARDIZATION-HOUSING-PILOT.md).
+
+## Finding blocks
+
+The Build sidebar groups blocks into Core model, Features and tensors, Neural networks, Sequences and attention, and Images. Core model is expanded initially; category choices are remembered in this browser. Search blocks searches all categories, including collapsed ones. Clear the search to restore your expanded categories. Block operations and existing saved models are unchanged.

@@ -21,3 +21,11 @@ export const blockPalette: Array<{ type: NodeType; label: string }> = [
   { type: 'conv2d', label: 'Convolution' },
   { type: 'avgpool2d', label: 'Average pooling' },
 ]
+
+export const blockCategories: Array<{ id: string; label: string; types: NodeType[] }> = [
+  { id: 'core', label: 'Core model', types: ['dataset', 'input', 'weight', 'arithmetic', 'matmul', 'target', 'loss'] },
+  { id: 'features', label: 'Features and tensors', types: ['standardize', 'tensor-transform', 'concat', 'one-hot'] },
+  { id: 'neural', label: 'Neural networks', types: ['activation', 'softmax', 'dropout', 'layer-norm'] },
+  { id: 'sequences', label: 'Sequences and attention', types: ['embedding', 'causal-mask'] },
+  { id: 'images', label: 'Images', types: ['conv2d', 'avgpool2d'] },
+]

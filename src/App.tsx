@@ -10,7 +10,6 @@ import { denseGroupDetail } from './domain/authoring'
 import '@xyflow/react/dist/style.css'
 import {
   BookOpen,
-  Calculator,
   ChevronDown,
   ClipboardPaste,
   Copy,
@@ -55,6 +54,7 @@ import { DecoderControls } from './components/DecoderControls'
 import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
 import { placeCanvasNode } from './domain/nodePlacement'
+import { BlockPalette } from './components/BlockPalette'
 import { blockPalette } from './domain/blockPalette'
 import { arithmeticInputCount } from './domain/arithmetic'
 import { compactVisualHierarchy } from './domain/continuousScene'
@@ -1529,20 +1529,7 @@ function App({
           <p className="palette-intro">
             Pick an operation. Place it. Connect it.
           </p>
-          <div className="palette-grid">
-            {blockPalette.map((item) => (
-              <button
-                key={item.type}
-                type="button"
-                className={`palette-button ${pendingNodeType === item.type ? 'is-selected' : ''}`}
-                aria-pressed={pendingNodeType === item.type}
-                onClick={() => selectPaletteNode(item.type)}
-              >
-                <Calculator size={15} />
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <BlockPalette selected={pendingNodeType ?? undefined} onSelect={selectPaletteNode} />
           {pendingNodeType ? (
             <p className="placement-hint">
               Click the graph canvas to place {labelForType(pendingNodeType)}.

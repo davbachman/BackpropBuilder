@@ -1382,6 +1382,7 @@ describe('Backprop Builder app', () => {
 
     await user.click(screen.getByRole('button', { name: /^Arithmetic$/i }))
     fireEvent.click(pane!, { clientX: 480, clientY: 260 })
+    await user.click(screen.getByRole('button', { name: /^Neural networks$/i }))
     await user.click(screen.getByRole('button', { name: /^Activation$/i }))
     fireEvent.click(pane!, { clientX: 660, clientY: 260 })
 
