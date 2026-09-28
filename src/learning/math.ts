@@ -11,9 +11,14 @@ function checkedSize(shape: number[]) {
   if (shape.some(d => !Number.isInteger(d) || d < 1) || !Number.isSafeInteger(count) || count > MAX_ELEMENTS) throw new Error(`Invalid or oversized tensor shape [${shape}].`)
   return count
 }
-const strides = (shape: number[]) => shape.map((_, i) => size(shape.slice(i + 1)))
-const coords = (index: number, shape: number[]) => strides(shape).map((stride, i) => Math.floor(index / stride) % shape[i])
-const offset = (indices: number[], shape: number[]) => indices.reduce((n, c, i) => n + c * strides(shape)[i], 0)
+function strides(shape: number[]) {
+  const result=Array<number>(shape.length)
+  let stride=1
+  for(let i=shape.length-1;i>=0;i--){result[i]=stride;stride*=shape[i]}
+  return result
+}
+const coords = (index: number, shape: number[], steps: number[]) => steps.map((stride, i) => Math.floor(index / stride) % shape[i])
+const offset = (indices: number[], steps: number[]) => indices.reduce((n, c, i) => n + c * steps[i], 0)
 
 export class Tensor implements TensorValue {
   shape: number[]
@@ -64,14 +69,17 @@ function broadcast(a: number[], b: number[]) {
   }
   return out
 }
-function broadcastIndex(index: number, outShape: number[], inputShape: number[]) {
-  const c = coords(index, outShape).slice(outShape.length - inputShape.length)
-  return offset(c.map((v, i) => inputShape[i] === 1 ? 0 : v), inputShape)
+function broadcastIndex(index: number, outShape: number[], inputShape: number[], outSteps:number[], inputSteps:number[]) {
+  let result=0
+  const leading=outShape.length-inputShape.length
+  for(let i=0;i<inputShape.length;i++) if(inputShape[i]!==1) result+=(Math.floor(index/outSteps[leading+i])%outShape[leading+i])*inputSteps[i]
+  return result
 }
 function binary(a: Tensor, b: Tensor, op: 'add' | 'mul') {
   const shape = broadcast(a.shape, b.shape), ai: number[] = [], bi: number[] = []
+  const outSteps=strides(shape),aSteps=strides(a.shape),bSteps=strides(b.shape)
   const data = Array.from({ length: checkedSize(shape) }, (_, i) => {
-    ai[i] = broadcastIndex(i, shape, a.shape); bi[i] = broadcastIndex(i, shape, b.shape)
+    ai[i] = broadcastIndex(i, shape, a.shape,outSteps,aSteps); bi[i] = broadcastIndex(i, shape, b.shape,outSteps,bSteps)
     return op === 'add' ? a.data[ai[i]] + b.data[bi[i]] : a.data[ai[i]] * b.data[bi[i]]
   })
   return result(shape, data, [a, b], out => {
@@ -102,17 +110,15 @@ export function reshape(a: Tensor, shape: number[]) {
 }
 export function transpose(a: Tensor, axes = a.shape.map((_, i) => a.shape.length - i - 1)) {
   if (axes.length !== a.shape.length || new Set(axes).size !== axes.length || axes.some(i => i < 0 || i >= axes.length || !Number.isInteger(i))) throw new Error('Invalid transpose permutation.')
-  const shape = axes.map(i => a.shape[i]), map = a.data.map((_, i) => {
-    const c = coords(i, shape), original = Array(c.length).fill(0)
-    axes.forEach((axis, j) => { original[axis] = c[j] })
-    return offset(original, a.shape)
-  })
+  const shape = axes.map(i => a.shape[i]),outSteps=strides(shape),inputSteps=strides(a.shape)
+  const map = a.data.map((_, i) => axes.reduce((index,axis,j)=>index+(Math.floor(i/outSteps[j])%shape[j])*inputSteps[axis],0))
   return result(shape, map.map(i => a.data[i]), [a], out => { if (a.requiresGrad) map.forEach((index, i) => { a.grad[index] += out.grad[i] }) })
 }
 export function slice(a: Tensor, axis: number, start: number, end: number) {
   if (![axis, start, end].every(Number.isInteger) || axis < 0 || axis >= a.shape.length || start < 0 || end > a.shape[axis] || end <= start) throw new Error('Invalid slice bounds.')
   const shape = [...a.shape]; shape[axis] = end - start
-  const map = Array.from({ length: size(shape) }, (_, i) => { const c = coords(i, shape); c[axis] += start; return offset(c, a.shape) })
+  const outSteps=strides(shape),inputSteps=strides(a.shape)
+  const map = Array.from({ length: size(shape) }, (_, i) => { const c = coords(i, shape,outSteps); c[axis] += start; return offset(c,inputSteps) })
   return result(shape, map.map(i => a.data[i]), [a], out => { if (a.requiresGrad) map.forEach((index, i) => { a.grad[index] += out.grad[i] }) })
 }
 export function concat(values: Tensor[], axis: number) {
@@ -122,10 +128,11 @@ export function concat(values: Tensor[], axis: number) {
     if (t.shape.length !== shape.length || t.shape.some((d, i) => i !== axis && d !== shape[i])) throw new Error('Concatenation shapes do not match.')
     shape[axis] += t.shape[axis]
   }
-  const map = Array.from({ length: size(shape) }, (_, i) => {
-    const c = coords(i, shape); let p = 0
+  const outSteps=strides(shape),inputSteps=values.map(t=>strides(t.shape))
+  const map = Array.from({ length: checkedSize(shape) }, (_, i) => {
+    const c = coords(i, shape,outSteps); let p = 0
     while (c[axis] >= values[p].shape[axis]) { c[axis] -= values[p].shape[axis]; p++ }
-    return [p, offset(c, values[p].shape)]
+    return [p, offset(c,inputSteps[p])]
   })
   return result(shape, map.map(([p, i]) => values[p].data[i]), values, out => map.forEach(([p, index], i) => { if (values[p].requiresGrad) values[p].grad[index] += out.grad[i] }))
 }
@@ -133,9 +140,10 @@ export function sum(a: Tensor, axis?: number, keepDims = false) {
   if (axis !== undefined && (!Number.isInteger(axis) || axis < 0 || axis >= a.shape.length)) throw new Error('Invalid reduction axis.')
   const shape = axis === undefined ? (keepDims ? a.shape.map(() => 1) : []) : a.shape.flatMap((d, i) => i === axis ? (keepDims ? [1] : []) : [d])
   const data = Array(checkedSize(shape)).fill(0)
+  const inputSteps=strides(a.shape),outSteps=strides(shape)
   const map = a.data.map((v, i) => {
-    const c = coords(i, a.shape), target = axis === undefined ? [] : c.flatMap((v, j) => j === axis ? (keepDims ? [0] : []) : [v])
-    const index = axis === undefined ? 0 : offset(target, shape); data[index] += v; return index
+    const c = coords(i,a.shape,inputSteps), target = axis === undefined ? [] : c.flatMap((v, j) => j === axis ? (keepDims ? [0] : []) : [v])
+    const index = axis === undefined ? 0 : offset(target,outSteps); data[index] += v; return index
   })
   return result(shape, data, [a], out => { if (a.requiresGrad) map.forEach((index, i) => { a.grad[i] += out.grad[index] }) })
 }

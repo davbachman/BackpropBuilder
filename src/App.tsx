@@ -3,7 +3,6 @@ import { mergePreservingLayout, ungroupPreservingLayout } from './domain/mergeLa
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
-import { TextGenerationControls } from './components/TextGenerationControls'
 import { TextImportDialog } from './components/TextImportDialog'
 import type { TextDatasetData } from './domain/types'
 import { generatePyTorchExport } from './domain/pytorchExport'
@@ -33,6 +32,8 @@ import {
   Undo2,
 } from 'lucide-react'
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -51,8 +52,6 @@ import './workspacePanels.css'
 import { CodeOutline, type CodeTarget } from './components/CodeOutline'
 import { ModelInspector } from './components/ModelInspector'
 import { DataInspector } from './components/DataInspector'
-import { DecoderControls } from './components/DecoderControls'
-import { CnnControls } from './components/CnnControls'
 import { isHeldOutSample } from './domain/modelDatasets'
 import { placeCanvasNode } from './domain/nodePlacement'
 import { BlockPalette } from './components/BlockPalette'
@@ -67,7 +66,7 @@ import { GraphCanvas } from './components/GraphCanvas'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { LossReportPanel, type LossReport } from './components/LossReportPanel'
 import { InferenceReportPanel } from './components/InferenceReportPanel'
-import { evaluateDataset, supportsNumericBatches, trainDataset } from './domain/datasetTraining'
+import { evaluateDataset, evaluateDatasetAsync, supportsNumericBatches, trainDataset } from './domain/datasetTraining'
 import {
   copyGraphSelection,
   pasteGraphClipboard,
@@ -125,6 +124,10 @@ import type {
   NodeParams,
   TensorValue,
 } from './domain/types'
+
+const CnnControls = lazy(() => import('./components/CnnControls').then(module => ({ default: module.CnnControls })))
+const DecoderControls = lazy(() => import('./components/DecoderControls').then(module => ({ default: module.DecoderControls })))
+const TextGenerationControls = lazy(() => import('./components/TextGenerationControls').then(module => ({ default: module.TextGenerationControls })))
 
 const MIN_PLAY_DELAY_MS = 50
 const MAX_PLAY_DELAY_MS = 1800
@@ -234,7 +237,19 @@ function App({
   const [isTraining, setIsTraining] = useState(false)
   const [trainingStatus, setTrainingStatus] = useState('')
   const trainingController = useRef<AbortController | null>(null)
-  useEffect(() => () => trainingController.current?.abort(), [])
+  const operationRevision = useRef(0)
+  const cancelActiveRun = useCallback(() => {
+    operationRevision.current++
+    trainingController.current?.abort()
+    trainingController.current = null
+    setIsTraining(false)
+    setTrainingStatus('')
+    setTestStatus('')
+  }, [])
+  useEffect(() => () => {
+    trainingController.current?.abort()
+    trainingController.current = null
+  }, [])
   const [currentLoss, setCurrentLoss] = useState<number | null>(() =>
     initialGraph ? (safeForward(initialGraph).loss ?? null) : null,
   )
@@ -256,6 +271,28 @@ function App({
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const customCsvInputRef = useRef<HTMLInputElement | null>(null)
   const pendingCustomCsvNodeId = useRef<string | undefined>(undefined)
+
+  const dismissPendingImports = useCallback(() => {
+    operationRevision.current++
+    pendingCustomCsvNodeId.current = undefined
+    setCsvPickerOpen(false)
+    setTextImportNode(undefined)
+    setImportError(undefined)
+  }, [])
+
+  const clearRecordedExecution = useCallback(() => {
+    cancelActiveRun()
+    dismissPendingImports()
+    setPhase('edit')
+    setTraceSteps([])
+    setTraceIndex(0)
+    setCurrentLoss(null)
+    setLossReports([])
+    setInferenceResult(undefined)
+    setReportingWarning(undefined)
+    setExecutionError(undefined)
+    setIsPlaying(false)
+  }, [cancelActiveRun, dismissPendingImports])
 
   const validationIssues = useMemo(() => validateGraph(graph), [graph])
   const blockingIssues = useMemo(() => validationIssues.filter(
@@ -360,6 +397,8 @@ function App({
   }, [snapshotCurrentState])
 
   const restoreSnapshot = useCallback((snapshot: HistorySnapshot) => {
+    cancelActiveRun()
+    dismissPendingImports()
     setGraph(cloneGraph(snapshot.graph))
     setVisualizationGraph(cloneGraph(snapshot.visualizationGraph))
     setInitialParams(cloneParameterValueMap(snapshot.initialParams))
@@ -374,7 +413,7 @@ function App({
     setInferenceResult(undefined)
     setPendingNodeType(undefined)
     setIsPlaying(false)
-  }, [])
+  }, [cancelActiveRun, dismissPendingImports])
 
   const undoLastAction = useCallback(() => {
     if (undoStack.length === 0) return
@@ -428,6 +467,7 @@ function App({
     if (!clipboard) return false
 
     pushHistory()
+    clearRecordedExecution()
     const offset = PASTE_OFFSET_STEP * (clipboardPasteCount + 1)
     const result = pasteGraphClipboard(graph, clipboard, {
       x: offset,
@@ -443,7 +483,7 @@ function App({
     setIsPlaying(false)
     setClipboardPasteCount((count) => count + 1)
     return true
-  }, [clipboard, clipboardPasteCount, graph, pushHistory])
+  }, [clipboard, clipboardPasteCount, graph, pushHistory, clearRecordedExecution])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -484,6 +524,7 @@ function App({
   const loadGraph = useCallback(
     (nextGraph: GraphModel) => {
       pushHistory()
+      clearRecordedExecution()
       setSelectedEdgeId(undefined)
       const evaluated = safeForward(nextGraph)
       setGraph(evaluated.graph)
@@ -503,11 +544,12 @@ function App({
       setTestStatus('')
       setPendingNodeType(undefined)
     },
-    [pushHistory, selectSingleNode],
+    [pushHistory, selectSingleNode, clearRecordedExecution],
   )
 
   const stepForward = useCallback(() => {
     if (blockingIssues.length > 0) return
+    setInferenceResult(undefined)
 
     if (traceSteps.length > 0 && traceIndex < traceSteps.length - 1) {
       pushHistory()
@@ -602,6 +644,7 @@ function App({
   const runOneTrainingStep = useCallback(() => {
     if (blockingIssues.length > 0 || !hasLoss) return
     if (heldOutSample) return
+    setInferenceResult(undefined)
     pushHistory()
     const result = runTrainingStep(graph, graph.learningRate)
     const updateSummary = summarizeUpdateSteps(result.steps.filter((step) => step.phase === 'update'))
@@ -629,7 +672,10 @@ function App({
   const trainingExampleCount = trainingDataset ? datasetExamplesForNode(trainingDataset).filter(example => example.split === 'train').length : 0
   const training = graph.training ?? DEFAULT_TRAINING
   const tensorTraining = training.engine === 'tensor' && !!trainingDataset
-  const setTraining = (changes:Partial<TrainingSettings>) => setGraph(existing=>({...existing,training:{...(existing.training??DEFAULT_TRAINING),...changes}}))
+  const setTraining = (changes:Partial<TrainingSettings>) => {
+    cancelActiveRun()
+    setGraph(existing=>({...existing,training:{...(existing.training??DEFAULT_TRAINING),...changes}}))
+  }
   const defaultBatchSize = trainingDataset && datasetMode(trainingDataset) === 'batch' ? trainingExampleCount : 1
   const batchSize = batchSizeInput === '' ? defaultBatchSize : Number(batchSizeInput)
   const validBatchSize = !trainingDataset || (Number.isInteger(batchSize) && batchSize >= 1 && batchSize <= trainingExampleCount
@@ -641,36 +687,46 @@ function App({
 
   const runEpochs = useCallback(async () => {
     if (!canRunEpochs || trainingController.current) return
+    dismissPendingImports()
     const controller = new AbortController()
     trainingController.current = controller
+    const isCurrent = () => trainingController.current === controller
     setIsTraining(true)
     setIsPlaying(false)
     setTrainingStatus(`Training 0 / ${epochCount} epochs`)
     setReportingWarning(undefined)
+    setInferenceResult(undefined)
     pushHistory()
     let nextGraph = graph, completed = 0, lastReported = 0
     const startEpoch = epoch
     const dataset = trainingDataset
     const hasHeldOut = dataset && datasetExamplesForNode(dataset).some(example => example.split === 'test')
     let lastLoss = currentLoss
-    const reportLosses = (sourceGraph: GraphModel, reportEpoch: number) => {
-      const loss = dataset ? evaluateDataset(sourceGraph, dataset.id, 'train').loss : lastLoss
+    const reportLosses = async (sourceGraph: GraphModel, reportEpoch: number) => {
+      const options = { signal: controller.signal, includePredictions: false }
+      const loss = dataset ? (await evaluateDatasetAsync(sourceGraph, dataset.id, 'train', options)).loss : lastLoss
+      controller.signal.throwIfAborted()
       if (loss === null || loss === undefined || !Number.isFinite(loss)) throw new Error('Training diverged. Lower the learning rate and try again.')
       let heldOutLoss: number | undefined
       if (dataset && hasHeldOut) {
-        try { heldOutLoss = evaluateDataset(sourceGraph, dataset.id, 'test').loss }
-        catch (error) { setReportingWarning(`Held-out loss unavailable: ${error instanceof Error ? error.message : 'evaluation failed.'}`) }
+        try { heldOutLoss = (await evaluateDatasetAsync(sourceGraph, dataset.id, 'test', options)).loss }
+        catch (error) {
+          controller.signal.throwIfAborted()
+          setReportingWarning(`Held-out loss unavailable: ${error instanceof Error ? error.message : 'evaluation failed.'}`)
+        }
         if (heldOutLoss !== undefined && !Number.isFinite(heldOutLoss)) {
           setReportingWarning('Held-out loss diverged. Reduce the learning rate or inspect the model inputs.')
           heldOutLoss = undefined
         } else if (heldOutLoss !== undefined) setReportingWarning(undefined)
       }
-      setLossReports(reports => appendLossReport(reports, { epoch: reportEpoch, loss, heldOutLoss }))
+      controller.signal.throwIfAborted()
+      if (isCurrent()) setLossReports(reports => appendLossReport(reports, { epoch: reportEpoch, loss, heldOutLoss }))
       return loss
     }
-    const publish = () => {
-      const loss = reportLosses(nextGraph, startEpoch + completed)
-      setGraph(nextGraph)
+    const publish = async () => {
+      const loss = await reportLosses(nextGraph, startEpoch + completed)
+      if (!isCurrent()) return
+      setGraph(existing => mergeExecutionGraph(existing, nextGraph))
       setVisualizationGraph(nextGraph)
       setInferenceResult(undefined)
       setTraceSteps([])
@@ -683,27 +739,30 @@ function App({
     try {
       if (tensorTraining && dataset) {
         const {trainTensorGraph} = await import('./domain/tensorTraining')
+        if (!isCurrent()) return
+        controller.signal.throwIfAborted()
         const result = await trainTensorGraph(graph, {
           epochs:epochCount,batchSize,settings:training,signal:controller.signal,epochOffset:startEpoch,shuffle:shuffleEachEpoch,
-          onBackend:(backend,fallback)=>{setTrainingStatus('Training on '+backend);if(fallback)setReportingWarning('Using '+backend+'. '+fallback)},
-          onProgress:(done,total)=>setTrainingStatus('Training '+done+' / '+total+' examples'),
-          onReport:report=>setLossReports(reports=>appendLossReport(reports,{epoch:report.epoch,loss:report.train.loss,heldOutLoss:report.validation.loss})),
+          onBackend:(backend,fallback)=>{if(!isCurrent())return;setTrainingStatus('Training on '+backend);if(fallback)setReportingWarning('Using '+backend+'. '+fallback)},
+          onProgress:(done,total)=>{if(isCurrent())setTrainingStatus('Training '+done+' / '+total+' examples')},
+          onReport:report=>{if(isCurrent())setLossReports(reports=>appendLossReport(reports,{epoch:report.epoch,loss:report.train.loss,heldOutLoss:report.validation.loss}))},
         })
+        if (!isCurrent()) return
         const evaluated=forwardPass(result.graph)
-        setGraph(evaluated.graph);setVisualizationGraph(evaluated.graph);setCurrentLoss(evaluated.loss??null)
+        setGraph(existing=>mergeExecutionGraph(existing,evaluated.graph));setVisualizationGraph(evaluated.graph);setCurrentLoss(evaluated.loss??null)
         setInferenceResult(undefined);setTraceSteps([]);setTraceIndex(0);setPhase('update')
         setEpoch(startEpoch+(training.patience>0||result.stopped?result.bestEpoch:result.completed))
         setTrainingStatus((result.stopped?'Stopped':'Completed')+' after '+result.completed+' epochs on '+result.backend+'. '+(training.patience>0||result.stopped?'Restored best validation checkpoint at epoch '+(startEpoch+result.bestEpoch)+'.':'Kept final parameters.'))
         return
       }
-      if (dataset) reportLosses(graph, startEpoch)
+      if (dataset) await reportLosses(graph, startEpoch)
       else {
         const initialLoss = forwardPass(graph).loss
         if (initialLoss !== undefined && Number.isFinite(initialLoss))
           setLossReports(reports => appendLossReport(reports, { epoch: startEpoch, loss: initialLoss }))
       }
       for (let index = 0; index < epochCount; index++) {
-        if (controller.signal.aborted) break
+        controller.signal.throwIfAborted()
         if (dataset) {
           nextGraph = await trainDataset(nextGraph, dataset.id, 1, { signal: controller.signal, epochOffset: startEpoch + index, batchSize, shuffleEachEpoch })
         } else {
@@ -712,16 +771,32 @@ function App({
           lastLoss = result.loss ?? null
           if (index % 8 === 7) await new Promise(resolve => setTimeout(resolve, 0))
         }
+        if (!isCurrent()) return
         completed++
         setTrainingStatus(`Training ${completed} / ${epochCount} epochs`)
-        if (completed % reportInterval === 0 || completed === epochCount) publish()
+        if (completed % reportInterval === 0 || completed === epochCount) await publish()
       }
-      if (completed > lastReported) publish()
+      if (completed > lastReported) await publish()
+      if (!isCurrent()) return
       setTrainingStatus(controller.signal.aborted ? `Stopped after ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.` : `Completed ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.`)
     } catch (error) {
+      if (!isCurrent()) return
       if (completed > lastReported) {
-        try { publish() } catch { /* retain the last finite report */ }
+        if (controller.signal.aborted) {
+          // Retain completed updates without starting another loss evaluation
+          // after Stop. Partial epochs are discarded by trainDataset.
+          setGraph(existing => mergeExecutionGraph(existing, nextGraph))
+          setVisualizationGraph(nextGraph)
+          setEpoch(startEpoch + completed)
+          setCurrentLoss(null)
+          setTraceSteps([])
+          setTraceIndex(0)
+          setPhase('update')
+        } else {
+          try { await publish() } catch { /* retain the last finite report */ }
+        }
       }
+      if (!isCurrent()) return
       const message = controller.signal.aborted ? `Stopped after ${completed} ${completed === 1 ? 'epoch' : 'epochs'}.` : error instanceof Error ? error.message : 'Training failed.'
       setTrainingStatus(message)
       if (!controller.signal.aborted) {
@@ -730,35 +805,48 @@ function App({
         setRightTab('details')
       }
     } finally {
-      trainingController.current = null
-      setIsTraining(false)
+      if (isCurrent()) {
+        trainingController.current = null
+        setIsTraining(false)
+      }
     }
-  }, [batchSize, canRunEpochs, currentLoss, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset, tensorTraining, training])
+  }, [batchSize, canRunEpochs, currentLoss, dismissPendingImports, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset, tensorTraining, training])
 
   const runInference = useCallback(async () => {
     const dataset = graph.nodes.find(node => node.type === 'dataset')
-    if (!dataset || blockingIssues.length > 0) return
+    if (!dataset || blockingIssues.length > 0 || trainingController.current) return
     setInferenceResult(undefined)
     setTestStatus('')
     const examples = datasetExamplesForNode(dataset)
     const first = examples.findIndex(example => example.split === inferenceSplit)
     if (first < 0) { setTestStatus(`This dataset has no ${inferenceSplit} examples.`); return }
+    dismissPendingImports()
     const source = { ...dataset, params: { ...dataset.params, datasetSplit: inferenceSplit, datasetIndex: first, datasetValues: undefined } }
     const testGraph = { ...graph, nodes: graph.nodes.map(node => node.id === dataset.id ? source : node) }
+    const controller = new AbortController()
+    trainingController.current = controller
+    const isCurrent = () => trainingController.current === controller
     setIsTraining(true)
+    setIsPlaying(false)
     setTestStatus('Evaluating examples…')
     try {
       const inferred = forwardPass(testGraph).graph
       let metrics: ReturnType<typeof evaluateDataset>
       if (training.engine === 'tensor') {
         const { selectTensorBackend, TensorGraph } = await import('./domain/tensorTraining')
+        if (!isCurrent()) return
+        controller.signal.throwIfAborted()
         await selectTensorBackend(testGraph, training.backend, training)
+        if (!isCurrent()) return
+        controller.signal.throwIfAborted()
         const model = new TensorGraph(testGraph)
-        try { metrics = await model.inference(model.examples.filter(row => row.split === inferenceSplit), 64) }
+        try { metrics = await model.inference(model.examples.filter(row => row.split === inferenceSplit), 64, controller.signal) }
         finally { model.dispose() }
-      } else metrics = evaluateDataset(inferred, dataset.id, inferenceSplit)
+      } else metrics = await evaluateDatasetAsync(inferred, dataset.id, inferenceSplit, { signal: controller.signal })
+      if (!isCurrent()) return
+      controller.signal.throwIfAborted()
       pushHistory()
-      setGraph(inferred)
+      setGraph(existing => mergeExecutionGraph(existing, inferred))
       setVisualizationGraph(inferred)
       setCurrentLoss(metrics.loss)
       setTraceSteps([])
@@ -768,14 +856,21 @@ function App({
       setTestStatus('')
       setExecutionError(undefined)
     } catch (error) {
+      if (!isCurrent()) return
+      if (controller.signal.aborted) { setTestStatus('Evaluation stopped.'); return }
       const message = error instanceof Error ? error.message : 'Inference failed.'
       setTestStatus(message)
       setExecutionError(message)
       setRightOpen(true)
       setRightTab('details')
     }
-    finally { setIsTraining(false) }
-  }, [blockingIssues.length, graph, inferenceSplit, pushHistory, training])
+    finally {
+      if (isCurrent()) {
+        trainingController.current = null
+        setIsTraining(false)
+      }
+    }
+  }, [blockingIssues.length, dismissPendingImports, graph, inferenceSplit, pushHistory, training])
 
   const openTrainTab = () => {
     setLeftTab('train')
@@ -785,6 +880,7 @@ function App({
     if (datasetMode(dataset) === 'batch' && dataset.params.datasetSplit !== 'test') return
     const firstTrainingExample = datasetExamplesForNode(dataset).findIndex(example => example.split === 'train')
     if (firstTrainingExample < 0) return
+    cancelActiveRun()
     pushHistory()
     const trainingGraph = {
       ...graph,
@@ -826,6 +922,7 @@ function App({
   const placePaletteNode = useCallback(
     (type: NodeType, position: { x: number; y: number }, parentGroupId?: string, sceneScale?: number) => {
       pushHistory()
+      clearRecordedExecution()
       const nextNode = createNode(type, nextNodeIndexForType(graph, type))
       const placedNode = { ...nextNode, position }
       setGraph(placeCanvasNode(graph, placedNode, displayGraph, parentGroupId, sceneScale))
@@ -833,7 +930,7 @@ function App({
       setPendingNodeType(undefined)
       setPhase('edit')
     },
-    [graph, displayGraph, pushHistory, selectSingleNode],
+    [graph, displayGraph, pushHistory, selectSingleNode, clearRecordedExecution],
   )
 
   const clearPendingPlacement = useCallback(() => {
@@ -842,38 +939,37 @@ function App({
 
   const updateNodeValue = useCallback(
     (nodeId: string, value: TensorValue) => {
+      const binding = projection.bindings[nodeId]
+      if (binding) {
+        if (!binding.editable || value.data.length !== 1) return
+        const canonical = graph.nodes.find(node => node.id === binding.nodeId)
+        if (!canonical) return
+        const original = toTensor(canonical.params.value)
+        nodeId = canonical.id
+        value = { ...original, data: original.data.map((entry, index) => index === binding.index ? value.data[0] : entry) }
+      }
       pushHistory()
-      setGraph((existing) =>
-        invalidateGraphResults({
-          ...existing,
-          nodes: existing.nodes.map((node) =>
-            node.id === nodeId
-              ? { ...node, params: { ...node.params, value }, value }
-              : node,
-          ),
-        }),
-      )
-      setVisualizationGraph((existing) => ({
+      clearRecordedExecution()
+      const next = invalidateGraphResults({
+        ...graph,
+        nodes: graph.nodes.map(node => node.id === nodeId ? { ...node, params: { ...node.params, value }, value } : node),
+      })
+      setGraph(next)
+      // Parameter curves follow the last completed forward pass. Direct input
+      // changes still update the experiment's displayed domain immediately.
+      setVisualizationGraph(existing => ({
         ...existing,
-        nodes: existing.nodes.map((node) =>
-          node.id === nodeId &&
-          (node.type === 'input' || node.type === 'target')
-            ? { ...node, params: { ...node.params, value }, value }
-            : node,
-        ),
+        nodes: existing.nodes.map(node => node.id === nodeId && (node.type === 'input' || node.type === 'target')
+          ? { ...node, params: { ...node.params, value }, value } : node),
       }))
-      setPhase('edit')
-      setTraceSteps([])
-      setTraceIndex(0)
-      setCurrentLoss(null)
-      setIsPlaying(false)
     },
-    [pushHistory],
+    [graph, projection.bindings, pushHistory, clearRecordedExecution],
   )
 
   const updateActivation = useCallback(
     (nodeId: string, activation: ActivationKind) => {
       pushHistory()
+      clearRecordedExecution()
       setGraph((existing) =>
         invalidateGraphResults({
           ...existing,
@@ -890,12 +986,13 @@ function App({
       setCurrentLoss(null)
       setIsPlaying(false)
     },
-    [pushHistory],
+    [pushHistory, clearRecordedExecution],
   )
 
   const updateLoss = useCallback(
     (nodeId: string, loss: LossKind) => {
       pushHistory()
+      clearRecordedExecution()
       setGraph((existing) =>
         invalidateGraphResults({
           ...existing,
@@ -912,12 +1009,13 @@ function App({
       setCurrentLoss(null)
       setIsPlaying(false)
     },
-    [pushHistory],
+    [pushHistory, clearRecordedExecution],
   )
 
   const applyDatasetSelection = useCallback(
     (nodeId: string, dataset: DatasetKind, customCsv?: CustomCsvData, textData?: TextDatasetData) => {
       pushHistory()
+      clearRecordedExecution()
       const updateNode = (node: GraphModel['nodes'][number]) => {
         if (node.id !== nodeId || node.type !== 'dataset') return node
         const updated = { ...node, params: { ...node.params, dataset, customCsv, textData, trainPercent: undefined, datasetIndex: dataset === 'custom-csv' ? 1 : 0, datasetMode: dataset === 'custom-csv' ? 'batch' as const : node.params.datasetMode, datasetSplit: dataset === 'custom-csv' ? 'train' as const : node.params.datasetSplit, datasetValues: undefined } }
@@ -942,10 +1040,14 @@ function App({
       setCurrentLoss(null)
       setIsPlaying(false)
     },
-    [pushHistory],
+    [pushHistory, clearRecordedExecution],
   )
 
   const updateDataset = useCallback((nodeId: string, dataset: DatasetKind) => {
+    if (dataset === 'custom-text' || dataset === 'custom-csv') {
+      cancelActiveRun()
+      dismissPendingImports()
+    }
     if (dataset === 'custom-text') { setTextImportNode(nodeId); return }
     if (dataset === 'custom-csv') {
       pendingCustomCsvNodeId.current = nodeId
@@ -958,30 +1060,37 @@ function App({
       return
     }
     applyDatasetSelection(nodeId, dataset)
-  }, [applyDatasetSelection])
+  }, [applyDatasetSelection, cancelActiveRun, dismissPendingImports])
 
   const importCustomCsv = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     const nodeId = pendingCustomCsvNodeId.current
     if (!file || !nodeId) return
+    cancelActiveRun()
+    const revision = operationRevision.current
     try {
-      applyDatasetSelection(nodeId, 'custom-csv', parseCustomCsv(await file.text(), file.name))
+      const csv = parseCustomCsv(await file.text(), file.name)
+      if (revision !== operationRevision.current) return
+      applyDatasetSelection(nodeId, 'custom-csv', csv)
       pendingCustomCsvNodeId.current = undefined
       setCsvPickerOpen(false)
       setImportError(undefined)
     } catch (error) {
+      if (revision !== operationRevision.current) return
       setImportError(error instanceof Error ? error.message : 'Could not read the CSV file.')
     }
   }
 
   const updateLearningRate = (learningRate: number) => {
     pushHistory()
+    cancelActiveRun()
     setGraph((existing) => ({ ...existing, learningRate }))
   }
 
   const randomizeParameters = () => {
     pushHistory()
+    clearRecordedExecution()
     setPhase('edit')
     setTraceSteps([])
     setTraceIndex(0)
@@ -1011,18 +1120,6 @@ function App({
       return evaluated.graph
     })
   }
-
-  const clearRecordedExecution = useCallback(() => {
-    setPhase('edit')
-    setTraceSteps([])
-    setTraceIndex(0)
-    setCurrentLoss(null)
-    setLossReports([])
-    setInferenceResult(undefined)
-    setTrainingStatus('')
-    setTestStatus('')
-    setIsPlaying(false)
-  }, [])
 
   const applyGraphChange = useCallback(
     (nextGraph: GraphModel) => {
@@ -1158,6 +1255,7 @@ function App({
   }
   const evaluateModel = () => {
     if (blockingIssues.length) return
+    setInferenceResult(undefined)
     pushHistory()
     const result = forwardPass(graph)
     setGraph(result.graph)
@@ -1221,7 +1319,7 @@ function App({
   }
 
   const chooseProjectStateFile = () => {
-    setImportError(undefined)
+    dismissPendingImports()
     importInputRef.current?.click()
   }
 
@@ -1265,8 +1363,17 @@ function App({
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     if (!file) return
-
-    const result = parseProjectStateFile(await file.text())
+    cancelActiveRun()
+    dismissPendingImports()
+    const revision = operationRevision.current
+    let contents: string
+    try { contents = await file.text() }
+    catch (error) {
+      if (revision === operationRevision.current) setImportError(error instanceof Error ? error.message : 'Could not read the project file.')
+      return
+    }
+    if (revision !== operationRevision.current) return
+    const result = parseProjectStateFile(contents)
     if (!result.ok) {
       setImportError(result.error)
       return
@@ -1274,6 +1381,7 @@ function App({
 
     const nextState = result.file.state
     pushHistory()
+    clearRecordedExecution()
     setGraph(cloneGraph(nextState.graph))
     setVisualizationGraph(cloneGraph(nextState.visualizationGraph))
     setInitialParams(cloneParameterValueMap(nextState.initialParameterValues))
@@ -1501,17 +1609,17 @@ function App({
       </div> : null}
 
       {csvPickerOpen && <div className="csv-picker-backdrop">
-        <section role="dialog" aria-modal="true" aria-labelledby="csv-picker-title" className="csv-picker-dialog" onKeyDown={event => { if (event.key === 'Escape') { pendingCustomCsvNodeId.current = undefined; setCsvPickerOpen(false) } }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="csv-picker-title" className="csv-picker-dialog" onKeyDown={event => { if (event.key === 'Escape') dismissPendingImports() }}>
           <p className="eyebrow">Dataset source</p>
           <h2 id="csv-picker-title">Choose a CSV file</h2>
           <p>The CSV stays in this browser and becomes part of your saved project.</p>
           <input ref={customCsvInputRef} type="file" accept=".csv,text/csv" aria-label="Choose custom CSV file" onChange={importCustomCsv} />
           {importError && <p role="alert" className="csv-picker-error">{importError}</p>}
-          <button type="button" onClick={() => { pendingCustomCsvNodeId.current = undefined; setCsvPickerOpen(false); setImportError(undefined) }}>Cancel</button>
+          <button type="button" onClick={dismissPendingImports}>Cancel</button>
         </section>
       </div>}
 
-      {textImportNode && <TextImportDialog onCancel={() => setTextImportNode(undefined)} onImport={data => { applyDatasetSelection(textImportNode, 'custom-text', undefined, data); setTextImportNode(undefined) }}/>}
+      {textImportNode && <TextImportDialog onCancel={dismissPendingImports} onImport={data => { applyDatasetSelection(textImportNode, 'custom-text', undefined, data); setTextImportNode(undefined) }}/>}
       <aside className="left-panel" aria-label="Build, train, and test sidebar">
         <div className="sidebar-heading">
           {leftOpen ? <div className="left-sidebar-tabs" role="tablist" aria-label="Left sidebar views">
@@ -1744,10 +1852,12 @@ function App({
           !selectedGroupId &&
           !selectedEdgeId &&
           graph.nodes.some((node) => node.id === 'image-input') && (
+            <Suspense fallback={<p role="status">Loading digit controls…</p>}>
             <CnnControls
               graph={graph}
               onGraphChange={(next) => {
                 pushHistory()
+                clearRecordedExecution()
                 setGraph(next)
                 setVisualizationGraph(next)
                 setPhase('edit')
@@ -1759,15 +1869,18 @@ function App({
                 setIsPlaying(false)
               }}
             />
+            </Suspense>
           )}
         {(!selectedNodeId || graph.nodes.find(node => node.id === selectedNodeId)?.type === 'dataset') &&
           !selectedGroupId &&
           !selectedEdgeId &&
           graph.nodes.some(node => node.type === 'dataset' && datasetForNode(node).task === 'sequence') && (
-            graph.nodes.some(node => node.params.textData?.task === 'language') ? <TextGenerationControls graph={graph}/> : <DecoderControls
+            <Suspense fallback={<p role="status">Loading generation controls…</p>}>
+            {graph.nodes.some(node => node.params.textData?.task === 'language') ? <TextGenerationControls graph={graph}/> : <DecoderControls
               graph={graph}
               onGraphChange={(next) => {
                 pushHistory()
+                clearRecordedExecution()
                 setGraph(next)
                 setVisualizationGraph(next)
                 setPhase('forward')
@@ -1776,7 +1889,8 @@ function App({
                 setCurrentLoss(null)
                 setIsPlaying(false)
               }}
-            />
+            />}
+            </Suspense>
           )}
         {!selectedGroupId && !selectedEdgeId && graph.nodes.filter(node => node.type === 'dataset' && (selectedNodeId === node.id || (!selectedNodeId && (!graph.groups?.some(group => group.id === 'network') || Boolean(datasetForNode(node).examples))))).map(node => <DatasetWorkbench key={`${node.id}:${node.params.dataset}`} graph={graph} node={node} onParams={updateNodeParams} onDataset={updateDataset} onRename={selectedNodeId === node.id ? (id,label) => applyGraphChange({...graph,nodes:graph.nodes.map(candidate => candidate.id === id ? {...candidate,label} : candidate)}) : undefined} onChooseCustomCsv={id => updateDataset(id, 'custom-csv')} />) }
         {(selectedGroup || (selectedNodeIds.length > 0 && inspectedNode?.type !== 'dataset')) && <ModelInspector
@@ -1933,6 +2047,20 @@ function computationSignature(graph: GraphModel): string {
       inputSlot,
     })),
   })
+}
+
+/** A run owns numerical state, while navigation and layout remain editable. */
+function mergeExecutionGraph(current: GraphModel, evaluated: GraphModel): GraphModel {
+  const nodes = new Map(evaluated.nodes.map(node => [node.id, node]))
+  const edges = new Map(evaluated.edges.map(edge => [edge.id, edge]))
+  return {
+    ...current,
+    nodes: current.nodes.map(node => {
+      const result = nodes.get(node.id)
+      return result ? { ...result, label: node.label, position: node.position, dimensions: node.dimensions } : node
+    }),
+    edges: current.edges.map(edge => ({ ...edge, value: edges.get(edge.id)?.value, grad: edges.get(edge.id)?.grad })),
+  }
 }
 
 function invalidateGraphResults(graph: GraphModel): GraphModel {

@@ -9,7 +9,8 @@ import { createEmptyGraph, createNode } from './examples'
 import { parseCustomCsv } from './customCsv'
 import { datasetExamplesForNode } from './datasets'
 import { forwardPass } from './engine'
-import { withDatasetExample } from './datasetTraining'
+import { evaluateDataset, withDatasetExample } from './datasetTraining'
+import { parameterPenalty } from './regularization'
 import { generatePyTorchExport } from './pytorchExport'
 import type { GraphModel } from './types'
 
@@ -120,17 +121,59 @@ describe('PyTorch export', () => {
       } finally { rmSync(directory, { recursive: true, force: true }) }
     }
   })
-  function runWithDataset(exported: ReturnType<typeof generatePyTorchExport>, script: string, harness?: string) {
+  function runWithDataset(exported: ReturnType<typeof generatePyTorchExport>, script: string, harness?: string, csv = 'answer,feature\n2,1\n4,2\n6,3\n8,4\n') {
     const directory = mkdtempSync(join(tmpdir(), 'backprop-export-'))
     try {
       writeFileSync(join(directory, 'backprop-builder-model.py'), script)
       if (exported.datasetFile) writeFileSync(join(directory, exported.datasetFile.name), exported.datasetFile.content)
-      else writeFileSync(join(directory, 'measurements.csv'), 'answer,feature\n2,1\n4,2\n6,3\n8,4\n')
+      else writeFileSync(join(directory, 'measurements.csv'), csv)
       return spawnSync(python!, harness ? ['-c', harness] : ['backprop-builder-model.py'], {
         cwd: directory, input: harness ? script : undefined, encoding: 'utf8', timeout: 120_000, env: { ...process.env, MPLBACKEND: 'Agg' },
       })
     } finally { rmSync(directory, { recursive: true, force: true }) }
   }
+  it.skipIf(!python).each([0, 1, 2])('reloads the original CSV with an explicit split in column %s', splitColumn => {
+    const rows = [['answer', 'feature'], ['2', '1'], ['4', '2'], ['6', '3'], ['8', '4']]
+    const splits = ['split', 'train', 'test', 'train', 'test']
+    rows.forEach((row, index) => row.splice(splitColumn, 0, splits[index]))
+    const csv = rows.map(row => row.join(',')).join('\n')
+    const graph = customArithmeticGraph()
+    const source = graph.nodes.find(node => node.type === 'dataset')!
+    source.params.customCsv = { ...parseCustomCsv(csv, 'measurements.csv'), targetColumn: 0 }
+    const exported = generatePyTorchExport(graph, { epochs: 1 })
+    const harness = `import sys,json\nns={}\nexec(sys.stdin.read(),ns)\nprint('ROWS=' + json.dumps([(row['features'][0]['data'][0],row['target']['data'][0],row['split']) for row in ns['DATASET']['examples']]))\n`
+    const run = runWithDataset(exported, exported.script, harness, csv)
+    expect(run.status, run.stderr).toBe(0)
+    expect(JSON.parse(run.stdout.match(/ROWS=([^\n]+)/)![1])).toEqual([[1, 2, 'train'], [2, 4, 'test'], [3, 6, 'train'], [4, 8, 'test']])
+    expect(run.stdout).toContain('Epoch 1: train loss=')
+  }, 30_000)
+
+  it.skipIf(!python).each(['l1', 'l2'] as const)('reports unpenalized train and held-out loss with %s regularization', regularization => {
+    const graph = createModelPreset('linear')
+    const source = graph.nodes.find(node => node.type === 'dataset')!
+    graph.nodes.find(node => node.type === 'loss')!.params = { loss: 'mse', regularization, regularizationStrength: 10 }
+    const exported = generatePyTorchExport(graph, { epochs: 0 })
+    const harness = `import sys,json\nns={}\nexec(sys.stdin.read(),ns)\nprint('LOSSES=' + json.dumps([ns['initial_train_loss'],ns['initial_held_out_loss'],float(ns['model'].regularization_penalty().detach())]))\n`
+    const run = runWithDataset(exported, exported.script, harness)
+    expect(run.status, run.stderr).toBe(0)
+    const actual = JSON.parse(run.stdout.match(/LOSSES=([^\n]+)/)![1])
+    expect(actual[0]).toBeCloseTo(evaluateDataset(graph, source.id, 'train').loss, 9)
+    expect(actual[1]).toBeCloseTo(evaluateDataset(graph, source.id, 'test').loss, 9)
+    expect(actual[2]).toBeCloseTo(parameterPenalty(graph), 9)
+    expect(actual[2]).toBeGreaterThan(0)
+  }, 30_000)
+
+  it.skipIf(!python)('evaluates a fixed prediction with an unused parameter without calling backward', () => {
+    const graph = customArithmeticGraph()
+    graph.nodes.find(node => node.type === 'weight')!.type = 'input'
+    graph.nodes.push(createNode('weight', 99))
+    const exported = generatePyTorchExport(graph, { epochs: 1 })
+    const run = runWithDataset(exported, exported.script)
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout).toContain('Epoch 1: train loss=')
+    expect(run.stdout).toContain('Test predictions')
+  }, 30_000)
+
   it.skipIf(!python)('runs the exported mini-batch loop and reports both losses', () => {
     const exported = generatePyTorchExport(createModelPreset('linear'), { batchSize: 4, epochs: 2, reportEvery: 1 })
     const run = runWithDataset(exported, exported.script)

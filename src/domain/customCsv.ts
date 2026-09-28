@@ -74,7 +74,8 @@ export function analyzeCustomCsv(csv: CustomCsvData): CsvColumns {
   const classLabels = [...new Set(rawTargets)].sort((a, b) => isNumeric(a) && isNumeric(b) ? Number(a) - Number(b) : a.localeCompare(b))
   if (classLabels.length < 2) throw new Error('Classification needs at least two target classes.')
   if (csv.task === 'binary-classification' && classLabels.length !== 2) throw new Error('Binary classification needs exactly two target classes.')
-  return { headers, features, targets: rawTargets.map(value => classLabels.indexOf(value)), classLabels }
+  const classIndices = new Map(classLabels.map((label, index) => [label, index]))
+  return { headers, features, targets: rawTargets.map(value => classIndices.get(value)!), classLabels }
 }
 
 export function isCustomCsvData(value: unknown): value is CustomCsvData {

@@ -12,6 +12,7 @@ import type {GraphModel, GraphNode, TensorValue} from './types'
 export {tf}
 type Axis = 'batch' | 'token' | 'feature'
 type Signal = {value:tf.Tensor; axes:Axis[]}
+type PredictionKind = 'regression' | 'binary' | 'categorical'
 export interface TensorMetrics {loss:number; objective?:number; accuracy:number; examples:number}
 export interface TensorReport {epoch:number; train:TensorMetrics; validation:TensorMetrics; improved:boolean}
 const SUPPORTED = new Set(['standardize','dropout','dataset','weight','bias','input','target','matmul','arithmetic','multiply','add','activation','embedding','one-hot','transpose','tensor-transform','mean','softmax','causal-mask','layer-norm','loss','cross-entropy','concat','reshape','slice'])
@@ -56,6 +57,25 @@ function arithmetic(expr:ParsedArithmetic['expression'], inputs:tf.Tensor[]):tf.
   switch(expr.op) {case '+':return tf.add(a,b);case '-':return tf.sub(a,b);case '*':return tf.mul(a,b);case '/':return tf.div(a,b);case '^':return tf.pow(a,b)}
 }
 const clipProbability=tf.customGrad((input)=>({value:tf.clipByValue(input as tf.Tensor,1e-7,1-1e-7),gradFunc:(dy:tf.Tensor)=>dy}))
+
+/** Broadcast each example independently; the leading batch axis must never
+ * align with a parameter's feature axis, even when their sizes happen to match. */
+function broadcastSignals(signals:Signal[]): {values:tf.Tensor[]; axes:Axis[]} {
+  const batched=signals.some(signal=>signal.axes[0]==='batch')
+  const ranks=signals.map(signal=>signal.value.rank-Number(signal.axes[0]==='batch'))
+  const rank=Math.max(...ranks)
+  const axes:Axis[]=Array.from({length:rank},(_,axis)=>signals.some((signal,i)=>{
+    const local=axis-(rank-ranks[i])+Number(signal.axes[0]==='batch')
+    return local>=0 && signal.axes[local]==='token'
+  })?'token':'feature')
+  const values=signals.map((signal,i)=>{
+    if(!batched) return signal.value
+    const hasBatch=signal.axes[0]==='batch'
+    const shape=[hasBatch?signal.value.shape[0]:1,...Array(rank-ranks[i]).fill(1),...signal.value.shape.slice(Number(hasBatch))]
+    return shape.length===signal.value.rank && shape.every((size,j)=>size===signal.value.shape[j]) ? signal.value : signal.value.reshape(shape)
+  })
+  return {values,axes:batched?['batch',...axes]:axes}
+}
 
 function product(a:tf.Tensor,b:tf.Tensor) {
   // Flatten token rows for a shared parameter matrix. Avoid implicit tiling and its gradient overhead.
@@ -105,6 +125,12 @@ export class TensorGraph {
     }
   }
   dispose(){for(const variable of this.variables.values()) variable.dispose()}
+  private predictionKind(prediction:tf.Tensor,target:tf.Tensor):PredictionKind {
+    const task=datasetForNode(this.source).task
+    if(lossKindForNode(this.lossNode,this.graph)==='cross-entropy') return 'categorical'
+    if(task==='binary-classification' && prediction.size===target.size) return 'binary'
+    return task.includes('classification') || task==='sequence' ? 'categorical' : 'regression'
+  }
   private execute(rows:DatasetExample[], training = false): {loss:tf.Scalar; dataLoss:tf.Scalar; prediction:tf.Tensor; target:tf.Tensor; mask:tf.Tensor} {
     const data=this.source.params.textData, count=rows.length
     const generic=!data || data.representation==='facts'
@@ -136,9 +162,13 @@ export class TensorGraph {
         case 'matmul':
           if(args[1].axes[0]==='batch'&&args[0].axes[0]!=='batch') throw Error('Tensor training currently needs batched matrix products to have the batch on the left input.')
           value=product(a,b);axes=[...args[0].axes.slice(0,-1),args[1].axes.at(-1)!];break
-        case 'arithmetic':value=arithmetic(this.expressions.get(node.id)!.expression,tensors);break
-        case 'add':value=tensors.reduce((x,y)=>tf.add(x,y));break
-        case 'multiply':value=tensors.reduce((x,y)=>tf.mul(x,y));break
+        case 'arithmetic':case 'add':case 'multiply': {
+          const broadcast=broadcastSignals(args)
+          axes=broadcast.axes
+          value=kind==='arithmetic'?arithmetic(this.expressions.get(node.id)!.expression,broadcast.values)
+            :broadcast.values.reduce((x,y)=>kind==='add'?tf.add(x,y):tf.mul(x,y))
+          break
+        }
         case 'dropout':value=training && (node.params.dropoutRate ?? 0.1)>0 ? tf.dropout(a,node.params.dropoutRate ?? 0.1,undefined,137 + this.dropoutStep++) : a;break
         case 'activation':value=node.params.activation==='relu'?tf.relu(a):node.params.activation==='sigmoid'?tf.sigmoid(a):node.params.activation==='tanh'?tf.tanh(a):a;break
         case 'transpose': {
@@ -182,8 +212,13 @@ export class TensorGraph {
       }
       values.set(node.id,{value,axes})
     }
-    const prediction=read(this.inputs.get(this.lossNode.id)![0]).value
-    const actual=read(this.inputs.get(this.lossNode.id)![1]).value
+    const outputSignal=read(this.inputs.get(this.lossNode.id)![0])
+    const predictionSignal:Signal=outputSignal.axes[0]==='batch'?outputSignal:{
+      value:tf.tile(outputSignal.value.expandDims(0),[count,...outputSignal.value.shape.map(()=>1)]),
+      axes:['batch',...outputSignal.axes],
+    }
+    const actualSignal=read(this.inputs.get(this.lossNode.id)![1])
+    const prediction=predictionSignal.value,actual=actualSignal.value
     let loss:tf.Tensor
     const lossKind=lossKindForNode(this.lossNode,this.graph)
     if(lossKind==='binary-cross-entropy') {
@@ -195,8 +230,11 @@ export class TensorGraph {
       const labels=actual.reshape(prediction.shape.slice(0,-1)).toInt()
       const losses=tf.neg(tf.sum(tf.mul(tf.oneHot(labels,width),tf.logSoftmax(prediction)),-1))
       loss=sequence?tf.mean(tf.div(tf.sum(tf.mul(losses,mask),1),tf.sum(mask,1))):tf.mean(losses)
-    } else if(lossKind==='mse') loss=tf.mean(tf.square(tf.sub(prediction,actual.reshape(prediction.shape))))
-    else if(lossKind==='mae') loss=tf.mean(tf.abs(tf.sub(prediction,actual.reshape(prediction.shape))))
+    } else if(lossKind==='mse' || lossKind==='mae') {
+      const {values:[predictions,labels]}=broadcastSignals([predictionSignal,actualSignal])
+      const difference=tf.sub(predictions,labels)
+      loss=tf.mean(lossKind==='mse'?tf.square(difference):tf.abs(difference))
+    }
     else throw Error('Tensor training supports MSE, MAE, binary cross entropy or cross entropy.')
     const dataLoss=loss as tf.Scalar
     if(this.lossNode.params.regularization && this.lossNode.params.regularization!=='none'){
@@ -219,11 +257,10 @@ export class TensorGraph {
       if(signal?.aborted) throw Error('Training stopped.')
       const batch=rows.slice(i,i+batchSize), result=tf.tidy(()=>{
         const {loss:objective,dataLoss:loss,prediction,target,mask}=this.execute(batch)
-        const binary=datasetForNode(this.source).task==='binary-classification'
+        const kind=this.predictionKind(prediction,target)
         const sequence=this.source.params.textData?.task==='language' && this.source.params.textData.targetMode!=='last'
-        const regression=datasetForNode(this.source).task==='regression'
-        const correct=regression?tf.zeros([batch.length]):binary?tf.equal(tf.greaterEqual(prediction,.5),tf.cast(target.reshape(prediction.shape),'bool')).cast('float32'):tf.mul(tf.equal(tf.argMax(prediction,-1),target.reshape(prediction.shape.slice(0,-1))).cast('float32'),sequence?mask:tf.scalar(1))
-        return {loss,objective,hits:tf.sum(correct),total:sequence?tf.sum(mask):tf.scalar(batch.length)}
+        const correct=kind==='regression'?tf.zeros([batch.length]):kind==='binary'?tf.equal(tf.greaterEqual(prediction,.5),tf.cast(target.reshape(prediction.shape),'bool')).cast('float32'):tf.mul(tf.equal(tf.argMax(prediction,-1),target.reshape(prediction.shape.slice(0,-1))).cast('float32'),sequence?mask:tf.scalar(1))
+        return {loss,objective,hits:tf.sum(correct),total:sequence?tf.sum(mask):tf.scalar(correct.size)}
       })
       try {const [loss,correct,count,objective]=await Promise.all([result.loss.data(),result.hits.data(),result.total.data(),result.objective.data()]);sum+=loss[0]*batch.length;objectives+=objective[0]*batch.length;hits+=correct[0];total+=count[0]}
       finally {tf.dispose(result)}
@@ -233,32 +270,31 @@ export class TensorGraph {
     return {loss:sum/rows.length,objective:objectives/rows.length,accuracy:hits/total,examples:rows.length}
   }
   /** Decode predictions in minibatches without blocking the UI on a traced pass per row. */
-  async inference(rows: DatasetExample[], batchSize = 64): Promise<DatasetMetrics> {
+  async inference(rows: DatasetExample[], batchSize = 64, signal?:AbortSignal): Promise<DatasetMetrics> {
     if (!rows.length || !Number.isInteger(batchSize) || batchSize < 1) throw Error('Evaluation needs examples and a positive batch size.')
     const dataset = datasetForNode(this.source)
-    const categorical = dataset.task.includes('classification') || dataset.task === 'sequence' || lossKindForNode(this.lossNode, this.graph) === 'cross-entropy'
-    const binary = dataset.task === 'binary-classification'
     const predictions: DatasetPrediction[] = []
     let sum = 0, hits = 0, scored = 0
     const display = (value: number, isClass: boolean) => isClass
       ? dataset.classLabels?.[value] ?? dataset.vocabulary?.[value] ?? String(value)
       : Number(value.toPrecision(5)).toString()
     for (let offset = 0; offset < rows.length; offset += batchSize) {
+      if(signal?.aborted) throw signal.reason ?? Error('Evaluation stopped.')
       const batch = rows.slice(offset, offset + batchSize)
       const result = tf.tidy(() => {
-        const { dataLoss, prediction } = this.execute(batch)
-        return { loss: dataLoss, prediction: tf.clone(prediction) }
+        const { dataLoss, prediction, target } = this.execute(batch)
+        return { loss: dataLoss, prediction: tf.clone(prediction), kind: this.predictionKind(prediction,target) }
       })
       try {
         const [loss, values] = await Promise.all([result.loss.data(), result.prediction.data()])
         sum += loss[0] * batch.length
-        const width = categorical && !binary ? result.prediction.shape.at(-1)! : 1
+        const width = result.kind==='categorical' ? result.prediction.shape.at(-1)! : 1
         const positions = values.length / (batch.length * width)
         batch.forEach((example, exampleIndex) => example.target.data.forEach((actual, position) => {
           const start = (exampleIndex * positions + position) * width
           const scores = Array.from(values.slice(start, start + width))
-          const isClass = categorical && (width > 1 || binary)
-          const predicted = width > 1 ? scores.indexOf(Math.max(...scores)) : binary ? Number(scores[0] >= .5) : scores[0]
+          const isClass = result.kind!=='regression'
+          const predicted = result.kind==='categorical' ? scores.indexOf(Math.max(...scores)) : result.kind==='binary' ? Number(scores[0] >= .5) : scores[0]
           if (isClass) { scored++; hits += Number(predicted === actual) }
           predictions.push({
             example: `${example.label ?? `Example ${offset + exampleIndex + 1}`}${example.target.data.length > 1 ? ` · output ${position + 1}` : ''}`,
@@ -269,6 +305,7 @@ export class TensorGraph {
       } finally { tf.dispose(result) }
       await new Promise(resolve => setTimeout(resolve, 0))
     }
+    if(signal?.aborted) throw signal.reason ?? Error('Evaluation stopped.')
     return { loss: sum / rows.length, examples: rows.length, predictions: scored, rows: predictions, accuracy: scored ? hits / scored : undefined }
   }
   async snapshot():Promise<GraphModel> {

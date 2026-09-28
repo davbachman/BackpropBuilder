@@ -49,6 +49,15 @@ describe('custom CSV datasets', () => {
     expect(analyzeCustomCsv(csv).classLabels).toEqual(['one', 'zero'])
   })
 
+  it('keeps sorted class IDs aligned for many repeated labels', () => {
+    const labels = Array.from({ length: 500 }, (_, index) => `label-${String(index).padStart(3, '0')}`)
+    const targets = [...labels].reverse().concat(labels)
+    const csv = parseCustomCsv('feature,target\n' + targets.map((label, index) => `${index},${label}`).join('\n'), 'classes.csv')
+    const parsed = analyzeCustomCsv(csv)
+    expect(parsed.classLabels).toEqual(labels)
+    expect(parsed.targets).toEqual([...labels.keys()].reverse().concat([...labels.keys()]))
+  })
+
   it('encodes string classes, supports a headerless CSV, and rejects invalid feature cells', () => {
     const csv = parseCustomCsv('1,2,no\n2,3,yes\n3,4,no\n4,5,yes\n', 'labels.csv')
     expect(csv.hasHeader).toBe(false)

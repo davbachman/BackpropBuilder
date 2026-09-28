@@ -32,7 +32,7 @@ export function SemanticNode(props: NodeProps): ReactElement {
   const displayValue = formatCompactTensor(data.showGradient ? node.grad : value)
   const inputs = Math.max(inputArityForNode(node), Number(props.data.displayInputCount ?? 0))
   const outputs = outputArityForNode(node)
-  const canAddInput = semanticHasAddInput(node, inputs)
+  const canAddInput = !coordinate && semanticHasAddInput(node, inputs)
   const [concatOutput, concatExpression] = node.type === 'concat' ? data.fullFormula.split(' = ', 2) : []
   const expandedHeight = expandedSemanticInputHeight(node)
   useEffect(() => {
@@ -51,7 +51,7 @@ export function SemanticNode(props: NodeProps): ReactElement {
     </> : <>
       {node.type === 'loss' ? <select aria-label="loss" className="semantic-operation-select nodrag nowheel" value={data.lossKind} onChange={event => data.onLossChange(node.id, event.target.value as LossKind)}>
         {data.lossOptions?.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
-      </select> : node.type === 'activation' ? <select aria-label="activation" className="semantic-operation-select nodrag nowheel" value={node.params.activation ?? 'identity'} onChange={event => data.onActivationChange(node.id, event.target.value)}>
+      </select> : node.type === 'activation' && !coordinate ? <select aria-label="activation" className="semantic-operation-select nodrag nowheel" value={node.params.activation ?? 'identity'} onChange={event => data.onActivationChange(node.id, event.target.value)}>
         <option value="identity">identity</option><option value="relu">ReLU</option><option value="sigmoid">sigmoid</option><option value="tanh">tanh</option>
       </select> : node.type === 'tensor-transform' ? <select aria-label="Tensor transform" className="semantic-operation-select nodrag nowheel" value={node.params.transform ?? 'reshape'} onChange={event => data.onTransformChange(node.id, event.target.value as TensorTransformKind)}>
         {TENSOR_TRANSFORM_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}

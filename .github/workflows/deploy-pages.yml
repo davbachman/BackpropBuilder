@@ -15,22 +15,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+  pytorch-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - run: python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Check Python exports and tensor parity
+        env:
+          PYTORCH_TEST_PYTHON: python
+        run: >-
+          npm test --
+          src/domain/pytorchExport.test.ts
+          src/domain/textExport.test.ts
+          src/domain/tensorNativeParity.test.ts
+          src/domain/tensorBatchSemantics.test.ts
+
+  deploy:
+    needs: [checks, pytorch-parity]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4

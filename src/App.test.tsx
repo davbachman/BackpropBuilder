@@ -105,14 +105,14 @@ describe('Backprop Builder app', () => {
     expect(screen.getByRole('img', { name: 'Training and held-out loss chart' })).toBeInTheDocument()
   })
 
-  it('shows held-out predictions and final accuracy from the Test tab', () => {
+  it('shows held-out predictions and final accuracy from the Test tab', async () => {
     const { graph } = scratchModel('transformer')
     render(<App initialGraph={graph} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Test' }))
     fireEvent.click(screen.getByRole('button', { name: 'Run inference' }))
     expect(screen.getByRole('tab', { name: 'Test' })).toHaveAttribute('aria-selected', 'true')
     const testPanel = screen.getByRole('tabpanel', { name: 'Test controls' })
-    expect(within(testPanel).getByLabelText('Test accuracy')).toHaveTextContent('%')
+    expect(await within(testPanel).findByLabelText('Test accuracy')).toHaveTextContent('%')
     const predictions = within(testPanel).getByLabelText('Test predictions')
     expect(within(predictions).getAllByRole('listitem').length).toBeGreaterThan(1)
     expect(predictions).toHaveTextContent('Actual')
@@ -313,7 +313,7 @@ describe('Backprop Builder app', () => {
     const line = screen.getByRole('button', { name: /Weighted sum.*z2/ })
     fireEvent.click(line)
     expect(line).toHaveAttribute('aria-current', 'true')
-    expect(container.querySelector('.react-flow__node.selected')).toBeInTheDocument()
+    await waitFor(() => expect(container.querySelector('.react-flow__node.selected')).toBeInTheDocument(), { timeout: 2000 })
     fireEvent.click(container.querySelector('.react-flow__node[data-id="target"]')!)
     await waitFor(() => expect(screen.getByRole('button', { name: /target: target = y/ })).toHaveAttribute('aria-current', 'true'))
     fireEvent.click(screen.getByRole('tab', { name: 'Details' }))

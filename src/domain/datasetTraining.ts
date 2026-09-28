@@ -1,6 +1,6 @@
 import {parameterPenalty} from './regularization'
 import { datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputCountForNode, datasetOutputValueForSlot, datasetTargetSlotForNode } from './datasets'
-import { forwardPass, isLossNode, runTrainingStepFast, validateGraph } from './engine'
+import { createForwardEvaluator, forwardPass, isLossNode, runTrainingStepFast, validateGraph } from './engine'
 import type { GraphModel, GraphNode } from './types'
 
 export function withDatasetExample(graph: GraphModel, id: string, index: number): GraphModel {
@@ -66,20 +66,24 @@ export function predictionNode(graph: GraphModel): GraphNode | undefined {
 export interface DatasetPrediction { example: string; actual: string; predicted: string; correct?: boolean }
 export interface DatasetMetrics { loss: number; accuracy?: number; examples: number; predictions: number; rows: DatasetPrediction[] }
 
-export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 'test'): DatasetMetrics {
+interface EvaluationOptions { includePredictions?: boolean; signal?: AbortSignal }
+
+function* evaluateDatasetSteps(graph: GraphModel, id: string, split: 'train' | 'test', options: EvaluationOptions = {}): Generator<void, DatasetMetrics> {
   const source = graph.nodes.find(node => node.id === id && node.type === 'dataset')
   if (!source) throw new Error('Choose a dataset block.')
   const dataset = datasetForNode(source)
   const examples = datasetExamplesForNode(source)
   const batch = datasetMode(source) === 'batch'
+  const evaluate = createForwardEvaluator(graph)
   const indices = examples.flatMap((example,index)=>example.split === split ? [index] : [])
   let loss = 0, count = 0, correct = 0, predictions = 0
   const rows: DatasetPrediction[] = []
   for (const index of batch ? indices.slice(0,1) : indices) {
-    const result = forwardPass(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index), false)
+    const result = evaluate(batch ? withDatasetBatch(graph,id,split) : withDatasetExample(graph, id, index))
     if (result.loss === undefined || !Number.isFinite(result.loss)) throw new Error('Connect predictions and dataset targets to a loss before evaluating.')
     loss += result.loss - parameterPenalty(result.graph)
     count++
+    if (options.includePredictions === false) { yield; continue }
     const lossNode = result.graph.nodes.find(isLossNode)!
     const output = predictionNode(result.graph)?.value
     const targetEdge = result.graph.edges.find(edge => edge.target === lossNode.id && edge.inputSlot === 1)
@@ -104,9 +108,35 @@ export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 
         })
       })
     }
+    yield
   }
   if (!count) throw new Error(`This dataset has no ${split} examples.`)
   return { loss: loss / count, examples: indices.length, predictions, rows, accuracy: predictions ? correct / predictions : undefined }
+}
+
+export function evaluateDataset(graph: GraphModel, id: string, split: 'train' | 'test', options: EvaluationOptions = {}): DatasetMetrics {
+  const evaluation = evaluateDatasetSteps(graph, id, split, options)
+  let step = evaluation.next()
+  while (!step.done) step = evaluation.next()
+  return step.value
+}
+
+/** Share metric semantics with synchronous evaluation, yielding between short
+ * chunks so reporting and inference remain cancellable on larger datasets. */
+export async function evaluateDatasetAsync(graph: GraphModel, id: string, split: 'train' | 'test', options: EvaluationOptions = {}): Promise<DatasetMetrics> {
+  const evaluation = evaluateDatasetSteps(graph, id, split, options)
+  // Let the browser display the busy state before starting numerical work.
+  await new Promise(resolve => setTimeout(resolve, 0))
+  let deadline = performance.now() + 8
+  while (true) {
+    options.signal?.throwIfAborted()
+    const step = evaluation.next()
+    if (step.done) return step.value
+    if (performance.now() >= deadline) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+      deadline = performance.now() + 8
+    }
+  }
 }
 
 function displayPrediction(value: number, categorical: boolean, classLabels?: string[], vocabulary?: string[]): string {

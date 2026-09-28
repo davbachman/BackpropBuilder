@@ -2,7 +2,7 @@ import { DATASET_OPTIONS, datasetExamplesForNode, datasetExampleIndex, datasetFo
 import { forwardPass, isLossNode, runTrainingStep } from './engine'
 import { toTensor } from './tensor'
 import type { DatasetKind, GraphModel } from './types'
-import { CNN_DIGITS } from '../learning/cnn'
+import CNN_DIGITS from '../learning/digits.json'
 
 export type ModelDatasetKind = DatasetKind | 'xor'
 export interface ModelSample { x: number[]; y: number; split: 'train' | 'test' }

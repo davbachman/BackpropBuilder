@@ -4,6 +4,7 @@ import { datasetExamplesForNode, datasetForNode, datasetMode, datasetTargetSlotF
 import { supportsNumericBatches } from './datasetTraining'
 import { inputArityForNode, isLossNode, lossKindForNode, topologicalSort, validateGraph } from './engine'
 import { toTensor } from './tensor'
+import { tokenize } from './textData'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from './types'
 
 export interface PyTorchExport {
@@ -135,6 +136,9 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
   if (!Number.isInteger(trainingEpochs) || trainingEpochs < 0 || !Number.isInteger(reportEvery) || reportEvery < 1) throw new Error('Choose positive whole-number training and reporting settings before exporting.')
   const targetSlot = datasetTargetSlotForNode(datasetNode)
   const customCsv = datasetNode.params.dataset === 'custom-csv' ? datasetNode.params.customCsv : undefined
+  const countData = datasetNode.params.dataset === 'custom-text' && datasetNode.params.textData?.representation === 'counts'
+    ? datasetNode.params.textData : undefined
+  const vocabularyIndices = new Map(countData?.vocabulary.map((token, index) => [token, index]))
   const datasetFile = customCsv
     ? undefined
     : {
@@ -145,7 +149,19 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
           classLabels: dataset.classLabels,
           vocabulary: dataset.vocabulary,
           textData: datasetNode.params.textData,
-          examples: examples.map(example => ({ label: example.label, split: example.split, features: example.features, target: example.target })),
+          examples: examples.map(example => {
+            if (!countData) return { label: example.label, split: example.split, features: example.features, target: example.target }
+            // Preserve lazy count vectors: exporting a corpus must not allocate
+            // documents × vocabulary cells, either here or when Python loads it.
+            const document = countData.documents[example.documentIndex!]
+            const counts = new Map<number, number>()
+            for (const token of tokenize(document.text, countData.tokenizer, countData.lowercase).slice(0, countData.maxLength)) {
+              const id = vocabularyIndices.get(token) ?? 0
+              counts.set(id, (counts.get(id) ?? 0) + 1)
+            }
+            const features = [{ shape: [1, countData.vocabulary.length], indices: [...counts.keys()], data: [...counts.values()] }, ...example.features.slice(1)]
+            return { label: example.label, split: example.split, features, target: example.target }
+          }),
         }),
       }
   const csvFileName = customCsv?.fileName.split(/[\\/]/).pop() || 'data.csv'
@@ -160,6 +176,11 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
   const parameterNodes = graph.nodes.filter(node => node.type === 'weight' || node.type === 'bias')
   const parameters = new Map(parameterNodes.map((node, index) => [node.id, `p_${index + 1}`]))
   const parameterLines = parameterNodes.map(node => `        self.${parameters.get(node.id)} = nn.Parameter(${tensorCode(node.params.value)})  # ${comment(node.label)}`)
+  const lossNode = losses[0]
+  const penaltyTerms = lossNode && lossNode.params.regularization && lossNode.params.regularization !== 'none'
+    ? regularizedParameters(graph, lossNode).map(node => `(self.${parameters.get(node.id)}.${lossNode.params.regularization === 'l1' ? 'abs()' : 'square() * 0.5'}).sum()`)
+    : []
+  const penaltyCode = penaltyTerms.length ? `${lossNode!.params.regularizationStrength ?? 0} * (${penaltyTerms.join(' + ')})` : '0.0'
   const forwardLines: string[] = []
   for (const id of order) {
     const node = nodeById.get(id)!
@@ -183,13 +204,9 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
       forwardLines.push(`        ${name} = ${args[0] ?? tensorCode(node.params.value)}`)
     } else {
       forwardLines.push(`        ${name} = ${operationCode(node, args, graph)}`)
-      if(isLossNode(node) && node.params.regularization && node.params.regularization!=='none') {
-        const terms=regularizedParameters(graph,node).map(n=>`self.${parameters.get(n.id)}.${node.params.regularization==='l1'?'abs()':'square() * 0.5'}`)
-        if(terms.length) forwardLines.push(`        ${name} = ${name} + ${node.params.regularizationStrength??0} * (${terms.map(t=>`(${t}).sum()`).join(' + ')})`)
-      }
+      if (isLossNode(node) && penaltyTerms.length) forwardLines.push(`        ${name} = ${name} + self.regularization_penalty()`)
     }
   }
-  const lossNode = losses[0]
   const predictionEdge = lossNode && sortedInputs(graph, lossNode).find(edge => (edge.inputSlot ?? 0) === 0)
   const actualEdge = lossNode && sortedInputs(graph, lossNode).find(edge => (edge.inputSlot ?? 0) === 1)
   const outputNode = lossNode ? undefined : [...order].reverse().map(id => nodeById.get(id)!).find(node =>
@@ -204,15 +221,19 @@ export function generatePyTorchExport(graph: GraphModel, options: PyTorchExportO
 `def load_dataset():\n` +
 `    with (DATASET_DIR / DATASET_FILE).open(newline='', encoding='utf-8-sig') as source:\n` +
 `        records = [row for row in csv.reader(source) if any(cell.strip() for cell in row)]\n` +
+`    split_column = next((index for index, name in enumerate(records[0]) if name.strip().lower() == 'split'), None) if records and CSV_HAS_HEADER and ${customCsv.splits ? 'True' : 'False'} else None\n` +
+`    if split_column is not None:\n` +
+`        records = [[cell for column, cell in enumerate(row) if column != split_column] for row in records]\n` +
 `    if CSV_HAS_HEADER:\n` +
 `        records = records[1:]\n` +
+`    class_indices = {label: index for index, label in enumerate(CSV_CLASS_LABELS)}\n` +
 `    examples = []\n` +
 `    for index, cells in enumerate(records):\n` +
 `        if len(cells) != ${customCsv.rows[0].length}:\n` +
 `            raise ValueError(f'CSV row {index + 1} has the wrong number of columns')\n` +
 `        features = [{'shape': [], 'data': [float(value.strip())]} for column, value in enumerate(cells) if column != CSV_TARGET_COLUMN]\n` +
 `        raw_target = cells[CSV_TARGET_COLUMN].strip()\n` +
-`        target_value = CSV_CLASS_LABELS.index(raw_target) if CSV_CLASS_LABELS else float(raw_target)\n` +
+`        target_value = class_indices[raw_target] if CSV_CLASS_LABELS else float(raw_target)\n` +
 `        examples.append({'label': f'Example {index + 1}', 'split': 'train' if index in CSV_TRAIN_ROW_INDICES else 'test', 'features': features, 'target': {'shape': ${dataset.task.includes('classification') ? '[1]' : '[]'}, 'data': [target_value]}})\n` +
 `    if len(examples) != ${examples.length}:\n` +
 `        raise ValueError(f'Expected ${examples.length} CSV examples, found {len(examples)}; use the dataset imported into the builder')\n` +
@@ -237,6 +258,8 @@ datasetLoader +
 `    def __init__(self):\n` +
 `        super().__init__()\n` +
 `${parameterLines.length ? parameterLines.join('\n') : '        pass'}\n\n` +
+`    def regularization_penalty(self):\n` +
+`        return ${penaltyCode}\n\n` +
 `    def forward(self, features, target):\n` +
 `${forwardLines.join('\n')}\n` +
 `        return ${predictionEdge ? sourceName(predictionEdge) : names.get(outputNode!.id)}, ${lossNode ? names.get(lossNode.id) : 'None'}, ${actualEdge ? sourceName(actualEdge) : 'target'}\n\n` +
@@ -247,7 +270,12 @@ datasetLoader +
 `LEARNING_RATE = ${json(graph.learningRate)}\n` +
 `TRAIN_EPOCHS = ${lossNode ? trainingEpochs : 0}  # Add a Loss block to enable training.\nREPORT_EVERY = ${reportEvery}\n\n` +
 `def tensor_value(value):\n` +
-`    return torch.tensor(value['data'], dtype=torch.float64).reshape(value['shape'])\n\n` +
+`    values = torch.tensor(value['data'], dtype=torch.float64)\n` +
+`    if 'indices' in value:\n` +
+`        dense = torch.zeros(value['shape'], dtype=torch.float64)\n` +
+`        dense.reshape(-1)[torch.tensor(value['indices'], dtype=torch.long)] = values\n` +
+`        return dense\n` +
+`    return values.reshape(value['shape'])\n\n` +
 `def model_inputs(rows, use_batch=None):\n` +
 `    if use_batch is None:\n` +
 `        use_batch = BATCH_MODE\n` +
@@ -267,7 +295,7 @@ datasetLoader +
 `            features, target = model_inputs(batch, EVALUATE_FULL_BATCH)\n` +
 `            prediction, loss, actual_target = model(features, target)\n` +
 `            if loss is not None:\n` +
-`                losses.append(float(loss))\n` +
+`                losses.append(float(loss - model.regularization_penalty()))\n` +
 `            actual = actual_target.reshape(-1)\n` +
 `            if prediction.numel() % actual.numel() != 0:\n` +
 `                continue\n` +
@@ -303,7 +331,7 @@ datasetLoader +
 `        if optimizer is not None:\n` +
 `            optimizer.zero_grad()\n` +
 `        _, loss, _ = model(features, target)\n` +
-`        if optimizer is not None:\n` +
+`        if optimizer is not None and loss.requires_grad:\n` +
 `            loss.backward()\n` +
 `            optimizer.step()\n` +
 `    if epoch % REPORT_EVERY == 0 or epoch == TRAIN_EPOCHS:\n` +

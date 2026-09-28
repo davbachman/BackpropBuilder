@@ -706,6 +706,38 @@ export function topologicalSort(graph: GraphModel): string[] {
 
 export interface ForwardOptions { training?: boolean; random?: () => number }
 
+/** Compile an inference-only pass for repeated dataset examples. Parameters and
+ * dataset selection may change between calls; node and edge topology must stay
+ * the same. The returned values are never written into the supplied graph. */
+export function createForwardEvaluator(graph: GraphModel): (input?: GraphModel) => EvaluationResult {
+  assertValid(graph)
+  const indexById = new Map(graph.nodes.map((node, index) => [node.id, index]))
+  const order = topologicalSort(graph).map(id => indexById.get(id)!)
+  const incoming = graph.nodes.map(node => incomingEdges(graph, node.id).map(edge => ({ edge, sourceIndex: indexById.get(edge.source)! })))
+  const nodeTypes = graph.nodes.map(node => ({ id: node.id, type: node.type }))
+  const topology = graph.edges.map(edge => [edge.id, edge.source, edge.target, edge.inputSlot ?? 0, edge.sourceSlot ?? 0])
+  const edges = graph.edges.map(edge => ({ ...edge, value: undefined, grad: undefined }))
+  return (input = graph) => {
+    if (input.nodes.length !== nodeTypes.length || input.nodes.some((node, i) => node.id !== nodeTypes[i].id || node.type !== nodeTypes[i].type) ||
+        input.edges.length !== topology.length || input.edges.some((edge, i) => edge.id !== topology[i][0] ||
+          edge.source !== topology[i][1] || edge.target !== topology[i][2] || (edge.inputSlot ?? 0) !== topology[i][3] || (edge.sourceSlot ?? 0) !== topology[i][4])) {
+      throw new Error('The graph topology changed. Compile a new forward evaluator.')
+    }
+    const next: GraphModel = { ...input, edges, nodes: input.nodes.map(node => ({ ...node, value: undefined, grad: undefined, cache: undefined, localDerivative: undefined })) }
+    for (const index of order) {
+      const node = next.nodes[index]
+      const inputs = incoming[index].map(({ edge, sourceIndex }) => {
+        const source = next.nodes[sourceIndex]
+        return source.type === 'dataset' ? datasetOutputValueForSlot(source, edge.sourceSlot ?? 0) : source.value!
+      })
+      const computed = computeForward(node, inputs, {}, false)
+      node.value = isLossNode(node) ? scalarValue(scalarFromTensor(computed.value) + parameterPenalty(next, node)) : computed.value
+    }
+    const loss = next.nodes.find(isLossNode)?.value
+    return { graph: next, steps: [], loss: loss ? scalarFromTensor(loss) : undefined }
+  }
+}
+
 export function forwardPass(graph: GraphModel, trace = true, options: ForwardOptions = {}): EvaluationResult {
   assertValid(graph)
   const next = cloneGraph(graph)
@@ -871,6 +903,7 @@ function computeForward(
   node: GraphNode,
   inputs: TensorValue[],
   options: ForwardOptions = {},
+  derivatives = true,
 ): { value: TensorValue; localDerivative?: TensorValue; localDerivatives: TensorValue[]; error?: TensorValue } {
   if (SOURCE_TYPES.has(node.type)) {
     return { value: sourceForwardValue(node, inputs), localDerivatives: [] }
@@ -878,10 +911,12 @@ function computeForward(
 
   if (node.type === 'standardize') {
     const result = standardize(inputs[0], node.params.standardization)
+    if (!derivatives) return { value: result.value, localDerivatives: [] }
     return {value:result.value, localDerivative:result.derivative, localDerivatives:[result.derivative]}
   }
 
   if (node.type === 'dropout') {
+    if (!derivatives && !options.training) return { value: cloneTensor(inputs[0]), localDerivatives: [] }
     const p = node.params.dropoutRate ?? 0.1
     const derivative = tensorValue(inputs[0].shape, inputs[0].data.map(() => options.training && p > 0 ? ((options.random ?? Math.random)() < p ? 0 : 1 / (1 - p)) : 1))
     return {value:multiplyTensors(inputs[0],derivative),localDerivative:derivative,localDerivatives:[derivative]}
@@ -908,6 +943,7 @@ function computeForward(
 
   if (node.type === 'multiply') {
     const value = elementwiseTensors(inputs, (entries) => entries.reduce((product, input) => product * input, 1))
+    if (!derivatives) return { value, localDerivatives: [] }
     return {
       value,
       localDerivatives: inputs.map((_, index) => productExceptIndex(inputs, index)),
@@ -916,6 +952,7 @@ function computeForward(
 
   if (node.type === 'add') {
     const value = elementwiseTensors(inputs, (entries) => entries.reduce((sum, input) => sum + input, 0))
+    if (!derivatives) return { value, localDerivatives: [] }
     return {
       value,
       localDerivative: oneLike(value),
@@ -925,23 +962,25 @@ function computeForward(
 
   if (node.type === 'arithmetic') {
     const result = evaluateArithmetic(node.params.expression ?? 'x1 * x2', inputs)
-    const derivatives = evaluateArithmetic(node.params.expression ?? 'x1 * x2', inputs, oneLike(result.value)).gradients
-    return { value: result.value, localDerivative: derivatives[0], localDerivatives: derivatives }
+    if (!derivatives) return { value: result.value, localDerivatives: [] }
+    const gradients = evaluateArithmetic(node.params.expression ?? 'x1 * x2', inputs, oneLike(result.value)).gradients
+    return { value: result.value, localDerivative: gradients[0], localDerivatives: gradients }
   }
 
   if (node.type === 'activation') {
     const activation = node.params.activation ?? 'identity'
     const value = mapActivation(activation, inputs[0])
+    if (!derivatives) return { value, localDerivatives: [] }
     const derivative = activationDerivativeTensor(activation, inputs[0], value)
     return { value, localDerivative: derivative, localDerivatives: [derivative] }
   }
 
   if (node.type === 'loss' && lossKindForInputs(node, inputs) === 'cross-entropy') {
-    const result = crossEntropyCalculation(node, inputs, scalarValue(1))
+    const result = crossEntropyCalculation(node, inputs, derivatives ? scalarValue(1) : undefined)
     return { value: result.value, localDerivative: result.gradients[0], localDerivatives: result.gradients }
   }
 
-  return computeLossForward(lossKindForInputs(node, inputs), inputs[0], inputs[1])
+  return computeLossForward(lossKindForInputs(node, inputs), inputs[0], inputs[1], derivatives)
 }
 
 function crossEntropyCalculation(node: GraphNode, inputs: TensorValue[], upstream?: TensorValue): { value: TensorValue; gradients: TensorValue[] } {
@@ -954,7 +993,7 @@ function crossEntropyCalculation(node: GraphNode, inputs: TensorValue[], upstrea
   if (upstream) calculation.output.backward(upstream.data)
   return {
     value: calculation.output.toValue(),
-    gradients: [tensorValue(logits.shape, calculation.operands[0].grad), zeroLike(target)],
+    gradients: upstream ? [tensorValue(logits.shape, calculation.operands[0].grad), zeroLike(target)] : [],
   }
 }
 
@@ -962,8 +1001,10 @@ function computeLossForward(
   kind: LossKind,
   prediction: TensorValue,
   target: TensorValue,
+  derivatives = true,
 ): { value: TensorValue; localDerivative?: TensorValue; localDerivatives: TensorValue[]; error?: TensorValue } {
   const error = subtractTensors(prediction, target)
+  if (!derivatives) return { value: scalarValue(lossValue(kind, prediction, target, error)), localDerivatives: [] }
   const predictionDerivative = lossGradient(kind, prediction, target)
 
   return {

@@ -88,6 +88,8 @@ describe('bounded tensor differentiation', () => {
     expect(() => matmul(tensor([1025, 1], Array(1025).fill(1)), tensor([1, 1025], Array(1025).fill(1)))).toThrow(/oversized/)
     expect(() => add(tensor([1025, 1], Array(1025).fill(1)), tensor([1, 1025], Array(1025).fill(1)))).toThrow(/oversized/)
     expect(() => tensor([2], [1, 2], true).backward()).toThrow(/seed/)
+    const large=tensor([1025,512],Array(1025*512).fill(1))
+    expect(()=>concat([large,large],1)).toThrow(/oversized/)
   })
 })
 

@@ -11,6 +11,8 @@ import type { GraphModel } from '../domain/types'
 import { LESSONS } from '../learning/presets'
 import { createNode } from '../domain/examples'
 import { placeCanvasNode } from '../domain/nodePlacement'
+import { DEFAULT_TRAINING } from '../domain/trainingSettings'
+import type { BuilderNodeData } from './BuilderNode'
 
 // Keep React Flow's real state hooks. Capture its boundary so these tests can
 // exercise our drag lifecycle without relying on jsdom's missing geometry.
@@ -81,6 +83,50 @@ function dragStop(nodes: Node[]) {
 
 describe('canvas movement gestures', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it.each([false, true])('keeps editing callbacks current after training settings change (dragging: %s)', dragging => {
+    const graph: GraphModel = { learningRate: .1, nodes: [createNode('add', 1)], edges: [] }
+    const { rerenderGraph, onGraphChange } = mountCanvas(graph)
+    const original = nodeById(graph.nodes[0].id)
+    const moved = displaced(original, 35, 20)
+    if (dragging) {
+      dragStart([original])
+      dragMove([moved])
+    }
+    const training = { ...DEFAULT_TRAINING, engine: 'tensor' as const, optimizer: 'adam' as const }
+    rerenderGraph({ ...graph, learningRate: .25, training })
+    const current = nodeById(original.id)
+    if (dragging) expect(current.position).toEqual(moved.position)
+    act(() => (current.data as BuilderNodeData).onFlexibleInputAdd(original.id))
+    expect(onGraphChange.mock.lastCall![0]).toMatchObject({ learningRate: .25, training })
+    expect(onGraphChange.mock.lastCall![0].nodes[0].params.inputCount).toBe(3)
+  })
+
+  it.each(['metaKey', 'ctrlKey'])('preserves React Flow modifier selection and deselection with %s', modifier => {
+    const graph: GraphModel = { learningRate: .1, nodes: [createNode('input', 1), createNode('weight', 1)], edges: [] }
+    const { onSelectionChange } = mountCanvas(graph)
+    const [first, second] = graph.nodes
+    act(() => flow.props!.onNodesChange!([{ type: 'select', id: first.id, selected: true }]))
+    act(() => flow.props!.onNodesChange!([{ type: 'select', id: second.id, selected: true }]))
+    const click = () => flow.props!.onNodeClick!(new MouseEvent('click', { [modifier]: true }) as unknown as ReactMouseEvent, nodeById(second.id))
+    act(click)
+    expect(onSelectionChange).toHaveBeenLastCalledWith({ nodeIds: [first.id, second.id], groupId: undefined })
+    act(() => flow.props!.onNodesChange!([{ type: 'select', id: second.id, selected: false }]))
+    act(click)
+    expect(onSelectionChange).toHaveBeenLastCalledWith({ nodeIds: [first.id], groupId: undefined })
+  })
+
+  it('centers an offscreen calculation selected from Code in an ungrouped graph', () => {
+    const node = { ...createNode('add', 1), position: { x: 2400, y: 1700 } }
+    const graph: GraphModel = { learningRate: .1, nodes: [node], edges: [] }
+    mountCanvas(graph, undefined, undefined, { kind: 'node', id: node.id, serial: 1 })
+    expect(flow.setViewport).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ duration: 650 }))
+    const viewport = flow.setViewport.mock.lastCall![0]
+    expect(node.position.x * viewport.zoom + viewport.x).toBeGreaterThan(0)
+    expect(node.position.y * viewport.zoom + viewport.y).toBeGreaterThan(0)
+    expect(node.position.x * viewport.zoom + viewport.x).toBeLessThan(900)
+    expect(node.position.y * viewport.zoom + viewport.y).toBeLessThan(600)
+  })
 
   it('opens the block picker on a blank-canvas double-click and places the chosen block there', () => {
     flow.screenToFlowPosition.mockImplementationOnce(() => ({ x: 417, y: -83 }))

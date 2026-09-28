@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec /opt/mpg-grader/bin/python3 /autograder/source/runner.py

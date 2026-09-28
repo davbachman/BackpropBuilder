@@ -5,7 +5,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import { Box, CircleDot, Crosshair, Database, Plus, Sigma } from 'lucide-react'
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import {
   FLEX_INPUT_HEIGHT_STEP,
   LOSS_OPTIONS,
@@ -36,6 +36,8 @@ export interface BuilderNodeData extends Record<string, unknown> {
   lossOptions?: Array<{ kind: LossKind; label: string }>
   active: boolean
   validationError?: boolean
+  accessible?: boolean
+  coordinate?: boolean
   hasIncomingValue: boolean
   onFlexibleInputAdd: (nodeId: string) => void
   onValueChange: (nodeId: string, value: TensorValue) => void
@@ -86,7 +88,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const isFlexibleInputNode = isFlexibleInputNodeType(node.type)
   const variableInputLayout = isFlexibleInputNode || node.type === 'arithmetic'
   const nodeHeight = node.dimensions?.height ?? heightForInputCount(inputCount)
-  const canAddInput = variableInputLayout && inputCount < MAX_FLEX_INPUT_COUNT
+  const canAddInput = !data.coordinate && variableInputLayout && inputCount < MAX_FLEX_INPUT_COUNT
+  const accessible = data.accessible !== false
   const isSource = outputCount > 0
   const editableValue =
     node.type === 'weight' ||
@@ -98,7 +101,7 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const lossKind = data.lossKind ?? lossKindForNode(node)
   const lossOptions = data.lossOptions ?? LOSS_OPTIONS
   const showTypeBadge = node.label.trim().toLowerCase() !== node.type && !(node.type === 'weight' && /^param\s+\d+$/i.test(node.label))
-  const valueText = formatTensorInput(node.params.value)
+  const valueText = useMemo(() => editableValue ? formatTensorInput(node.params.value) : '', [editableValue, node.params.value])
   const [valueDraft, setValueDraft] = useState({ source: valueText, text: valueText, valid: true })
   const draftValue = valueDraft.source === valueText ? valueDraft.text : valueText
   const valueIsValid = valueDraft.source === valueText ? valueDraft.valid : true
@@ -119,6 +122,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
   return (
     <div
       className={`builder-node node-${node.type} ${customCsv ? 'is-custom-csv' : ''} ${isFlexibleInputNode ? 'has-flex-inputs' : ''} ${data.active ? 'is-active' : ''} ${props.selected ? 'is-selected' : ''} ${data.validationError ? 'has-error' : ''}`}
+      aria-hidden={!accessible}
+      inert={!accessible}
       aria-invalid={data.validationError || undefined}
       style={{ ...(variableInputLayout ? { height: nodeHeight } : {}), ...(customCsv ? { width: customCsvCardWidth(node), height: customCsvCardHeight(node, true) } : {}), ...(typeof data.sceneScale === 'number' ? { height: builderCardHeight(node), transform: `scale(${data.sceneScale})`, transformOrigin: 'top left' } : {}) }}
     >
@@ -161,10 +166,10 @@ export function BuilderNode(props: NodeProps): ReactElement {
         </div>
       ) : data.showMath && node.type !== 'arithmetic' ? (
         <div className="node-formula">
-          <HoverText text={data.formula} tooltip={data.fullFormula} />
+          <HoverText text={data.formula} tooltip={accessible ? data.fullFormula : data.formula} />
         </div>
       ) : null}
-      {node.type === 'activation' ? (
+      {node.type === 'activation' && !data.coordinate ? (
         <label className="node-field">
           activation
           <select
@@ -267,14 +272,15 @@ export function BuilderNode(props: NodeProps): ReactElement {
               label={datasetOutputLabelForSlot(node, index)}
               value={datasetOutputValueForSlot(node, index)}
               valueOnly={customCsv}
+              detailed={accessible}
             />
           ))
         ) : (
-          <TensorMetric label="out" value={node.value} />
+          <TensorMetric label="out" value={node.value} detailed={accessible} />
         )}
         {parameterTensor && parameterTensor.shape.length > 0 ? <span className="node-tensor-shape">shape {parameterTensor.shape.join(' × ')} · {parameterTensor.data.length} values</span> : null}
-        {node.localDerivative !== undefined ? <TensorMetric label="d local" value={node.localDerivative} /> : null}
-        {data.showGradient && !customCsv ? <TensorMetric label="grad" value={node.grad} /> : null}
+        {node.localDerivative !== undefined ? <TensorMetric label="d local" value={node.localDerivative} detailed={accessible} /> : null}
+        {data.showGradient && !customCsv ? <TensorMetric label="grad" value={node.grad} detailed={accessible} /> : null}
       </div>
       {isSource ? (
         Array.from({ length: outputCount }).map((_, index) => (
@@ -313,11 +319,15 @@ function outputHandleTop(index: number): number {
   return FLEX_INPUT_HEIGHT_STEP + index * 30
 }
 
-function TensorMetric({ label, value, valueOnly = false }: { label: string; value: TensorValue | undefined; valueOnly?: boolean }): ReactElement {
+function TensorMetric({ label, value, valueOnly = false, detailed }: { label: string; value: TensorValue | undefined; valueOnly?: boolean; detailed: boolean }): ReactElement {
+  const text = valueOnly ? formatCompactTensor(value) : `${label} ${formatCompactTensor(value)}`
+  // Covered calculations cannot be inspected. Defer their full tensor strings
+  // until the camera reveals them, then reuse those strings during panning.
+  const tooltip = useMemo(() => detailed ? `${label} ${formatFullTensor(value)}` : text, [detailed, label, value, text])
   return (
     <HoverText
-      text={valueOnly ? formatCompactTensor(value) : `${label} ${formatCompactTensor(value)}`}
-      tooltip={`${label} ${formatFullTensor(value)}`}
+      text={text}
+      tooltip={tooltip}
     />
   )
 }

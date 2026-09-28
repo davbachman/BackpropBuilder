@@ -46,7 +46,7 @@ import {
   moveVisualGroup,
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
-import { builderCardHeight, builderInputPortY, builderOutputPortY } from '../domain/builderGeometry'
+import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPortY } from '../domain/builderGeometry'
 import { blockPalette } from '../domain/blockPalette'
 import { appendArithmeticInput } from '../domain/arithmetic'
 import { codeForGroup } from '../domain/codeOutline'
@@ -73,6 +73,7 @@ import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutConti
 import './modules.css'
 import './semanticCanvas.css'
 import './canvasAddMenu.css'
+import { useCanvasSelectionRepaint } from './useCanvasSelectionRepaint'
 
 const nodeTypes = { builderNode: BuilderNode, groupNode: GroupNode }
 const edgeTypes = { builderEdge: BuilderEdge }
@@ -175,6 +176,7 @@ function GraphCanvasInner({
   const scene = useMemo(() => continuous ? layoutContinuousScene(geometryGraph) : undefined, [geometryGraph, continuous])
   const layout = useMemo(() => scene ?? (semantic ? layoutSemanticGraph(renderedGraph) : undefined), [renderedGraph, semantic, scene])
   const shell = useRef<HTMLDivElement>(null)
+  useCanvasSelectionRepaint(shell, JSON.stringify([selectedNodeIds, selectedGroupId, selectedEdgeId]))
   const [camera, setCamera] = useState(graph.view?.viewport ?? { x: 0, y: 0, zoom: 1 })
   const [addMenu, setAddMenu] = useState<{ x: number; y: number; position: GraphPosition; parentGroupId?: string; sceneScale?: number }>()
   const [renameGroup, setRenameGroup] = useState<{ id: string; x: number; y: number; label: string }>()
@@ -215,10 +217,15 @@ function GraphCanvasInner({
       else void fitView({ nodes: [{ id: groupNodeId(focusRequest.id) }], padding: .18, duration: 650, maxZoom: 1.6 })
       return
     }
-    const rect = scene?.nodes.get(focusRequest.id) ?? layout?.nodes.get(focusRequest.id)
+    const node = renderedGraph.nodes.find(node => node.id === focusRequest.id)
+    const rect = scene?.nodes.get(focusRequest.id) ?? layout?.nodes.get(focusRequest.id) ?? (node ? {
+      ...node.position,
+      width: node.dimensions?.width ?? builderCardWidth(node),
+      height: node.dimensions?.height ?? builderCardHeight(node),
+    } : undefined)
     if (!rect) return
     void setViewport(getViewportForBounds(rect, canvasSize.width, canvasSize.height, .01, maxZoom, .32), { duration: 650, ease: focusEase })
-  }, [focusRequest, scene, layout, zoomToGroup, fitView, setViewport, canvasSize, maxZoom])
+  }, [focusRequest, scene, layout, renderedGraph.nodes, zoomToGroup, fitView, setViewport, canvasSize, maxZoom])
   useEffect(() => { if (addMenu) addSearch.current?.focus() }, [addMenu])
   useEffect(() => {
     if (!shell.current || typeof ResizeObserver === 'undefined') return
@@ -611,62 +618,26 @@ function GraphCanvasInner({
   const presentedEdges = scene ? routedEdges.map(edge => ({ ...edge, focusable: accessible(edge.data?.parentId as string | undefined),
     data: { ...edge.data!, cameraZoom, accessible: accessible(edge.data?.parentId as string | undefined) },
   })) : routedEdges.filter(edge => visibleEdgeIds.has(edge.id))
-  const nodeSyncKey = useMemo(
-    () =>
-      JSON.stringify({
-        continuous,
-        activeNodeId: activeStep?.nodeId,
-        edges: renderedGraph.edges,
-        groups: renderedGraph.groups ?? [],
-        nodes: renderedGraph.nodes,
-        view: renderedGraph.view,
-        selectedGroupId,
-        selectedNodeIds,
-        showGradient,
-        showMath,
-      }),
-    [
-      activeStep?.nodeId,
-      continuous,
-      renderedGraph.edges,
-      renderedGraph.groups,
-      renderedGraph.nodes,
-      renderedGraph.view,
-      selectedGroupId,
-      selectedNodeIds,
-      showGradient,
-      showMath,
-    ],
-  )
-  const edgeSyncKey = useMemo(
-    () =>
-      JSON.stringify({
-        continuous,
-        activeEdgeIds: activeStep?.edgeIds ?? [],
-        edges: renderedGraph.edges,
-        groups: renderedGraph.groups ?? [],
-        phase,
-        view: renderedGraph.view,
-        showGradient,
-        selectedEdgeId,
-      }),
-    [activeStep?.edgeIds, phase, renderedGraph.edges, renderedGraph.groups, renderedGraph.view, showGradient, selectedEdgeId, continuous],
-  )
-  const previousNodeSyncKey = useRef(nodeSyncKey)
-  const previousEdgeSyncKey = useRef(edgeSyncKey)
+  const previousReactNodes = useRef(reactNodes)
+  const previousReactEdges = useRef(reactEdges)
 
   useLayoutEffect(() => {
-    if (dragPositions.current) return
-    if (previousNodeSyncKey.current === nodeSyncKey) return
-    previousNodeSyncKey.current = nodeSyncKey
-    setNodes(reactNodes)
-  }, [nodeSyncKey, reactNodes, setNodes])
+    if (previousReactNodes.current === reactNodes) return
+    previousReactNodes.current = reactNodes
+    // Callbacks may change without any serialized graph data changing (for
+    // example after editing training settings). Keep them current even while
+    // the drag library owns the live positions.
+    if (dragPositions.current) {
+      const byId = new Map(reactNodes.map(node => [node.id, node]))
+      setNodes(current => current.map(node => ({ ...node, data: byId.get(node.id)?.data ?? node.data })))
+    } else setNodes(reactNodes)
+  }, [reactNodes, setNodes])
 
   useLayoutEffect(() => {
-    if (previousEdgeSyncKey.current === edgeSyncKey) return
-    previousEdgeSyncKey.current = edgeSyncKey
+    if (previousReactEdges.current === reactEdges) return
+    previousReactEdges.current = reactEdges
     setEdges(reactEdges)
-  }, [edgeSyncKey, reactEdges, setEdges])
+  }, [reactEdges, setEdges])
 
   const onNodesChange = useCallback(
     (changes: NodeChange<CanvasNode>[]) => {
@@ -876,9 +847,12 @@ function GraphCanvasInner({
   )
 
   const handleNodeClick = useCallback(
-    (_: ReactMouseEvent, node: CanvasNode) => {
+    (event: ReactMouseEvent, node: CanvasNode) => {
       setAddMenu(undefined)
       setRenameGroup(undefined)
+      // React Flow already toggled this node through onNodesChange. Replacing
+      // the selection here would discard the other modifier-selected nodes.
+      if (event.metaKey || event.ctrlKey) return
       const groupId = groupIdFromNodeId(node.id)
       const group = renderedGraph.groups?.find((candidate) => candidate.id === groupId)
       if (group?.detail?.virtual && typeof group.detail.layerId === 'string' && typeof group.detail.unitIndex === 'number') {
