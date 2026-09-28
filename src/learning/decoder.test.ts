@@ -97,17 +97,29 @@ describe('actual miniature decoder', () => {
     expect(sampleToken([1, 3, 2], { mode: 'greedy', temperature: 0, topK: 1, seed: 3 }).token).toBe(1)
     expect(() => samplingDistribution([1, 2], 0)).toThrow(/positive/)
   })
-  it('reproduces the checkpoint exactly from the fixed seed, dataset and update budget', () => {
+  it('reproduces the checkpoint numerically from the fixed seed, dataset and update budget', () => {
     const trained = getCheckpoint('trained'), model = createDecoder(trained.metadata.seed), state = createAdamState(), examples = sequenceExamples('training'), random = seededRandom(trained.metadata.seed + 1)
     for (let step = 0; step < trained.metadata.steps; step++) {
       const example = examples[Math.floor(random() * examples.length)]
       trainDecoderStep(model, example.input, example.targets, state, trained.metadata.learningRate)
     }
-    for (const [name, parameter] of Object.entries(model.parameters)) expect(parameter.data).toEqual(trained.parameters[name].data)
+    // Math transcendental functions can round differently across platforms.
+    // Check every coordinate to 12 decimal places, rather than requiring the
+    // Linux runner to reproduce a macOS checkpoint bit for bit.
+    for (const [name, parameter] of Object.entries(model.parameters)) {
+      const expected = trained.parameters[name]
+      expect(parameter.shape).toEqual(expected.shape)
+      expect(parameter.data).toHaveLength(expected.data.length)
+      parameter.data.forEach((value, index) => expect(value).toBeCloseTo(expected.data[index], 12))
+    }
     expect(decoderLoss(model, 'validation')).toBeLessThan(0.01)
     expect(decoderLoss(model, 'validation')).toBeCloseTo(trained.metadata.validationLoss, 12)
     const restored = loadCheckpoint(JSON.parse(JSON.stringify(trained)))
-    expect(decoderForward(restored, [0, 1, 2]).logits).toEqual(decoderForward(model, [0, 1, 2]).logits)
+    const restoredLogits = decoderForward(restored, [0, 1, 2]).logits
+    const reproducedLogits = decoderForward(model, [0, 1, 2]).logits
+    expect(reproducedLogits.shape).toEqual(restoredLogits.shape)
+    expect(reproducedLogits.data).toHaveLength(restoredLogits.data.length)
+    reproducedLogits.data.forEach((value, index) => expect(value).toBeCloseTo(restoredLogits.data[index], 12))
     expect(sampleToken(decoderForward(restored, [0, 1, 2]).logits.data.slice(-5), { mode: 'greedy', temperature: 1, topK: 5, seed: 7 }).token).toBe(3)
   })
   it('rejects invalid checkpoint shapes and out-of-budget inputs', () => {

@@ -10,7 +10,9 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     globals: true,
     css: true,
-    maxWorkers: 4,
-    testTimeout: 10000,
+    // Full DOM/transformer tests contend for CPU on hosted runners. Preserve
+    // all assertions while allowing their real interaction sequences to finish.
+    maxWorkers: process.env.CI ? 2 : 4,
+    testTimeout: process.env.CI ? 30000 : 10000,
   },
 })

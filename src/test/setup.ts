@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+import { configure } from '@testing-library/react'
+
+// Training/evaluation deliberately yield between chunks; a one-second wait
+// can expire before their UI reports completion on slower CI machines.
+configure({ asyncUtilTimeout: 5000 })
 
 class ResizeObserverStub {
   observe() {}
