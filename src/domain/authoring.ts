@@ -24,6 +24,7 @@ export const operationHelp: Partial<Record<NodeType, string>> = {
   concat: 'Axis 1 treats vectors as single columns: four [112] inputs become [112, 4]. Vectors can join matrices with the same row count. Axis 0 joins vectors end to end; higher-rank tensors keep their original shape rules.',
   softmax: 'Normalizes the last axis into probabilities. For classification training, wire logits directly to Cross-entropy.',
   'causal-mask': 'Masks positions above the diagonal of a square [tokens, tokens] score matrix before softmax.',
+  standardize: 'Fit column means and population standard deviations on training rows in Details. Fixed statistics are reused for prediction; constant columns use scale 1. Place before trainable layers.',
   dropout: 'During training, independently drop each activation with probability p and scale survivors by 1/(1−p). Evaluation passes inputs unchanged. Backward reuses the forward mask.',
   'layer-norm': 'Ports: input [tokens, width], learned scale γ [width], learned bias β [width]. Initialize γ to ones and β to zeros.',
   reshape: 'Changes shape without changing the number of values. Use one -1 to infer a dimension (e.g. -1, 1 for numeric batches). Empty shape makes a scalar (one value only).',

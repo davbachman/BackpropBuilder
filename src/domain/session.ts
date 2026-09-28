@@ -1,3 +1,4 @@
+import {isStandardizationStats} from './standardization'
 import {isTrainingSettings} from './trainingSettings'
 import { cloneGraph } from './engine'
 import { isDatasetKind } from './datasets'
@@ -39,7 +40,7 @@ const NODE_TYPES = new Set([
   'target',
   'loss',
   'one-hot', 'conv2d', 'avgpool2d',
-  'dropout', 'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
+  'standardize', 'dropout', 'embedding', 'transpose', 'slice', 'concat', 'softmax', 'causal-mask', 'layer-norm', 'reshape', 'mean', 'cross-entropy',
 ])
 const ACTIVATION_KINDS = new Set<ActivationKind>(['identity', 'relu', 'sigmoid', 'tanh'])
 const LOSS_KINDS = new Set<LossKind>(['squared-error', 'mse', 'mae', 'binary-cross-entropy', 'cross-entropy'])
@@ -242,6 +243,7 @@ function isNodeParams(value: unknown): value is NodeParams {
     isOptionalNonNegativeInteger(value.end) &&
     (value.axes === undefined || (Array.isArray(value.axes) && value.axes.every(isNonNegativeInteger))) &&
     (value.shape === undefined || (Array.isArray(value.shape) && value.shape.every(d => isNonNegativeInteger(d) || d === -1))) &&
+    (value.standardization === undefined || isStandardizationStats(value.standardization)) &&
     (value.dropoutRate === undefined || (isFiniteNumber(value.dropoutRate) && value.dropoutRate >= 0 && value.dropoutRate < 1)) &&
     (value.epsilon === undefined || (isFiniteNumber(value.epsilon) && value.epsilon > 0)) &&
     (value.keepDims === undefined || typeof value.keepDims === 'boolean')

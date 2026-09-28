@@ -1,3 +1,4 @@
+import {StandardizationInspector} from './StandardizationInspector'
 import { useState } from 'react'
 import { initializeTensor, operationHelp, type Initializer } from '../domain/authoring'
 import { ConvolutionInspector } from './ConvolutionInspector'
@@ -181,6 +182,7 @@ export function ModelInspector({
                 onValue={onValue}
               />
             )}
+          {node.type === 'standardize' && !node.id.startsWith('inspect:') && <StandardizationInspector key={node.id} graph={graph} node={node} onParams={onParams}/>}
           {node.type === 'dropout' && !node.id.startsWith('inspect:') && <label className="inspector-field">Dropout probability<input aria-label="Dropout probability" type="number" min="0" max="0.99" step="0.05" value={node.params.dropoutRate ?? 0.1} onChange={event => onParams(node.id,{dropoutRate:Number(event.target.value)})}/><span>Training drops activations and scales survivors. Evaluation passes them unchanged.</span></label>}
           {node.type === 'activation' &&
             !binding &&

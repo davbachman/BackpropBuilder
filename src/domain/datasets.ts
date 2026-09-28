@@ -180,8 +180,15 @@ export function datasetForNode(node: GraphNode): ToyDataset {
   }
   return DATASET_OPTIONS.find(dataset => dataset.kind === node.params.dataset) ?? DATASET_OPTIONS[0]
 }
+const numericExamplesCache = new WeakMap<ToyDataset, DatasetExample[]>()
+const explicitSplitCache = new WeakMap<CustomCsvData, DatasetExample[]>()
 export function datasetExamples(dataset: ToyDataset): DatasetExample[] {
-  return dataset.examples ?? dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task.includes('classification') ? [1] : [], [target]) }))
+  if (dataset.examples) return dataset.examples
+  const cached = numericExamplesCache.get(dataset)
+  if (cached) return cached
+  const examples: DatasetExample[] = dataset.targetValue.data.map((target, i) => ({ label: `Example ${i + 1}`, split: i % 4 === 0 ? 'test' : 'train', features: dataset.featureValues.map(value => tensorValue([], [value.data[i]])), target: tensorValue(dataset.task.includes('classification') ? [1] : [], [target]) }))
+  numericExamplesCache.set(dataset, examples)
+  return examples
 }
 const splitCache = new WeakMap<ToyDataset, Map<number, DatasetExample[]>>()
 /** An optional, deterministic split overrides the included examples' default
@@ -189,7 +196,14 @@ const splitCache = new WeakMap<ToyDataset, Map<number, DatasetExample[]>>()
 export function datasetExamplesForNode(node: GraphNode): DatasetExample[] {
   const dataset = datasetForNode(node)
   if (node.params.dataset === 'custom-text') return datasetExamples(dataset)
-  if(node.params.customCsv?.splits) return datasetExamples(dataset).map((e,i)=>({...e,split:node.params.customCsv!.splits![i]}))
+  if (node.params.customCsv?.splits) {
+    const csv = node.params.customCsv
+    const cached = explicitSplitCache.get(csv)
+    if (cached) return cached
+    const examples = datasetExamples(dataset).map((e, i) => ({ ...e, split: csv.splits![i] }))
+    explicitSplitCache.set(csv, examples)
+    return examples
+  }
   const percent = node.params.trainPercent
   if (percent === undefined) return datasetExamples(dataset)
   const cached = !dataset.examples && splitCache.get(dataset)?.get(percent)
@@ -198,7 +212,9 @@ export function datasetExamplesForNode(node: GraphNode): DatasetExample[] {
   const groups = new Map<string, number[]>()
   examples.forEach((example, index) => {
     const key = dataset.task.includes('classification') ? String(example.target.data[0]) : 'all'
-    groups.set(key, [...(groups.get(key) ?? []), index])
+    const group = groups.get(key) ?? []
+    group.push(index)
+    groups.set(key, group)
   })
   const training = new Set<number>()
   for (const [key, indexes] of groups) {

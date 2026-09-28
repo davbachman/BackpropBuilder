@@ -75,6 +75,7 @@ export function createNode(type: NodeType, index: number): GraphNode {
   if (type === 'activation') {
     return { ...opNode(`activation-${index}`, type, 'activation', baseX, baseY), params: { activation: 'sigmoid' } }
   }
+  if (type === 'standardize') return opNode('standardize-' + index, type, 'Standardize features', baseX, baseY)
   if (type === 'dropout') return { ...opNode('dropout-' + index, type, 'Dropout', baseX, baseY), params: { dropoutRate: 0.1 } }
   if (type === 'one-hot') return { ...opNode('one-hot-' + index, type, 'One-hot', baseX, baseY), params: { numClasses: 2 } }
   if (type === 'arithmetic') return { ...opNode(`arithmetic-${index}`, type, 'Arithmetic', baseX, baseY), params: { expression: 'x1 * x2' } }

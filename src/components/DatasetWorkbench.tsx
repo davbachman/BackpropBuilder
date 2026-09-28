@@ -66,7 +66,8 @@ export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, o
       if (mode === 'batch') update({datasetSplit:next})
       else update({datasetSplit:next,datasetIndex:examples.findIndex(example => next === 'all' || example.split === next)})
     }}><option value="all">All examples</option><option value="train">Training · {counts.train}</option><option value="test">Held out · {counts.test}</option></select></label>
-    {mode === 'sample' && <label className="inspector-field">Current example<select aria-label="Dataset example" value={index} onChange={event => update({ datasetIndex: Number(event.target.value) })}>
+    {mode === 'sample' && examples.length > 500 && <label className="inspector-field">Current example<input type="number" aria-label="Dataset example number" min={1} max={examples.length} value={index + 1} onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 1 && value <= examples.length) update({ datasetIndex: value - 1 }) }}/><small>{examples[index]?.split} · {examples.length} examples</small></label>}
+    {mode === 'sample' && examples.length <= 500 && <label className="inspector-field">Current example<select aria-label="Dataset example" value={index} onChange={event => update({ datasetIndex: Number(event.target.value) })}>
       {examples.map((example, i) => (split === 'all' || example.split === split || i === index) && <option key={i} value={i}>{i + 1}. {example.label} · {example.split}</option>)}
     </select></label>}
     {image && <div className="dataset-image-preview"><div role="img" aria-label={`Handwritten digit ${datasetOutputValueForSlot(node, 1).data[0]}`} style={{display:'grid',gridTemplateColumns:'repeat(8, 1fr)'}}>{image.data.map((pixel, i) => <i key={i} style={{background:`rgba(77,67,128,${pixel})`}} />)}</div><span>Label<strong>{datasetOutputValueForSlot(node, 1).data[0]}</strong><small>8 × 8 × 1 · normalized pixels</small></span></div>}

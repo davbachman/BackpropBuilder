@@ -24,6 +24,7 @@ class CurriculumModel(TextTensorModel):
             axes=next((x[1] for x in args if 'batch' in x[1]),args[0][1] if args else [])
             if kind in ('weight','bias'):v=self.parameter_map[key];axes=['feature']*v.ndim
             elif kind in ('input','target'):v=a[0] if a else torch.tensor(p['value']['data']).reshape(p['value']['shape'])
+            elif kind=='standardize':v=(a[0]-torch.tensor(p['standardization']['mean'],dtype=a[0].dtype))/torch.tensor(p['standardization']['scale'],dtype=a[0].dtype)
             elif kind=='embedding':v=F.embedding(a[1].long(),a[0]);axes=args[1][1]+['feature']
             elif kind=='matmul':v=a[0]@a[1];axes=args[0][1][:-1]+args[1][1][-1:]
             elif kind=='arithmetic':v=self.arithmetic(self.expressions[key],a)

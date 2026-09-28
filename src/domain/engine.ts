@@ -1,3 +1,4 @@
+import {isStandardizationStats, standardize} from './standardization'
 import {parameterPenalty,penaltyGradients} from './regularization'
 import { resolveReshape } from './reshape'
 import { arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
@@ -102,6 +103,7 @@ export const inputArityByType: Record<NodeType, number> = {
   add: 2,
   arithmetic: 2,
   activation: 1,
+  standardize: 1,
   dropout: 1,
   target: 1,
   loss: 2,
@@ -207,6 +209,7 @@ export function formulaForNode(node: GraphNode, graph?: GraphModel, valueFormatt
       ? `${outputLabel} = column_stack(${inputLabels.join(', ')})`
       : `${outputLabel} = concat(${inputLabels.join(', ')}, axis=${node.params.axis})`
     case 'softmax': return `${outputLabel} = softmax(${inputLabels[0]})`
+    case 'standardize': return `${outputLabel} = (${inputLabels[0]} − μ_train) / s_train`
     case 'dropout': return `${outputLabel} = training ? mask · ${inputLabels[0]} / (1 − ${node.params.dropoutRate ?? 0.1}) : ${inputLabels[0]}`
     case 'causal-mask': return `${outputLabel}[i,j] = ${inputLabels[0]}[i,j] if j ≤ i; otherwise −∞`
     case 'layer-norm': return `${outputLabel} = γ · (${inputLabels[0]} − mean) / √(variance + ε) + β`
@@ -541,6 +544,7 @@ export function validateGraph(graph: GraphModel, options: { requireLoss?: boolea
   }
 
   for (const node of graph.nodes) if (isLossNode(node) && ((!['none','l1','l2'].includes(node.params.regularization??'none')) || !Number.isFinite(node.params.regularizationStrength??0) || (node.params.regularizationStrength??0)<0 || node.params.regularizationParameterIds?.some(id=>!graph.nodes.some(n=>n.id===id&&(n.type==='weight'||n.type==='bias'))))) issues.push({code:'invalid-value',nodeId:node.id,message:'Regularization needs a nonnegative finite strength and existing parameter blocks.'})
+  for (const node of graph.nodes) if (node.type === 'standardize' && !isStandardizationStats(node.params.standardization)) issues.push({code:'invalid-value',nodeId:node.id,message:'Fit Standardize features on training rows in Details.'})
   for (const node of graph.nodes) if (node.type === 'dropout' && (!Number.isFinite(node.params.dropoutRate ?? 0.1) || (node.params.dropoutRate ?? 0.1) < 0 || (node.params.dropoutRate ?? 0.1) >= 1)) issues.push({code:'invalid-value',nodeId:node.id,message:'Dropout probability must be at least 0 and less than 1.'})
   issues.push(...validateTensorShapes(graph))
   issues.push(...validateDiscreteInputs(graph))
@@ -618,6 +622,7 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   }
   const [first, second, third] = inputShapes
   const axis = node.params.axis ?? (node.type === 'concat' ? 1 : 0)
+  if (node.type === 'standardize') return !isStandardizationStats(node.params.standardization) || node.params.standardization.mean.length === 1 || first.at(-1) === node.params.standardization.mean.length ? [...first] : undefined
   if (node.type === 'dropout') return [...first]
   if (node.type === 'conv2d') return first.length === 3 && second.length === 4 && third.length === 1 && first[2] === second[3] && second[0] === third[0] && first[0] >= second[1] && first[1] >= second[2] ? [first[0] - second[1] + 1, first[1] - second[2] + 1, second[0]] : undefined
   if (node.type === 'avgpool2d') return first.length === 3 && first[0] >= 2 && first[1] >= 2 ? [Math.floor(first[0] / 2), Math.floor(first[1] / 2), first[2]] : undefined
@@ -869,6 +874,11 @@ function computeForward(
     return { value: sourceForwardValue(node, inputs), localDerivatives: [] }
   }
 
+  if (node.type === 'standardize') {
+    const result = standardize(inputs[0], node.params.standardization)
+    return {value:result.value, localDerivative:result.derivative, localDerivatives:[result.derivative]}
+  }
+
   if (node.type === 'dropout') {
     const p = node.params.dropoutRate ?? 0.1
     const derivative = tensorValue(inputs[0].shape, inputs[0].data.map(() => options.training && p > 0 ? ((options.random ?? Math.random)() < p ? 0 : 1 / (1 - p)) : 1))
@@ -1059,7 +1069,7 @@ function computeBackward(
     return incoming.map((edge, index) => ({ edgeId: edge.id, sourceId: edge.source, gradient: gradients[index] }))
   }
 
-  if (node.type === 'activation' || node.type === 'dropout') {
+  if (node.type === 'activation' || node.type === 'dropout' || node.type === 'standardize') {
     const derivative = node.localDerivative ?? node.cache?.localDerivatives[0] ?? oneLike(values[0])
     return [
       {
@@ -1320,6 +1330,7 @@ function calculationForForward(node: GraphNode, inputs: TensorValue[]): string {
   if (node.type === 'arithmetic') {
     return `${(node.params.expression ?? 'x1 * x2').replace(/x([1-9]\d*)\b/g, (_, index: string) => formatNumber(inputs[Number(index) - 1]))} = ${formatNumber(node.value)}`
   }
+  if (node.type === 'standardize') return `(${formatNumber(inputs[0])} − fitted training mean) / fitted scale = ${formatNumber(node.value)}`
   if (node.type === 'dropout') return `${formatNumber(inputs[0])} × saved scale ${formatNumber(node.localDerivative)} = ${formatNumber(node.value)}`
   if (node.type === 'activation') {
     return `${node.params.activation ?? 'identity'}(${formatNumber(inputs[0])}) = ${formatNumber(node.value)}`
@@ -1358,6 +1369,7 @@ function derivativeFormula(node: GraphNode, graph?: GraphModel): string {
   }
   if (node.type === 'add') return inputLabels.map((label) => `dz/d${label} = 1`).join(', ')
   if (node.type === 'arithmetic') return `Apply the chain rule to ${node.params.expression ?? 'x1 * x2'} for each input.`
+  if (node.type === 'standardize') return 'dOutput/dInput = 1 / training_standard_deviation; fitted statistics are constants'
   if (node.type === 'dropout') return `dOutput/dInput = saved forward mask / (1 − p) during training; 1 during evaluation`
   if (node.type === 'activation') {
     const activation = node.params.activation ?? 'identity'
@@ -1410,6 +1422,7 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
   if (node.type === 'arithmetic') return [formulaForNode(node, graph).replaceAll('^', '**')]
+  if (node.type === 'standardize') return ['z = (input - fitted_training_mean) / fitted_training_scale']
   if (node.type === 'dropout') return ['mask = Bernoulli(1 - p)', 'z = input * mask / (1 - p) if training else input']
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
   const lossKind = lossKindForNode(node, graph)
@@ -1429,6 +1442,7 @@ function pseudocodeForBackward(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['for each input i:', '  input_i.grad += g * product(other inputs)']
   if (node.type === 'add') return ['for each input:', '  input.grad += g']
   if (node.type === 'arithmetic') return ['for each input i:', '  input_i.grad += g * ∂expression/∂input_i']
+  if (node.type === 'standardize') return ['input.grad += g / fitted_training_scale']
   if (node.type === 'dropout') return ['input.grad += g * saved_forward_scale']
   if (node.type === 'activation') return ['u.grad += g * local_derivative']
   if (node.type === 'loss') return lossBackwardPseudocode(lossKindForNode(node, graph))

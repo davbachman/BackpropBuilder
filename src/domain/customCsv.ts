@@ -1,6 +1,6 @@
 import type { CustomCsvData } from './types'
 
-const MAX_ROWS = 10_000
+const MAX_ROWS = 50_000
 const MAX_COLUMNS = 129
 const MAX_FILE_CHARACTERS = 10_000_000
 
@@ -52,7 +52,7 @@ export function analyzeCustomCsv(csv: CustomCsvData): CsvColumns {
     throw new Error('The CSV table or target column is invalid.')
   }
   const dataRows = csv.rows.slice(csv.hasHeader ? 1 : 0)
-  if (dataRows.length < 2 || dataRows.length > MAX_ROWS) throw new Error('CSV needs 2–10,000 data rows.')
+  if (dataRows.length < 2 || dataRows.length > MAX_ROWS) throw new Error('CSV needs 2–50,000 data rows.')
   if(csv.splits && (csv.splits.length!==dataRows.length || csv.splits.some(s=>s!=='train'&&s!=='test') || !csv.splits.includes('train') || !csv.splits.includes('test'))) throw Error('Explicit splits must provide train/test for every data row.')
   const rawHeaders = csv.hasHeader ? csv.rows[0] : Array.from({ length: width }, (_, index) => index === csv.targetColumn ? 'y' : `x${index + 1}`)
   const headers = rawHeaders.map((header, index) => header.trim() || `column ${index + 1}`)

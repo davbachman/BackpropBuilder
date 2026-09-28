@@ -19,6 +19,7 @@ export type NodeType =
   | 'softmax'
   | 'causal-mask'
   | 'layer-norm'
+  | 'standardize'
   | 'dropout'
   | 'reshape'
   | 'tensor-transform'
@@ -117,6 +118,7 @@ export interface NodeParams {
   end?: number
   axes?: number[]
   shape?: number[]
+  standardization?: import('./standardization').StandardizationStats
   dropoutRate?: number
   epsilon?: number
   keepDims?: boolean

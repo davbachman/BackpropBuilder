@@ -14,7 +14,7 @@ type Axis = 'batch' | 'token' | 'feature'
 type Signal = {value:tf.Tensor; axes:Axis[]}
 export interface TensorMetrics {loss:number; objective?:number; accuracy:number; examples:number}
 export interface TensorReport {epoch:number; train:TensorMetrics; validation:TensorMetrics; improved:boolean}
-const SUPPORTED = new Set(['dropout','dataset','weight','bias','input','target','matmul','arithmetic','multiply','add','activation','embedding','one-hot','transpose','tensor-transform','mean','softmax','causal-mask','layer-norm','loss','cross-entropy','concat','reshape','slice'])
+const SUPPORTED = new Set(['standardize','dropout','dataset','weight','bias','input','target','matmul','arithmetic','multiply','add','activation','embedding','one-hot','transpose','tensor-transform','mean','softmax','causal-mask','layer-norm','loss','cross-entropy','concat','reshape','slice'])
 
 /** Probe actual forward AND gradient kernels; merely initializing a backend is insufficient. */
 export async function selectTensorBackend(graph:GraphModel, requested:TrainingSettings['backend'], settings:TrainingSettings=DEFAULT_TRAINING) {
@@ -131,6 +131,7 @@ export class TensorGraph {
         case 'weight':case 'bias': value=this.variables.get(node.id)!;axes=value.shape.map(()=>'feature');break
         case 'input':case 'target': {const constant=toTensor(node.params.value);value=a??tf.tensor(constant.data,constant.shape);axes=args[0]?.axes??value.shape.map(()=>'feature');break}
         case 'embedding': value=tf.gather(a,b.toInt());axes=[...args[1].axes,'feature'];break
+        case 'standardize': {const stats=node.params.standardization!;value=tf.div(tf.sub(a,stats.mean.length===1?tf.scalar(stats.mean[0]):tf.tensor1d(stats.mean)),stats.scale.length===1?tf.scalar(stats.scale[0]):tf.tensor1d(stats.scale));break}
         case 'one-hot':value=tf.oneHot(a.toInt(),node.params.numClasses??2);axes=[...args[0].axes,'feature'];break
         case 'matmul':
           if(args[1].axes[0]==='batch'&&args[0].axes[0]!=='batch') throw Error('Tensor training currently needs batched matrix products to have the batch on the left input.')

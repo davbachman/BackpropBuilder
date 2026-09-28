@@ -77,6 +77,7 @@ function operationCode(node: GraphNode, args: string[], graph: GraphModel): stri
       return `${a}.narrow(${axis}, ${start}, ${length})`
     }
     case 'concat': return `torch.cat([${args.map(value => axis === 1 ? `(${value}.reshape(-1, 1) if ${value}.ndim == 1 else ${value})` : value).join(', ')}], dim=${axis})`
+    case 'standardize': return `(${a} - ${tensorCode({shape:node.params.standardization!.mean.length===1?[]:[node.params.standardization!.mean.length],data:node.params.standardization!.mean})}) / ${tensorCode({shape:node.params.standardization!.scale.length===1?[]:[node.params.standardization!.scale.length],data:node.params.standardization!.scale})}`
     case 'dropout': return `F.dropout(${a}, p=${node.params.dropoutRate ?? 0.1}, training=self.training)`
     case 'softmax': return `torch.softmax(${a}, dim=-1)`
     case 'causal-mask': return `${a}.masked_fill(torch.triu(torch.ones_like(${a}, dtype=torch.bool), diagonal=1), float('-inf'))`

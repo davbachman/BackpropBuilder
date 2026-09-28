@@ -42,3 +42,7 @@ For regression, use mean squared error or mean absolute error. For a binary clas
 ## Dropout
 
 Connect one tensor input; output shape is unchanged. Set **Dropout probability** in Details (default 0.1, valid range 0 inclusive to 1 exclusive). During training, independently zero entries with probability p and scale retained entries by 1/(1−p). The backward pass uses the same mask. Run forward, reporting, inference, and generation use the unchanged input. Step on a training example and epoch training enable dropout. A probability of zero disables the block. See the [dropout experiment](IMDB-DROPOUT-STUDY.md) for placements and results.
+
+## Standardize features
+
+Fixed feature preprocessing: (x − training mean) / training standard deviation. Fit explicitly in the inspector after connecting inputs. Uses only training examples, treats constant columns with scale 1, and saves statistics for inference and export. Supports scalars or feature vectors on the last tensor axis. This is dataset feature scaling, distinct from Layer norm. See [housing exercise](STANDARDIZATION-HOUSING-PILOT.md).
