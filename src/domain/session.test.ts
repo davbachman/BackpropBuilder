@@ -7,6 +7,7 @@ import {
   parseProjectStateFile,
 } from './session'
 import {DEFAULT_TRAINING} from './trainingSettings'
+import { mergePreservingLayout } from './mergeLayout'
 import { scalarValue } from './tensor'
 import type { ProjectStateSnapshot } from './types'
 
@@ -128,6 +129,21 @@ describe('project state files', () => {
     result.file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y = 999
     expect(file.state.graph.view!.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)
     expect(snapshot.graph.view.layoutOffsets!['inspect:blocks.0.ff1.layer:0:w0'].y).toBe(12)
+  })
+
+  it('round-trips merged geometry and rejects invalid saved scales', () => {
+    const snapshot = projectSnapshot()
+    snapshot.graph = mergePreservingLayout(snapshot.graph, ['w', 'mul', 'add']).graph
+    const file = createProjectStateFile(snapshot)
+    const result = parseProjectStateFile(JSON.stringify(file))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.file.state.graph.view?.preservedLayouts).toEqual(snapshot.graph.view?.preservedLayouts)
+    expect(result.file.state.graph.view?.preservedLayoutBounds).toEqual(snapshot.graph.view?.preservedLayoutBounds)
+    result.file.state.graph.view!.preservedLayouts!['group-1'].w.x += 100
+    expect(result.file.state.graph.view?.preservedLayouts).not.toEqual(snapshot.graph.view?.preservedLayouts)
+    file.state.graph.view!.preservedLayouts!['group-1'].w.scale = -1
+    expect(parseProjectStateFile(JSON.stringify(file)).ok).toBe(false)
   })
 
   it('round-trips the wiring-independent layout without sharing mutable edge references', () => {

@@ -23,6 +23,7 @@ export function compactVisualHierarchy(graph: GraphModel): GraphModel {
   const replacements = new Map<string, string>()
   const byId = new Map(groups.map(group => [group.id, group]))
   for (const group of groups) {
+    if (graph.view?.preservedLayouts?.[group.id]) continue
     const children = groups.filter(child => child.parentId === group.id)
     const child = children[0]
     if (children.length === 1 && child.nodeIds.length > 0 && child.nodeIds.length === group.nodeIds.length && child.nodeIds.every(id => group.nodeIds.includes(id))) {
@@ -88,6 +89,7 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
   }
   const manualPlacements = graph.view?.manualNodePlacements ?? {}
   const activeManualPlacement = (id: string) => {
+    if (graph.view?.preservedLayouts?.[ownerByNode.get(id)?.id ?? '']?.[id]) return undefined
     const placement = manualPlacements[id]
     // Grouping changes ownership, but an older manual placement can still
     // point at the previous level. Let membership win so every selected block
@@ -107,12 +109,18 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       view: { expandedGroupIds: [], layoutEdges: graph.view?.layoutEdges },
     }
     const local = layoutSemanticGraph(localGraph, true, parent)
+    const preserved = graph.view?.preservedLayouts?.[parent?.id ?? '']
+    if (preserved) {
+      for (const [id, rect] of local.nodes) local.nodes.set(id, preserved[id] ?? rect)
+      for (const [id, rect] of local.groups) local.groups.set(id, preserved[sceneGroupId(id)] ?? rect)
+    }
     const rects = [...local.nodes.values(), ...local.groups.values()]
     if (!rects.length && !manualNodes.length) return
-    const left = rects.length ? Math.min(...rects.map(rect => rect.x)) : 0
-    const top = rects.length ? Math.min(...rects.map(rect => rect.y)) : 0
-    const width = rects.length ? Math.max(...rects.map(rect => rect.x + rect.width)) - left : 176
-    const height = rects.length ? Math.max(...rects.map(rect => rect.y + rect.height)) - top : 112
+    const savedBounds = graph.view?.preservedLayoutBounds?.[parent?.id ?? '']
+    const left = savedBounds?.x ?? (rects.length ? Math.min(...rects.map(rect => rect.x)) : 0)
+    const top = savedBounds?.y ?? (rects.length ? Math.min(...rects.map(rect => rect.y)) : 0)
+    const width = savedBounds?.width ?? (rects.length ? Math.max(...rects.map(rect => rect.x + rect.width)) - left : 176)
+    const height = savedBounds?.height ?? (rects.length ? Math.max(...rects.map(rect => rect.y + rect.height)) - top : 112)
     let scale = 1, x = 0, y = 0
     if (parent) {
       const frame = scene.groups.get(parent.id)!, outerScale = scene.scales.get(sceneGroupId(parent.id))!
@@ -144,7 +152,7 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       const placed = { x: x + rect.x * scale + (offset?.x ?? 0), y: y + rect.y * scale + (offset?.y ?? 0), width: rect.width * scale, height: rect.height * scale }
       if (group) scene.groups.set(id, placed)
       else scene.nodes.set(id, placed)
-      scene.scales.set(key, scale)
+      scene.scales.set(key, scale * (preserved?.[key]?.scale ?? 1))
       scene.parents.set(key, parent?.id)
       ids.push(key)
     }

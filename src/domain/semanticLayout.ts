@@ -61,6 +61,15 @@ export function layoutSemanticGraph(graph: GraphModel, nestedCards = false, root
       const source = owner.get(edge.source), target = owner.get(edge.target)
       return source && target && source !== target ? [{ ...edge, from: source, to: target }] : []
     })
+    // Independent calculations in a hand-built module have no dependency
+    // columns. Use a horizontal row instead of a tall column of rank-zero nodes.
+    if (parent?.detail?.userCreated && links.length === 0) {
+      const position = (item: Item) => item.node?.position ?? item.group?.position ?? { x: 0, y: 0 }
+      const ordered = [...items].sort((a, b) => position(a).x - position(b).x || position(a).y - position(b).y)
+      let x = 0
+      for (const item of ordered) { item.x = x; item.y = 0; x += item.width + COLUMN_GAP }
+      return items
+    }
     for (const edge of edges) {
       const source = owner.get(edge.source)
       const target = owner.get(edge.target)

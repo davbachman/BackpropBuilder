@@ -387,6 +387,8 @@ export function cloneGraph(graph: GraphModel): GraphModel {
     training: graph.training ? {...graph.training} : undefined,
     view: graph.view ? {
       ...graph.view,
+      preservedLayouts: graph.view.preservedLayouts ? structuredClone(graph.view.preservedLayouts) : undefined,
+      preservedLayoutBounds: graph.view.preservedLayoutBounds ? structuredClone(graph.view.preservedLayoutBounds) : undefined,
       inspectedNeuron: graph.view.inspectedNeuron ? { ...graph.view.inspectedNeuron } : undefined,
       layoutOffsets: graph.view.layoutOffsets ? Object.fromEntries(Object.entries(graph.view.layoutOffsets).map(([id, offset]) => [id, { ...offset }])) : undefined,
       manualNodePlacements: graph.view.manualNodePlacements ? Object.fromEntries(Object.entries(graph.view.manualNodePlacements).map(([id, placement]) => [id, { ...placement, offset: { ...placement.offset } }])) : undefined,

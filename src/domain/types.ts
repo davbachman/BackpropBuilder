@@ -173,6 +173,9 @@ export interface GraphGroup {
 }
 
 export interface GraphViewState {
+  /** Local rectangles captured on merge, keyed by parent group (empty key = model). */
+  preservedLayouts?: Record<string, Record<string, { x: number; y: number; width: number; height: number; scale: number }>>
+  preservedLayoutBounds?: Record<string, { x: number; y: number; width: number; height: number }>
   canvasStyle?: 'builder' | 'architecture'
   semanticZoom?: boolean
   inspectedNeuron?: { groupId: string; unitIndex: number; row: number }

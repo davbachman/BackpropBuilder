@@ -1,4 +1,5 @@
 import {DEFAULT_TRAINING, type TrainingSettings} from './domain/trainingSettings'
+import { mergePreservingLayout, ungroupPreservingLayout } from './domain/mergeLayout'
 import { DatasetWorkbench } from './components/DatasetWorkbench'
 import { datasetExamplesForNode, datasetForNode, datasetMode } from './domain/datasets'
 import { parseCustomCsv } from './domain/customCsv'
@@ -92,8 +93,6 @@ import {
 } from './domain/examples'
 import {
   collapsedGroupForNode,
-  explodeVisualGroup,
-  mergeNodesIntoVisualGroup,
   moveVisualGroup,
   setVisualGroupExpanded,
 } from './domain/grouping'
@@ -1049,7 +1048,7 @@ function App({
   }, [applyGraphChange, graph])
 
   const mergeSelectedNodes = useCallback(() => {
-    const result = mergeNodesIntoVisualGroup(graph, selectedNodeIds)
+    const result = mergePreservingLayout(graph, selectedNodeIds, displayGraph)
     if (!result.group) return
 
     pushHistory()
@@ -1057,7 +1056,7 @@ function App({
     setSelectedNodeIds([])
     setSelectedGroupId(result.group.id)
     setPendingNodeType(undefined)
-  }, [graph, pushHistory, selectedNodeIds])
+  }, [graph, displayGraph, pushHistory, selectedNodeIds])
 
   const explodeGroup = useCallback(
     (groupId: string) => {
@@ -1065,7 +1064,7 @@ function App({
       if (!group) return
 
       pushHistory()
-      setGraph(explodeVisualGroup(graph, groupId))
+      setGraph(ungroupPreservingLayout(graph, groupId))
       setSelectedNodeIds(group.nodeIds)
       setSelectedGroupId(undefined)
       setPendingNodeType(undefined)

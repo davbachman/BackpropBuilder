@@ -15,6 +15,32 @@ import {
 import type { GraphModel } from './types'
 
 describe('visual graph grouping', () => {
+  it('lays out a new module from current wires and discards offsets from its former level', () => {
+    const graph = createStarterGraph()
+    graph.view = { expandedGroupIds: [], layoutEdges: [], layoutOffsets: { mul: { x: 40, y: 20 }, target: { x: 10, y: 5 } } }
+    const original = structuredClone(graph)
+    const merged = mergeNodesIntoVisualGroup(graph, ['mul', 'add', 'pred']).graph
+    const scene = layoutContinuousScene(merged)
+    const multiply = scene.nodes.get('mul')!, add = scene.nodes.get('add')!, prediction = scene.nodes.get('pred')!
+    expect(multiply.x + multiply.width).toBeLessThan(add.x)
+    expect(add.x + add.width).toBeLessThan(prediction.x)
+    expect(merged.view?.layoutOffsets).toEqual({ target: { x: 10, y: 5 } })
+    expect(merged.nodes).toEqual(graph.nodes)
+    expect(merged.edges).toEqual(graph.edges)
+    expect(graph).toEqual(original)
+  })
+
+  it('places unconnected selected blocks side by side instead of stacking them vertically', () => {
+    const graph = createStarterGraph()
+    const merged = mergeNodesIntoVisualGroup(graph, ['x', 'w', 'b']).graph
+    const scene = layoutContinuousScene(merged)
+    const input = scene.nodes.get('x')!, weight = scene.nodes.get('w')!, bias = scene.nodes.get('b')!
+    expect(input.x + input.width).toBeLessThan(weight.x)
+    expect(weight.x + weight.width).toBeLessThan(bias.x)
+    expect(input.y).toBeCloseTo(weight.y)
+    expect(weight.y).toBeCloseTo(bias.y)
+  })
+
   it('merges selected nodes into editor metadata without changing computation nodes or edges', () => {
     const graph = createStarterGraph()
 

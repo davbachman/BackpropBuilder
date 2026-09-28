@@ -169,7 +169,7 @@ function GraphCanvasInner({
     nodes: renderedGraph.nodes.map(({ id, type, label, position, dimensions, params }) => ({ id, type, label, position, dimensions, params: { inputCount: params.inputCount, expression: params.expression, dataset: params.dataset, customCsv: params.customCsv ? csvGeometrySample(params.customCsv) : undefined } })),
     edges: renderedGraph.edges.map(({ id, source, target, inputSlot, sourceSlot }) => ({ id, source, target, inputSlot, sourceSlot })),
     groups: renderedGraph.groups,
-    view: { expandedGroupIds: [], layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges, manualNodePlacements: renderedGraph.view?.manualNodePlacements },
+    view: { expandedGroupIds: [], preservedLayouts: renderedGraph.view?.preservedLayouts, preservedLayoutBounds: renderedGraph.view?.preservedLayoutBounds, layoutOffsets: renderedGraph.view?.layoutOffsets, layoutEdges: renderedGraph.view?.layoutEdges, manualNodePlacements: renderedGraph.view?.manualNodePlacements },
   })
   const geometryGraph = useMemo(() => JSON.parse(geometryKey) as GraphModel, [geometryKey])
   const scene = useMemo(() => continuous ? layoutContinuousScene(geometryGraph) : undefined, [geometryGraph, continuous])
@@ -234,13 +234,13 @@ function GraphCanvasInner({
     else onGraphChange({ ...graph, view })
   }, [graph, onGraphChange, onViewChange])
   const compactLayout = useCallback(() => {
-    const cleanGraph = { ...renderedGraph, view: { ...renderedGraph.view!, layoutOffsets: undefined, layoutEdges: undefined } }
+    const cleanGraph = { ...renderedGraph, view: { ...renderedGraph.view!, preservedLayouts: undefined, preservedLayoutBounds: undefined, layoutOffsets: undefined, layoutEdges: undefined } }
     const clean = continuous ? layoutContinuousScene(cleanGraph) : layoutSemanticGraph(cleanGraph)
     const rects = [...clean.nodes.values(), ...clean.groups.values()]
     if (!rects.length) return
     const x = Math.min(...rects.map(rect => rect.x)), y = Math.min(...rects.map(rect => rect.y))
     const bounds = { x, y, width: Math.max(...rects.map(rect => rect.x + rect.width)) - x, height: Math.max(...rects.map(rect => rect.y + rect.height)) - y }
-    changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], layoutOffsets: undefined, layoutEdges: undefined, focusedGroupId: undefined,
+    changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], preservedLayouts: undefined, preservedLayoutBounds: undefined, layoutOffsets: undefined, layoutEdges: undefined, focusedGroupId: undefined,
       viewport: getViewportForBounds(bounds, canvasSize.width, canvasSize.height, .01, 1.5, .2) })
     onSelectionChange({ nodeIds: [] })
   }, [renderedGraph, continuous, graph.view, canvasSize, changeView, onSelectionChange])
@@ -953,7 +953,7 @@ function GraphCanvasInner({
         <button type="button" onClick={() => focusGroup(undefined)}><Maximize size={14} /> Fit model</button>
         {semantic ? <button type="button" onClick={compactLayout} title="Rearrange all blocks and fit the model; keep the current weights and values"><LayoutGrid size={14} /> Compact layout</button> : null}
       </nav> : null}
-      <div className={`flow-shell ${semantic ? 'semantic-flow' : ''}`} ref={shell} onPointerDownCapture={handleFlowPointerDownCapture} onDoubleClick={handlePaneDoubleClick}
+      <div className={`flow-shell ${semantic ? 'semantic-flow' : ''}`} style={{ '--selection-border-width': `${1 / cameraZoom}px` } as React.CSSProperties} ref={shell} onPointerDownCapture={handleFlowPointerDownCapture} onDoubleClick={handlePaneDoubleClick}
         onContextMenu={(event) => event.preventDefault()}
         onPointerMove={(event) => {
           const pan = secondaryPan.current
@@ -1021,7 +1021,7 @@ function GraphCanvasInner({
           selectionKeyCode={null}
           className={pendingNodeType ? 'placement-mode' : undefined}
         >
-          <Background color="var(--grid-dot)" gap={continuous ? 24 / cameraZoom : 24} size={continuous ? 1 / cameraZoom : 1} variant={BackgroundVariant.Dots} />
+          <Background color="var(--grid-dot)" gap={24 / cameraZoom} size={1 / cameraZoom} variant={BackgroundVariant.Dots} />
           <Controls showInteractive={false} />
         </ReactFlow>
         {addMenu ? <div className="canvas-add-menu" role="dialog" aria-label="Add a block" style={{ left: addMenu.x, top: addMenu.y }} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>

@@ -1,6 +1,7 @@
 import { denseGroupDetail } from './authoring'
 import { customCsvCardHeight, customCsvCardWidth } from './datasets'
 import { connectGraphNodes, type GraphConnection } from './graphEditing'
+import { layoutConnections } from './layoutState'
 import {
   MIN_NODE_HEIGHT,
   NODE_WIDTH,
@@ -63,8 +64,17 @@ export function mergeNodesIntoVisualGroup(graph: GraphModel, nodeIds: string[]):
     dimensions: { width: NODE_WIDTH, height: MIN_NODE_HEIGHT },
   }
   group.detail = { ...denseGroupDetail(graph, group), userCreated: true }
+  // Wiring edits freeze the previous layout to avoid moving blocks mid-drag.
+  // A new module must use its current internal wires, not that old snapshot.
+  const internalEdge = (edge: Pick<GraphEdge, 'source' | 'target'>) => selected.has(edge.source) && selected.has(edge.target)
+  const layoutEdges = graph.view?.layoutEdges?.filter(edge => !internalEdge(edge))
+  if (layoutEdges) layoutEdges.push(...layoutConnections(graph.edges.filter(internalEdge)))
+  const layoutOffsets = graph.view?.layoutOffsets && Object.fromEntries(
+    Object.entries(graph.view.layoutOffsets).filter(([key]) => !selected.has(key) &&
+      !groups.some(candidate => key === `visual-group:${candidate.id}` && candidate.nodeIds.every(nodeId => selected.has(nodeId)))),
+  )
   return {
-    graph: { ...graph, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: true }, groups: [...groups.map((candidate) =>
+    graph: { ...graph, view: { ...graph.view, layoutEdges, layoutOffsets, expandedGroupIds: graph.view?.expandedGroupIds ?? [], semanticZoom: true }, groups: [...groups.map((candidate) =>
       candidate.parentId === parent?.id && candidate.nodeIds.every((nodeId) => selected.has(nodeId))
         ? { ...candidate, parentId: id } : candidate), group] },
     group,

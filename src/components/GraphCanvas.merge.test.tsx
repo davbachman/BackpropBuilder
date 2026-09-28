@@ -6,7 +6,7 @@ import { GraphCanvas } from './GraphCanvas'
 import { createStarterGraph } from '../domain/examples'
 import { parseCustomCsv } from '../domain/customCsv'
 import { forwardPass } from '../domain/engine'
-import { mergeNodesIntoVisualGroup, explodeVisualGroup } from '../domain/grouping'
+import { mergePreservingLayout as mergeNodesIntoVisualGroup, ungroupPreservingLayout as explodeVisualGroup } from '../domain/mergeLayout'
 
 it.each([false, true])('merges and ungroups CSV models with explicit splits (dataset selected: %s)', async (includeDataset) => {
   const user = userEvent.setup()

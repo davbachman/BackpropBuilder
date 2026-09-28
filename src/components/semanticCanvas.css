@@ -1,10 +1,17 @@
-.semantic-flow { position: relative; background: radial-gradient(ellipse at 45% 35%, #fff 0%, #f5f8fc 72%, #eef3f9 100%); }
-/* Keep Safari's compositing layer on the unscaled renderer. Putting it on the
-   zoomed viewport lets a trace update rasterize the whole graph at 1x, then
-   magnify that bitmap. The screen-sized parent keeps text and wires sharp.
-   Related WebKit layering issue: https://bugs.webkit.org/show_bug.cgi?id=160661 */
-.semantic-flow .react-flow__renderer { transform: translateZ(0); }
-.semantic-flow .react-flow__background { opacity: .65; }
+.semantic-flow { position: relative; }
+/* Do not force a bitmap layer around the zoomed graph: Safari can magnify
+   that cached layer instead of repainting nested blocks at their final scale. */
+.flow-shell .react-flow__nodesselection-rect {
+  /* Shadows retain fractional widths; CSS borders can round up to one world
+     pixel, which becomes a thick frame when zooming into nested modules. */
+  border: 0;
+  box-shadow: 0 0 0 var(--selection-border-width, 1px) var(--accent);
+  background: transparent;
+}
+.flow-shell .react-flow__selection {
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
 .semantic-flow .react-flow__edge-path { stroke: #91a1bc; stroke-width: 1.8; }
 .semantic-flow .builder-edge.is-residual { stroke: #c59a59; stroke-width: 2.3; stroke-dasharray: 7 4; }
 .semantic-flow .react-flow__controls { border: 1px solid #dce3ed; border-radius: 12px; box-shadow: 0 5px 18px #27364d0a; overflow: hidden; }

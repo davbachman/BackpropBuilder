@@ -123,7 +123,6 @@
 .theme-dark .visual-group-node.semantic-group.has-error:not(.is-expanded) { background: #432b36; }
 
 /* Keep the canvas readable at every zoom level, including fading group covers. */
-.theme-dark .semantic-flow { background: radial-gradient(ellipse at 45% 32%, #202b3e 0%, #172132 68%, #121b2b 100%); }
 .theme-dark .react-flow {
   --xy-controls-button-background-color: #253047;
   --xy-controls-button-background-color-hover: #34415a;
@@ -136,7 +135,6 @@
 .theme-dark .react-flow__controls { border: 1px solid var(--border); box-shadow: 0 8px 24px #070b1980; }
 .theme-dark .react-flow__controls-button { background: #253047; color: var(--text); fill: var(--text); }
 .theme-dark .react-flow__controls-button svg { fill: var(--text); }
-.theme-dark .semantic-flow .react-flow__background { opacity: .7; }
 .theme-dark .semantic-flow .react-flow__edge-path { stroke: #71819d; }
 .theme-dark .semantic-flow .react-flow__controls { border-color: var(--border); box-shadow: 0 8px 24px #070b1980; }
 .theme-dark .semantic-flow .react-flow__controls button { background: #253047; border-color: var(--border); color: var(--text); fill: var(--text); }
