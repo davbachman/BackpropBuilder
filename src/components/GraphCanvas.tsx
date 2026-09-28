@@ -597,7 +597,8 @@ function GraphCanvasInner({
         : rect.height * (source ? builderOutputPortY(operation!, index) : builderInputPortY(operation!, index)) / builderCardHeight(operation!),
       width: 0, height: 0,
     })))
-    return { ...node, selectable: available && (!groupId || reveal < .95), focusable: available,
+    const selectable = available && (!groupId || reveal < .95)
+    return { ...node, selected: Boolean(node.selected && selectable), selectable, focusable: available,
       extent: parentBounds ? [[parentBounds.x, parentBounds.y], [parentBounds.x + parentBounds.width, parentBounds.y + parentBounds.height]] as [[number, number], [number, number]] : undefined,
       width: rect.width, height: rect.height, measured: { width: rect.width, height: rect.height }, handles,
       dragHandle: groupId && reveal > .95 ? '.visual-group-title-row' : undefined,

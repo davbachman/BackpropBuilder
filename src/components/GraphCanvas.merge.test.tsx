@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, it, vi } from 'vitest'
 import { GraphCanvas } from './GraphCanvas'
@@ -38,4 +38,25 @@ it.each([false, true])('merges and ungroups CSV models with explicit splits (dat
   expect(container.querySelector('[data-id="visual-group:group-1"]')).not.toBeInTheDocument()
   expect(container.querySelector('[data-id="mul"]')).toBeInTheDocument()
   expect(JSON.stringify(initial)).toBe(original)
+})
+
+it('releases the selected group when zoom reveals its selectable contents', async () => {
+  const merged = mergeNodesIntoVisualGroup(createStarterGraph(), ['mul', 'add'])
+  const onSelectionChange = vi.fn()
+  const props = {
+    selectedNodeIds: [], selectedGroupId: merged.group!.id, showMath: true, showGradient: true,
+    phase: 'edit' as const, onGraphChange: vi.fn(), onSelectionChange,
+    onCreateNode: vi.fn(), onCancelPendingPlacement: vi.fn(), onNodeValueChange: vi.fn(),
+    onActivationChange: vi.fn(), onGroupMove: vi.fn(), onGroupCreate: vi.fn(), onGroupExplode: vi.fn(),
+  }
+  const graph = { ...merged.graph, view: { ...merged.graph.view!, viewport: { x: 0, y: 0, zoom: .5 } } }
+  const { container, rerender } = render(<GraphCanvas {...props} graph={graph} />)
+  const group = () => container.querySelector('[data-id="visual-group:group-1"]')!
+  expect(group()).toHaveClass('selected')
+  rerender(<GraphCanvas {...props} graph={{ ...graph, view: { ...graph.view, viewport: { x: 0, y: 0, zoom: 20 } } }} />)
+  await waitFor(() => expect(group()).not.toHaveClass('selected'))
+  const inside = container.querySelector('[data-id="mul"]')!
+  expect(inside).toHaveClass('selectable')
+  fireEvent.click(inside)
+  expect(onSelectionChange).toHaveBeenCalledWith({ nodeIds: ['mul'] })
 })
