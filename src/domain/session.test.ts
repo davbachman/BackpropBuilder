@@ -37,12 +37,23 @@ function projectSnapshot(): ProjectStateSnapshot {
 }
 
 describe('project state files', () => {
+  it('imports legacy projects and saves them with the Neural Canvas format name', () => {
+    const file = createProjectStateFile(projectSnapshot())
+    const result = parseProjectStateFile(JSON.stringify({ ...file, kind: 'backprop-builder-state' }))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.file.kind).toBe('neural-canvas-state')
+    expect(result.file.state).toEqual(file.state)
+    expect(createProjectStateFile(result.file.state).kind).toBe('neural-canvas-state')
+  })
+
   it('creates a versioned project state file that preserves graph and workspace state', () => {
     const snapshot = projectSnapshot()
 
     const file = createProjectStateFile(snapshot)
 
-    expect(file.kind).toBe('backprop-builder-state')
+    expect(file.kind).toBe('neural-canvas-state')
     expect(file.version).toBe(1)
     expect(file.savedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(file.state.graph.learningRate).toBe(0.1)
@@ -172,11 +183,11 @@ describe('project state files', () => {
   it('rejects malformed project state files with a helpful error', () => {
     expect(parseProjectStateFile('{').ok).toBe(false)
     expect(parseProjectStateFile(JSON.stringify({ kind: 'session-summary', version: 1 })).ok).toBe(false)
-    expect(parseProjectStateFile(JSON.stringify({ kind: 'backprop-builder-state', version: 99 })).ok).toBe(false)
+    expect(parseProjectStateFile(JSON.stringify({ kind: 'neural-canvas-state', version: 99 })).ok).toBe(false)
     expect(
       parseProjectStateFile(
         JSON.stringify({
-          kind: 'backprop-builder-state',
+          kind: 'neural-canvas-state',
           version: 1,
           savedAt: new Date().toISOString(),
           state: { graph: { nodes: [], learningRate: 0.1 } },

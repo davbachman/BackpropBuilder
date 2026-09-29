@@ -1,10 +1,10 @@
 Created by David Bachman with Codex
 
-# Backprop Builder
+# Neural Canvas
 
-[Open Backprop Builder](https://davbachman.github.io/BackpropBuilder/)
+[Open Neural Canvas](https://davbachman.github.io/NeuralCanvas/)
 
-Backprop Builder is a visual, editable machine-learning workbench for students. Start with a blank canvas, connect individual calculations into a model, and watch values move forward and gradients move backward. Group calculations into neurons, layers, attention heads, or larger modules, then zoom between those scales. You can train and test on built-in or imported data and export a working PyTorch version of a supported graph.
+Neural Canvas is a visual, editable machine-learning workbench for students. Start with a blank canvas, connect individual calculations into a model, and watch values move forward and gradients move backward. Group calculations into neurons, layers, attention heads, or larger modules, then zoom between those scales. You can train and test on built-in or imported data and export a working PyTorch version of a supported graph.
 
 ## Guide
 

@@ -127,8 +127,8 @@ def read_json(path):
 
 def graph_from_file(path, data):
     file = read_json(path)
-    require(isinstance(file, dict) and file.get('kind') == 'backprop-builder-state' and file.get('version') == 1,
-            'Upload a JSON downloaded using File → Save in Backprop Builder.')
+    require(isinstance(file, dict) and file.get('kind') in ('neural-canvas-state', 'backprop-builder-state') and file.get('version') == 1,
+            'Upload a JSON downloaded using File → Save in Neural Canvas.')
     graph = file.get('state', {}).get('graph')
     require(isinstance(graph, dict), 'The file has no saved graph.')
     nodes, edges = graph.get('nodes'), graph.get('edges')

@@ -529,7 +529,7 @@ export function validateGraph(graph: GraphModel, options: { requireLoss?: boolea
   if (sorted.length !== graph.nodes.length) {
     issues.push({
       code: 'cycle',
-      message: 'The graph contains a cycle. Backprop Builder supports directed acyclic graphs only.',
+      message: 'The graph contains a cycle. Neural Canvas supports directed acyclic graphs only.',
     })
   }
 

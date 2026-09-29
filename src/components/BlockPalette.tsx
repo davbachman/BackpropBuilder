@@ -4,10 +4,10 @@ import { blockPalette, blockCategories } from '../domain/blockPalette'
 import type { NodeType } from '../domain/types'
 import './BlockPalette.css'
 
-const storageKey = 'backprop-builder-block-categories'
+const storageKey = 'neural-canvas-block-categories'
 function initialOpen(): string[] {
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
+    const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? localStorage.getItem('backprop-builder-block-categories') ?? 'null')
     if (Array.isArray(saved) && saved.every(value => typeof value === 'string')) {
       return saved.filter(value => blockCategories.some(category => category.id === value))
     }

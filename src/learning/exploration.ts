@@ -39,7 +39,7 @@ export interface ExplorationExecution {
 }
 
 export interface ExplorationFile {
-  kind: 'backprop-exploration'
+  kind: 'neural-canvas-exploration'
   version: 1
   state: ExplorationState
   execution?: ExplorationExecution
@@ -176,7 +176,7 @@ export function parseExploration(text: string): ExplorationFile {
     if (
       !value ||
       typeof value !== 'object' ||
-      value.kind !== 'backprop-exploration' ||
+      (value.kind !== 'neural-canvas-exploration' && (value as { kind: string }).kind !== 'backprop-exploration') ||
       value.version !== 1 ||
       !Array.isArray(value.comparisons)
     )
@@ -210,7 +210,7 @@ export function parseExploration(text: string): ExplorationFile {
       )
     )
       throw new Error(error)
-    return value
+    return { ...value, kind: 'neural-canvas-exploration' }
   } catch {
     throw new Error(error)
   }
@@ -222,7 +222,7 @@ export function downloadExploration(file: ExplorationFile) {
   )
   const a = document.createElement('a')
   a.href = url
-  a.download = `backprop-${file.state.kind}.json`
+  a.download = `neural-canvas-${file.state.kind}.json`
   a.click()
   URL.revokeObjectURL(url)
 }

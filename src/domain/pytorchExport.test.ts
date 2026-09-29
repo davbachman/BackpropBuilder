@@ -58,7 +58,7 @@ describe('PyTorch export', () => {
     expect(script).toContain('DATASET = load_dataset()')
     expect(script).toContain('json.load(source)')
     expect(script).not.toContain('-3.62')
-    expect(exported.datasetFile?.name).toBe('backprop-builder-dataset.json')
+    expect(exported.datasetFile?.name).toBe('neural-canvas-dataset.json')
     expect(JSON.parse(exported.datasetFile!.content).examples).toHaveLength(20)
     expect(exported.notebook).not.toContain('-3.62')
     expect(script).toContain('TRAIN_EPOCHS = 10')
@@ -124,10 +124,10 @@ describe('PyTorch export', () => {
   function runWithDataset(exported: ReturnType<typeof generatePyTorchExport>, script: string, harness?: string, csv = 'answer,feature\n2,1\n4,2\n6,3\n8,4\n') {
     const directory = mkdtempSync(join(tmpdir(), 'backprop-export-'))
     try {
-      writeFileSync(join(directory, 'backprop-builder-model.py'), script)
+      writeFileSync(join(directory, 'neural-canvas-model.py'), script)
       if (exported.datasetFile) writeFileSync(join(directory, exported.datasetFile.name), exported.datasetFile.content)
       else writeFileSync(join(directory, 'measurements.csv'), csv)
-      return spawnSync(python!, harness ? ['-c', harness] : ['backprop-builder-model.py'], {
+      return spawnSync(python!, harness ? ['-c', harness] : ['neural-canvas-model.py'], {
         cwd: directory, input: harness ? script : undefined, encoding: 'utf8', timeout: 120_000, env: { ...process.env, MPLBACKEND: 'Agg' },
       })
     } finally { rmSync(directory, { recursive: true, force: true }) }

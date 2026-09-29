@@ -14,7 +14,7 @@ vi.mock('./domain/examples', async (importOriginal) => {
 
 import App from './App'
 
-describe('Backprop Builder visualization data edits', () => {
+describe('Neural Canvas visualization data edits', () => {
   it('shows the complete linear dataset without the old experiment and instruction panels', () => {
     const { container } = render(<App initialGraph={createModelPreset('linear')} />)
     expect(screen.queryByText('Fit a function')).not.toBeInTheDocument()

@@ -116,16 +116,16 @@ export function NetworkLesson({ kind, onBuilder }: { kind: NetworkKind; onBuilde
     setNotice('Parameters reset reproducibly. The dataset and selected input are unchanged.')
   }
   const save = () => {
-    const blob = new Blob([JSON.stringify({ kind: 'backprop-network-experiment', version: 1, state, comparisons, view: { showMath, showCode, showGradients, instructorMode, showControls, zoom } }, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify({ kind: 'neural-canvas-network-experiment', version: 1, state, comparisons, view: { showMath, showCode, showGradients, instructorMode, showControls, zoom } }, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob), anchor = document.createElement('a')
-    anchor.href = url; anchor.download = `backprop-${kind}-experiment.json`; anchor.click(); URL.revokeObjectURL(url)
+    anchor.href = url; anchor.download = `neural-canvas-${kind}-experiment.json`; anchor.click(); URL.revokeObjectURL(url)
     setNotice('Saved inputs, parameters, seeds, hierarchy, comparisons, and display settings.')
   }
   const restore = async (file?: File) => {
     if (!file) return
     try {
       const document = JSON.parse(await file.text())
-      if (document.kind !== 'backprop-network-experiment' || document.version !== 1 || !validState(document.state, kind)) throw new Error('This is not a valid saved experiment for this lesson.')
+      if ((document.kind !== 'neural-canvas-network-experiment' && document.kind !== 'backprop-network-experiment') || document.version !== 1 || !validState(document.state, kind)) throw new Error('This is not a valid saved experiment for this lesson.')
       const imported = document.state as LessonState
       // Recompute cached output from saved parameters instead of trusting imported caches.
       imported.recorded = imported.recorded ? { model: copy(imported.model), calculation: runNetwork(imported.model, imported.example.x), loss: ['loss', 'backward', 'update'].includes(imported.phase) ? networkLoss(imported.model, [imported.example]).loss : null, gradients: imported.phase === 'backward' ? networkLoss(imported.model, [imported.example], true).gradients : null } : null

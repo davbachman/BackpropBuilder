@@ -2,7 +2,7 @@
 
 [Guide home](../README.md) · [Canvas](CANVAS.md) · [Blocks](BLOCKS.md) · [Datasets](DATASETS.md) · [Training](TRAINING.md)
 
-Open the [app](https://davbachman.github.io/BackpropBuilder/). It starts on a blank builder canvas so a class can construct a model from its first calculation. You can also [download an example project](../public/models/README.md) and choose **File → Import**.
+Open the [app](https://davbachman.github.io/NeuralCanvas/). It starts on a blank builder canvas so a class can construct a model from its first calculation. You can also [download an example project](../public/models/README.md) and choose **File → Import**.
 
 ## Find your way around
 
@@ -16,7 +16,7 @@ Open the [app](https://davbachman.github.io/BackpropBuilder/). It starts on a bl
 | **Code** in the right sidebar | Browse an expandable pseudocode outline and navigate to the corresponding blocks. |
 | **Reporting** in the right sidebar | See an applicable graph, recorded losses, and test predictions or accuracy. |
 
-Both sidebars can be resized or collapsed. The **Dark** button in the top bar switches between light and dark themes; the browser remembers your choice. The clickable **Backprop Builder** title opens **About** and **Reference** (the online guide). **File** contains New, Save, Import, and PyTorch exports; **Edit** contains Undo, Copy, Paste, and Duplicate. **Randomize parameters** is in **Train**.
+Both sidebars can be resized or collapsed. The **Dark** button in the top bar switches between light and dark themes; the browser remembers your choice. The clickable **Neural Canvas** title opens **About** and **Reference** (the online guide). **File** contains New, Save, Import, and PyTorch exports; **Edit** contains Undo, Copy, Paste, and Duplicate. **Randomize parameters** is in **Train**.
 
 ## Build your first regression model
 

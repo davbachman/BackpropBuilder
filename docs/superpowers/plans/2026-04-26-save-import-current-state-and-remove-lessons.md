@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Add reloadable project save/import and remove lesson-specific UI and state from Backprop Builder.
+**Goal:** Add reloadable project save/import and remove lesson-specific UI and state from Neural Canvas.
 
 **Architecture:** Put the project-state JSON format, cloning, and validation in `src/domain/session.ts`, reusing `cloneGraph` and tensor helpers. Keep App responsible for wiring browser download/upload actions and for restoring React state after a validated import. Remove lesson drawer/progress UI, lesson state, the Session card, and the old session summary export.
 

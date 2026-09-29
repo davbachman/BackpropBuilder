@@ -34,11 +34,11 @@ function handBuiltLinearGraph(): GraphModel {
   ] }
 }
 
-describe('Backprop Builder app', () => {
+describe('Neural Canvas app', () => {
   it('renders the teaching workspace controls', () => {
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Backprop Builder/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Neural Canvas/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^File$/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Reporting' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Data' })).toBeInTheDocument()
@@ -142,17 +142,17 @@ describe('Backprop Builder app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    const title = screen.getByRole('button', { name: 'Backprop Builder' })
+    const title = screen.getByRole('button', { name: 'Neural Canvas' })
     await user.click(title)
-    const menu = screen.getByRole('menu', { name: 'Backprop Builder' })
+    const menu = screen.getByRole('menu', { name: 'Neural Canvas' })
     const reference = within(menu).getByRole('menuitem', { name: /Reference/i })
-    expect(reference).toHaveAttribute('href', 'https://github.com/davbachman/BackpropBuilder#readme')
+    expect(reference).toHaveAttribute('href', 'https://github.com/davbachman/NeuralCanvas#readme')
     expect(reference).toHaveAttribute('target', '_blank')
     await user.click(within(menu).getByRole('menuitem', { name: 'About' }))
-    const dialog = screen.getByRole('dialog', { name: 'About Backprop Builder' })
+    const dialog = screen.getByRole('dialog', { name: 'About Neural Canvas' })
     expect(dialog).toHaveTextContent('Created by David Bachman with Codex')
     await user.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog', { name: 'About Backprop Builder' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'About Neural Canvas' })).not.toBeInTheDocument()
   })
 
   it('puts selection editing in the Edit menu while keeping Details focused on the block', async () => {
@@ -1473,7 +1473,7 @@ describe('Backprop Builder app', () => {
       const blob = createObjectURL.mock.calls[0]?.[0]
       if (!(blob instanceof Blob)) throw new Error('Expected state export to create a Blob.')
       const saved = JSON.parse(await blob.text())
-      expect(saved.kind).toBe('backprop-builder-state')
+      expect(saved.kind).toBe('neural-canvas-state')
       expect(saved.version).toBe(1)
       expect(saved.state.graph.nodes.find((node: { id: string }) => node.id === 'w')?.params.value).toBeDefined()
       expect(saved.state.epoch).toBe(1)
@@ -1498,7 +1498,7 @@ describe('Backprop Builder app', () => {
       const user = userEvent.setup()
       render(<App initialGraph={createModelPreset('linear')} />)
       await chooseFileMenuItem(user, /^Export PyTorch notebook$/i)
-      expect(downloads).toEqual(['backprop-builder-model.ipynb', 'backprop-builder-dataset.json'])
+      expect(downloads).toEqual(['neural-canvas-model.ipynb', 'neural-canvas-dataset.json'])
       const blob = createObjectURL.mock.calls[0]?.[0]
       if (!(blob instanceof Blob)) throw new Error('Expected a notebook Blob.')
       const notebook = JSON.parse(await blob.text())
@@ -1519,7 +1519,7 @@ describe('Backprop Builder app', () => {
       vi.useFakeTimers()
       act(() => fireEvent.click(screen.getByRole('button', { name: /^File$/i })))
       act(() => fireEvent.click(screen.getByRole('menuitem', { name: /^Export PyTorch notebook$/i })))
-      expect(screen.getByRole('status')).toHaveTextContent('backprop-builder-model.ipynb')
+      expect(screen.getByRole('status')).toHaveTextContent('neural-canvas-model.ipynb')
 
       act(() => vi.advanceTimersByTime(6000))
       expect(screen.queryByRole('status')).not.toBeInTheDocument()

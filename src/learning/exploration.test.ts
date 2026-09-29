@@ -6,10 +6,14 @@ import { softmax, tensor } from './math'
 
 function file(): ExplorationFile {
   const state = initialExploration('decoder')
-  return { kind: 'backprop-exploration', version: 1, state, comparisons: [{ label: 'Initial', state: structuredClone(state), output: [1, 2, 3] }] }
+  return { kind: 'neural-canvas-exploration', version: 1, state, comparisons: [{ label: 'Initial', state: structuredClone(state), output: [1, 2, 3] }] }
 }
 
 describe('prepared exploration save/restore', () => {
+  it('imports explorations saved under the previous app name', () => {
+    const saved = file()
+    expect(parseExploration(JSON.stringify({ ...saved, kind: 'backprop-exploration' }))).toEqual(saved)
+  })
   it('round-trips exact parameters, seeds, inputs, sampling controls and expanded module selections', () => {
     const saved = file(), parameter = [...getCheckpoint('trained').parameters['blocks.0.q'].data]
     parameter[3] += 0.25

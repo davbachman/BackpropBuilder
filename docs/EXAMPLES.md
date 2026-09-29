@@ -2,7 +2,7 @@
 
 [Guide home](../README.md) · [Get started](USAGE.md) · [Canvas](CANVAS.md) · [Datasets](DATASETS.md)
 
-Backprop Builder opens blank. To use an example, download its JSON file from the [model directory](../public/models/README.md) and choose **File → Import**. These are editable projects on the same canvas and use visible Dataset blocks, so you can change their data, calculations, parameters, groups, and layouts.
+Neural Canvas opens blank. To use an example, download its JSON file from the [model directory](../public/models/README.md) and choose **File → Import**. These are editable projects on the same canvas and use visible Dataset blocks, so you can change their data, calculations, parameters, groups, and layouts.
 
 | Start with | Files | What to explore |
 | --- | --- | --- |

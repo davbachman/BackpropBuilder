@@ -2,7 +2,7 @@
 
 ## Context
 
-Backprop Builder is a Vite/React graph editor built on `@xyflow/react`. The computational graph lives in `GraphModel`, while visual groups are metadata in `GraphModel.groups`. `App.tsx` owns selection, undo snapshots, phase/trace state, and graph updates. `GraphCanvas.tsx` maps graph nodes and groups to React Flow nodes and reports selection changes back to `App.tsx`.
+Neural Canvas is a Vite/React graph editor built on `@xyflow/react`. The computational graph lives in `GraphModel`, while visual groups are metadata in `GraphModel.groups`. `App.tsx` owns selection, undo snapshots, phase/trace state, and graph updates. `GraphCanvas.tsx` maps graph nodes and groups to React Flow nodes and reports selection changes back to `App.tsx`.
 
 ## Requirements
 

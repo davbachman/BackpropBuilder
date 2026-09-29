@@ -1,6 +1,6 @@
 # Importable model files
 
-Backprop Builder opens to a blank canvas. Download any JSON file in this folder, then choose **File → Import** in the app and select it. Use **File → Save** to download your changes; you can import that file later.
+Neural Canvas opens to a blank canvas. Download any JSON file in this folder, then choose **File → Import** in the app and select it. Use **File → Save** to download your changes; you can import that file later.
 
 The files are complete editable projects, not screenshots or locked demonstrations. They use the same nodes, connections, datasets, and controls available on a blank canvas.
 

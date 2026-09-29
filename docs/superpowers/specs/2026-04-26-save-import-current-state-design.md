@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a first-class save/import workflow that lets a user download the current Backprop Builder workspace and later restore it. The saved state must include the computation graph and all parameter values, and it should restore the surrounding lab state that affects what the user sees.
+Add a first-class save/import workflow that lets a user download the current Neural Canvas workspace and later restore it. The saved state must include the computation graph and all parameter values, and it should restore the surrounding lab state that affects what the user sees.
 
 The old session summary export is removed along with lesson-specific UI. The save/import project file is the only JSON export in the app.
 
@@ -28,7 +28,7 @@ The save file will be JSON:
 
 ```json
 {
-  "kind": "backprop-builder-state",
+  "kind": "neural-canvas-state",
   "version": 1,
   "savedAt": "2026-04-26T00:00:00.000Z",
   "state": {
@@ -58,7 +58,7 @@ The save file will be JSON:
 
 Add two buttons to the left action stack near reset/randomize:
 
-- `Save state`: downloads `backprop-builder-state-YYYY-MM-DD.json`.
+- `Save state`: downloads `neural-canvas-state-YYYY-MM-DD.json`.
 - `Import state`: opens a hidden JSON file input and restores the saved workspace.
 
 Import should push the current workspace onto the undo stack before replacing it, stop playback, clear pending node placement, and show a concise error message if the file cannot be imported.

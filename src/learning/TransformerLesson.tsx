@@ -325,7 +325,7 @@ export function TransformerLesson({ kind }: { kind: TokenLesson }) {
   const selectToken = (position: number) => patch({ token: position })
   const save = () =>
     downloadExploration({
-      kind: 'backprop-exploration',
+      kind: 'neural-canvas-exploration',
       version: 1,
       state,
       comparisons,

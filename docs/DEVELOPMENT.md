@@ -2,7 +2,7 @@
 
 [Guide home](../README.md) · [Example models](EXAMPLES.md) · [CNN data attribution](CNN-DATA.md)
 
-Backprop Builder is a React and TypeScript app built with Vite. The graph runs in the browser; normal use does not require an account, a model-serving API, or a large model download.
+Neural Canvas is a React and TypeScript app built with Vite. The graph runs in the browser; normal use does not require an account, a model-serving API, or a large model download.
 
 From the repository root:
 

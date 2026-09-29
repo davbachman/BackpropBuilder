@@ -52,7 +52,7 @@ PYTORCH_TEST_PYTHON=/path/to/python3 npm test
 
 `IMDB_STUDY_OUTPUT` changes the output directory for the JavaScript preparation/report scripts; the Python runner accepts `--root`. The preparation script writes exact source filenames and split assignments to `manifest.json`. It also records the initial trace-engine loss so native runs verify graph agreement before training. `RESULTS.md`, `summary.json`, and per-run JSON reports provide the full local results. Generated data and models must stay out of Git.
 
-To repeat the original browser benchmark, generate the earlier text-curriculum pilot data as described in its guide, start `npm run dev`, and open `/BackpropBuilder/scripts/browser/tensor-benchmark.html` on that server. Click **Run GPU training checks**. It uses 32 pilot reviews, deliberately shortens some to exercise padding, and compares CPU/WebGL/WebGPU with the same initial parameters. GPU checks may take tens of seconds; a backend error is a failed result, not a valid timing.
+To repeat the original browser benchmark, generate the earlier text-curriculum pilot data as described in its guide, start `npm run dev`, and open `/NeuralCanvas/scripts/browser/tensor-benchmark.html` on that server. Click **Run GPU training checks**. It uses 32 pilot reviews, deliberately shortens some to exercise padding, and compares CPU/WebGL/WebGPU with the same initial parameters. GPU checks may take tens of seconds; a backend error is a failed result, not a valid timing.
 
 The follow-up [dropout and learning-rate experiment](IMDB-DROPOUT-STUDY.md) adds a Dropout block and tests nine settings. Its three-seed validation comparison favors learning rate 0.001 without dropout; these validation figures are separate from the original final-test table above.
 

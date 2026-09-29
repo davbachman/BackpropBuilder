@@ -166,11 +166,11 @@ function App({
   initialGraph,
 }: AppProps = {}): ReactElement {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return localStorage.getItem('backprop-builder-theme') === 'dark' ? 'dark' : 'light' }
+    try { return (localStorage.getItem('neural-canvas-theme') ?? localStorage.getItem('backprop-builder-theme')) === 'dark' ? 'dark' : 'light' }
     catch { return 'light' }
   })
   useEffect(() => {
-    try { localStorage.setItem('backprop-builder-theme', theme) }
+    try { localStorage.setItem('neural-canvas-theme', theme) }
     catch { /* Theme preference is optional when storage is unavailable. */ }
   }, [theme])
   const [graph, setGraph] = useState<GraphModel>(
@@ -1306,7 +1306,7 @@ function App({
         anchor.click()
         window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       }
-      const name = format === 'notebook' ? 'backprop-builder-model.ipynb' : 'backprop-builder-model.py'
+      const name = format === 'notebook' ? 'neural-canvas-model.ipynb' : 'neural-canvas-model.py'
       download(format === 'notebook' ? exported.notebook : exported.script, name,
         format === 'notebook' ? 'application/x-ipynb+json' : 'text/x-python')
       if (exported.datasetFile) download(exported.datasetFile.content, exported.datasetFile.name, 'application/json')
@@ -1435,7 +1435,7 @@ function App({
     >
       <header className="top-bar">
         <div className="top-brand topbar-menu">
-          <div className="brand-mark" aria-hidden="true">BB</div>
+          <div className="brand-mark" aria-hidden="true">NC</div>
           <h1><button
             id="app-menu-trigger"
             type="button"
@@ -1443,10 +1443,10 @@ function App({
             aria-haspopup="menu"
             aria-expanded={isAppMenuOpen}
             onClick={() => { setIsFileMenuOpen(false); setIsEditMenuOpen(false); setIsAppMenuOpen(open => !open) }}
-          >Backprop Builder <ChevronDown size={15} aria-hidden="true" /></button></h1>
-          {isAppMenuOpen ? <div className="topbar-menu-panel app-menu-panel" role="menu" aria-label="Backprop Builder">
+          >Neural Canvas <ChevronDown size={15} aria-hidden="true" /></button></h1>
+          {isAppMenuOpen ? <div className="topbar-menu-panel app-menu-panel" role="menu" aria-label="Neural Canvas">
             <button type="button" role="menuitem" onClick={() => { setIsAppMenuOpen(false); setIsAboutOpen(true) }}>About</button>
-            <a role="menuitem" href="https://github.com/davbachman/BackpropBuilder#readme" target="_blank" rel="noopener noreferrer" onClick={() => setIsAppMenuOpen(false)}>Reference <ExternalLink size={14} aria-hidden="true" /></a>
+            <a role="menuitem" href="https://github.com/davbachman/NeuralCanvas#readme" target="_blank" rel="noopener noreferrer" onClick={() => setIsAppMenuOpen(false)}>Reference <ExternalLink size={14} aria-hidden="true" /></a>
           </div> : null}
         </div>
 
@@ -1600,8 +1600,8 @@ function App({
           if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
         }}>
-          <div className="about-dialog-mark" aria-hidden="true">BB</div>
-          <h2 id="about-title">About Backprop Builder</h2>
+          <div className="about-dialog-mark" aria-hidden="true">NC</div>
+          <h2 id="about-title">About Neural Canvas</h2>
           <p id="about-description">Created by David Bachman with Codex. Build and explore machine-learning models from individual calculations through neural networks, attention, and transformers.</p>
           <p>Learn more about <a href="https://pzacad.pitzer.edu/~dbachman/" target="_blank" rel="noopener noreferrer">David Bachman</a> and his AI podcast, <a href="https://profbachman.substack.com/" target="_blank" rel="noopener noreferrer"><em>Entropy Bonus</em></a>.</p>
           <button type="button" autoFocus onClick={closeAbout}>Close</button>

@@ -277,7 +277,7 @@ export interface ProjectStateSnapshot {
 }
 
 export interface ProjectStateFile {
-  kind: 'backprop-builder-state'
+  kind: 'neural-canvas-state'
   version: 1
   savedAt: string
   state: ProjectStateSnapshot

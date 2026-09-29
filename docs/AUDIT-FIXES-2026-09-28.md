@@ -1,4 +1,4 @@
-# Backprop Builder audit fixes — September 28, 2026
+# Neural Canvas audit fixes — September 28, 2026
 
 All 13 confirmed defects in [the original audit](AUDIT-2026-09-28.md) have been addressed. The implementation also improves evaluation, exports, canvas rendering, dependency hygiene, and deployment checks. These changes are local; no commit, push, or deployment was performed.
 

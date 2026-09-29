@@ -2,7 +2,7 @@
 
 ## Context
 
-Backprop Builder uses `@xyflow/react` for canvas interaction. `GraphCanvas.tsx` converts domain `GraphEdge` objects into React Flow edges and handles edge deletion and connection creation. Visual group inputs and outputs are derived from boundary edges in `visualGroupInterface`.
+Neural Canvas uses `@xyflow/react` for canvas interaction. `GraphCanvas.tsx` converts domain `GraphEdge` objects into React Flow edges and handles edge deletion and connection creation. Visual group inputs and outputs are derived from boundary edges in `visualGroupInterface`.
 
 ## Requirements
 

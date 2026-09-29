@@ -9,7 +9,7 @@ export function LossReportPanel({ reports, warning }: { reports: LossReport[]; w
     const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = 'backpropbuilder-loss.csv'
+    link.download = 'neuralcanvas-loss.csv'
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }

@@ -3,7 +3,7 @@ import {useState} from 'react'
 import {TensorGraph,selectTensorBackend,trainTensorGraph} from '../../src/domain/tensorTraining'
 import {fitStandardizer} from '../../src/domain/standardizationFit'
 import type {GraphModel} from '../../src/domain/types'
-const root='/BackpropBuilder/output/housing-pilot/'
+const root='/NeuralCanvas/output/housing-pilot/'
 async function read(path:string){const r=await fetch(root+path);if(!r.ok)throw Error(path);return r.json()}
 async function save(name:string,result:unknown){const r=await fetch('/pilot-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,result})});if(!r.ok)throw Error('Save failed')}
 export default function App(){

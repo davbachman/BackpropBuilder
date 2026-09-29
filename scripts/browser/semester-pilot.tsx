@@ -5,7 +5,7 @@ import {forwardPass,parameterValues} from '../../src/domain/engine'
 import {createProjectStateFile,parseProjectStateFile} from '../../src/domain/session'
 import {generateText} from '../../src/domain/textGeneration'
 import type {GraphModel} from '../../src/domain/types'
-const base='/BackpropBuilder/output/semester-pilot/'
+const base='/NeuralCanvas/output/semester-pilot/'
 async function read(path:string){const r=await fetch(base+path);if(!r.ok)throw Error('Missing '+path);return r.json()}
 async function save(name:string,result:unknown){const response=await fetch('/pilot-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,result})});if(!response.ok)throw Error('Could not save browser result')}
 const maxError=(a:ArrayLike<number>,b:ArrayLike<number>)=>Array.from(a).reduce((m,x,i)=>Math.max(m,Math.abs(x-b[i])),0)

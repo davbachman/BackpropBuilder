@@ -103,7 +103,7 @@ python scripts/evaluate-semester-final.py
 node scripts/serve-semester-pilot.mjs
 ```
 
-Open the local pilot page printed/served on port 5174 at /BackpropBuilder/scripts/browser/semester-pilot.html. Check all recipes verifies representative seeds and all full-MPG penalty settings. Train from initialization executes the real app engine. The native interpreter is in scripts/lib/curriculum_tensor_model.py; instructor graphs are in src/test/curriculumModels.ts. Do not rerun preparation stages over an existing exploratory manifest, which appends refinement runs. Final evaluation refuses to overwrite its result.
+Open the local pilot page printed/served on port 5174 at /NeuralCanvas/scripts/browser/semester-pilot.html. Check all recipes verifies representative seeds and all full-MPG penalty settings. Train from initialization executes the real app engine. The native interpreter is in scripts/lib/curriculum_tensor_model.py; instructor graphs are in src/test/curriculumModels.ts. Do not rerun preparation stages over an existing exploratory manifest, which appends refinement runs. Final evaluation refuses to overwrite its result.
 
 ## Verification and limits
 

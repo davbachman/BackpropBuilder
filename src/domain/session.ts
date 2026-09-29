@@ -24,7 +24,7 @@ import type {
   TensorValue,
 } from './types'
 
-const PROJECT_STATE_KIND = 'backprop-builder-state'
+const PROJECT_STATE_KIND = 'neural-canvas-state'
 const PROJECT_STATE_VERSION = 1
 const NODE_TYPES = new Set([
   'dataset',
@@ -62,7 +62,7 @@ export function downloadProjectStateFile(file: ProjectStateFile): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `backprop-builder-state-${file.savedAt.slice(0, 10)}.json`
+  anchor.download = `neural-canvas-state-${file.savedAt.slice(0, 10)}.json`
   anchor.click()
   URL.revokeObjectURL(url)
 }
@@ -72,7 +72,7 @@ export function parseProjectStateFile(text: string): ProjectStateParseResult {
   try {
     parsed = JSON.parse(text)
   } catch {
-    return { ok: false, error: 'Import failed: choose a valid Backprop Builder state JSON file.' }
+    return { ok: false, error: 'Import failed: choose a valid Neural Canvas state JSON file.' }
   }
 
   const validationError = projectStateFileError(parsed)
@@ -82,6 +82,7 @@ export function parseProjectStateFile(text: string): ProjectStateParseResult {
     ok: true,
     file: {
       ...(parsed as ProjectStateFile),
+      kind: PROJECT_STATE_KIND,
       state: cloneProjectStateSnapshot((parsed as ProjectStateFile).state),
     },
   }
@@ -116,8 +117,8 @@ function cloneTraceSteps(steps: EvaluationTraceStep[]): EvaluationTraceStep[] {
 }
 
 function projectStateFileError(value: unknown): string | undefined {
-  if (!isRecord(value)) return 'Import failed: choose a valid Backprop Builder state JSON file.'
-  if (value.kind !== PROJECT_STATE_KIND) return 'Import failed: this is not a Backprop Builder state file.'
+  if (!isRecord(value)) return 'Import failed: choose a valid Neural Canvas state JSON file.'
+  if (value.kind !== PROJECT_STATE_KIND && value.kind !== 'backprop-builder-state') return 'Import failed: this is not a Neural Canvas state file.'
   if (value.version !== PROJECT_STATE_VERSION) return 'Import failed: this state file version is not supported.'
   if (typeof value.savedAt !== 'string') return 'Import failed: the state file is missing its saved timestamp.'
   if (!isProjectStateSnapshot(value.state)) return 'Import failed: the state file is missing required graph data.'
