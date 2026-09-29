@@ -1,4 +1,4 @@
-/* The theme lives on the workspace so switching never changes model data. */
+/* Dark appearance is the only workspace theme. */
 .app-shell.theme-dark {
   color-scheme: dark;
   --page-bg: #101522;
@@ -86,8 +86,6 @@
 .theme-dark .brand-menu-button:hover:not(:disabled),
 .theme-dark .brand-menu-button[aria-expanded="true"] { color: #decaff; background: #332b48; }
 .theme-dark.unified-studio .topbar-menu-trigger:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--accent); }
-.theme-dark .theme-toggle { color: var(--accent); }
-.theme-dark .theme-toggle[aria-pressed="true"] { background: var(--accent-soft); }
 .theme-dark .topbar-menu-panel { background: #232a3b; }
 .theme-dark .topbar-menu-panel button:hover:not(:disabled),
 .theme-dark .topbar-menu-panel a:hover { background: #393052; }

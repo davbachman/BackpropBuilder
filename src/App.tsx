@@ -25,8 +25,6 @@ import {
   Play,
   RotateCcw,
   Shuffle,
-  Moon,
-  Sun,
   StepForward,
   Upload,
   Undo2,
@@ -165,14 +163,6 @@ interface AppProps {
 function App({
   initialGraph,
 }: AppProps = {}): ReactElement {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try { return (localStorage.getItem('neural-canvas-theme') ?? localStorage.getItem('backprop-builder-theme')) === 'dark' ? 'dark' : 'light' }
-    catch { return 'light' }
-  })
-  useEffect(() => {
-    try { localStorage.setItem('neural-canvas-theme', theme) }
-    catch { /* Theme preference is optional when storage is unavailable. */ }
-  }, [theme])
   const [graph, setGraph] = useState<GraphModel>(
     () => safeForward(initialGraph ?? createEmptyGraph()).graph,
   )
@@ -1430,7 +1420,7 @@ function App({
 
   return (
     <main
-      className={`app-shell workspace-split unified-studio ${theme === 'dark' ? 'theme-dark' : ''} ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''} ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
+      className={`app-shell workspace-split unified-studio theme-dark ${inspectorOpen ? 'inspector-open' : ''} ${paletteOpen ? 'palette-open' : ''} ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
       style={{ '--left-size': leftOpen ? `${leftWidth}px` : '42px', '--right-size': rightOpen ? `${rightWidth}px` : '42px' } as CSSProperties}
     >
       <header className="top-bar">
@@ -1563,17 +1553,6 @@ function App({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="topbar-button theme-toggle"
-            aria-label={theme === 'dark' ? 'Use light theme' : 'Use dark theme'}
-            aria-pressed={theme === 'dark'}
-            title={theme === 'dark' ? 'Use light theme' : 'Use dark theme'}
-            onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}
-          >
-            {theme === 'dark' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
-            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
           <input
             ref={importInputRef}
             type="file"
