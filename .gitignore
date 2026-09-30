@@ -14,7 +14,8 @@ dist-ssr
 .playwright-cli
 output
 
-# Course assignments and their preparation scripts stay local.
+# Coursework lives in the sibling private NeuralCanvas-Coursework repository.
+# Keep these exclusions to prevent accidental reintroduction.
 assignments/
 scripts/assignments/
 
