@@ -24,6 +24,7 @@ function fixture() {
 }
 it('fits training rows only, handles a constant feature, and reuses saved statistics',async()=>{
  const graph=fixture(),node=graph.nodes.find(n=>n.id==='standard')!
+ node.params.outputName='u'
  expect(validateGraph(graph).some(i=>i.message.includes('Fit Standardize'))).toBe(true)
  node.params.standardization=await fitStandardizer(graph,node.id)
  expect(node.params.standardization).toEqual({mean:[2,7],scale:[1,1],count:2})
@@ -31,7 +32,10 @@ it('fits training rows only, handles a constant feature, and reuses saved statis
  expect(forwardPass(graph).graph.nodes.find(n=>n.id===node.id)!.value!.data).toEqual([-1,0])
  const file=createProjectStateFile({graph,visualizationGraph:graph,initialParameterValues:parameterValues(graph),selectedNodeIds:[],phase:'edit',traceSteps:[],traceIndex:0,epoch:0,currentLoss:null,display:{showMath:true,showGradient:true,showCode:false,showVisualization:false}})
  const result=parseProjectStateFile(JSON.stringify(file));expect(result.ok).toBe(true)
- if(result.ok)expect(result.file.state.graph.nodes.find(n=>n.id===node.id)!.params.standardization).toEqual(node.params.standardization)
+ if(result.ok){
+  expect(result.file.state.graph.nodes.find(n=>n.id===node.id)!.params.standardization).toEqual(node.params.standardization)
+  expect(result.file.state.graph.nodes.find(n=>n.id===node.id)!.params.outputName).toBe('u')
+ }
  expect(generatePyTorchExport({...graph,training:undefined}).script).toContain('[2,7]')
 })
 it('matches traced and accelerated values and all parameter gradients',async()=>{

@@ -131,6 +131,15 @@ export function ModelInspector({
       )}
       {node && (
         <>
+          {!binding && !node.id.startsWith('inspect:') && !['dataset', 'input', 'target', 'weight', 'bias', 'loss', 'cross-entropy'].includes(node.type) &&
+            <label className="inspector-field">Output variable
+              <input aria-label="Output variable" placeholder="Automatic (z1, z2, …)" value={node.params.outputName ?? ''}
+                onChange={event => {
+                  const name = event.target.value
+                  if (!name || /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) onParams(node.id, { outputName: name || undefined })
+                }} />
+              <span>Used in formulas and pseudocode. Clear for automatic naming. Duplicate names get a numeric suffix.</span>
+            </label>}
           {operationHelp[node.type] && <p className="coordinate-note">{operationHelp[node.type]}</p>}
           {node.type === 'one-hot' && <label className="inspector-field">Vocabulary size<input aria-label="One-hot vocabulary size" type="number" min="2" max="8192" value={node.params.numClasses ?? 2} onChange={event => onParams(node.id, {numClasses: Number(event.target.value)})}/></label>}
           {node.type === 'conv2d' && <ConvolutionInspector graph={graph} node={node} onValue={onValue}/>}

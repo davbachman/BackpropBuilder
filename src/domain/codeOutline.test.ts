@@ -3,6 +3,8 @@ import { buildCodeOutline, codeForGroup, type CodeOutlineLine } from './codeOutl
 import { compactVisualHierarchy } from './continuousScene'
 import { formulaForNode } from './engine'
 import { createModelPreset } from './modelPresets'
+import { createNode } from './examples'
+import type { GraphModel } from './types'
 import { LESSONS } from '../learning/presets'
 
 function flatten(lines: CodeOutlineLine[]): CodeOutlineLine[] {
@@ -10,6 +12,36 @@ function flatten(lines: CodeOutlineLine[]): CodeOutlineLine[] {
 }
 
 describe('code outline', () => {
+  it('uses an explicit output variable in assignments and downstream references, and restores automatic naming', () => {
+    const input = { ...createNode('input', 0), label: 'mean_radius' }
+    const standard = createNode('standardize', 1)
+    const activation = createNode('activation', 2)
+    activation.params.activation = 'sigmoid'
+    const graph: GraphModel = { nodes: [input, standard, activation], edges: [
+      { id: 'in', source: input.id, target: standard.id, inputSlot: 0 },
+      { id: 'out', source: standard.id, target: activation.id, inputSlot: 0 },
+    ], learningRate: 0.1 }
+    standard.params.outputName = 'u'
+    let lines = buildCodeOutline(graph)
+    expect(lines.find(line => line.id === standard.id)?.code).toBe('u = (mean_radius − μ_train) / s_train')
+    expect(lines.find(line => line.id === activation.id)?.code).toBe('z1 = sigmoid(u)')
+    expect(standard.label).toBe('Standardize features')
+    const group = { id: 'normalization', label: 'Normalize', nodeIds: [standard.id], position: { x: 0, y: 0 }, dimensions: { width: 200, height: 100 } }
+    expect(codeForGroup(graph, group)).toBe('u = normalize(mean_radius)')
+    expect(codeForGroup(graph, { ...group, nodeIds: [activation.id] })).toMatch(/ = normalize\(u\)$/)
+    standard.params.outputName = undefined
+    lines = buildCodeOutline(graph)
+    expect(lines.find(line => line.id === standard.id)?.code).toBe('z1 = (mean_radius − μ_train) / s_train')
+    expect(lines.find(line => line.id === activation.id)?.code).toBe('z2 = sigmoid(z1)')
+    standard.params.outputName = 'z1'
+    expect(buildCodeOutline(graph).find(line => line.id === activation.id)?.code).toBe('z2 = sigmoid(z1)')
+    standard.params.outputName = 'mean_radius'
+    activation.params.outputName = 'mean_radius'
+    lines = buildCodeOutline(graph)
+    expect(lines.find(line => line.id === standard.id)?.code).toBe('mean_radius_2 = (mean_radius − μ_train) / s_train')
+    expect(lines.find(line => line.id === activation.id)?.code).toBe('mean_radius_3 = sigmoid(mean_radius_2)')
+  })
+
   it.each(LESSONS)('lists every calculation and visible block exactly once for $id', ({ id }) => {
     const graph = compactVisualHierarchy(createModelPreset(id))
     const lines = flatten(buildCodeOutline(graph))

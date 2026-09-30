@@ -94,6 +94,8 @@ export interface Position {
 }
 
 export interface NodeParams {
+  /** Optional variable name used in displayed formulas and pseudocode. */
+  outputName?: string
   value?: TensorValue | number
   activation?: ActivationKind
   loss?: LossKind

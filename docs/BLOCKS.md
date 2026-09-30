@@ -45,6 +45,8 @@ Connect one tensor input; output shape is unchanged. Set **Dropout probability**
 
 ## Standardize features
 
+To name its output (for example, `u`), select the block and set **Output variable** in Details. Formulas and pseudocode use this name in both the assignment and downstream calculations. The block title stays separate. Clear the field to restore automatic naming; duplicate variable names receive a numeric suffix.
+
 Fixed feature preprocessing: (x − training mean) / training standard deviation. Fit explicitly in the inspector after connecting inputs. Uses only training examples, treats constant columns with scale 1, and saves statistics for inference and export. Supports scalars or feature vectors on the last tensor axis. This is dataset feature scaling, distinct from Layer norm. See [housing exercise](STANDARDIZATION-HOUSING-PILOT.md).
 
 ## Finding blocks

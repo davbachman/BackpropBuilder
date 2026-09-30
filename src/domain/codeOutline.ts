@@ -1,5 +1,5 @@
 import { compactVisualHierarchy } from './continuousScene'
-import { formulaForNode } from './engine'
+import { formulaForNode, outputLabelForFormula } from './engine'
 import type { GraphGroup, GraphModel, GraphNode } from './types'
 
 export interface CodeOutlineLine {
@@ -24,11 +24,15 @@ function groupVariable(graph: GraphModel, group: GraphGroup): string {
 export function codeForGroup(graph: GraphModel, group: GraphGroup): string {
   const contained = new Set(group.nodeIds)
   const names = new Map(graph.nodes.map(node => [node.id, node]))
+  const variable = (id: string) => {
+    const node = names.get(id)
+    return node?.params.outputName ? outputLabelForFormula(node, graph)! : identifier(node?.label ?? id)
+  }
   const sources = [...new Set(graph.edges.filter(edge => contained.has(edge.target) && !contained.has(edge.source)).map(edge => edge.source))]
-  const argumentsList = sources.map(id => names.get(id)?.label ?? id).map(identifier).join(', ')
+  const argumentsList = sources.map(variable).join(', ')
   const outgoing = [...new Set(graph.edges.filter(edge => contained.has(edge.source) && !contained.has(edge.target)).map(edge => edge.source))]
   const terminals = outgoing.length ? outgoing : group.nodeIds.filter(id => !graph.edges.some(edge => edge.source === id && contained.has(edge.target)))
-  const outputs = terminals.map(id => identifier(names.get(id)?.label ?? id))
+  const outputs = terminals.map(variable)
   const result = outputs.length === 1 ? outputs[0] : outputs.length > 1 ? `(${outputs.join(', ')})` : groupVariable(graph, group)
   return `${result} = ${groupVariable(graph, group)}(${argumentsList})`
 }

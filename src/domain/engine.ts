@@ -348,12 +348,12 @@ function inputLabelForIndex(index: number): string {
   return alphabet[index] ?? `input${index + 1}`
 }
 
-function outputLabelForFormula(node: GraphNode | undefined, graph?: GraphModel, sourceSlot = 0): string | undefined {
+export function outputLabelForFormula(node: GraphNode | undefined, graph?: GraphModel, sourceSlot = 0): string | undefined {
   if (!node) return undefined
   if (node.type === 'dataset') return datasetOutputLabelForSlot(node, sourceSlot)
   if (SOURCE_TYPES.has(node.type)) return node.label
   if (isLossNode(node)) return 'L'
-  if (!graph) return 'z'
+  if (!graph) return node.params.outputName || 'z'
   return computedOutputLabels(graph).get(node.id) ?? 'z'
 }
 
@@ -372,10 +372,25 @@ function computedOutputLabels(graph: GraphModel): Map<string, string> {
 
   let index = 1
   const labels = new Map<string, string>()
+  const used = new Set(['L', ...graph.nodes.filter(node => SOURCE_TYPES.has(node.type)).flatMap(node =>
+    node.type === 'dataset' ? Array.from({ length: outputArityForNode(node) }, (_, slot) => datasetOutputLabelForSlot(node, slot)) : [node.label])])
+  // Reserve explicit names before allocating automatic names.
+  for (const nodeId of [...order, ...fallbackIds]) {
+    const node = graph.nodes.find(candidate => candidate.id === nodeId)
+    if (!node || SOURCE_TYPES.has(node.type) || isLossNode(node) || !node.params.outputName) continue
+    const base = node.params.outputName
+    let name = base, suffix = 2
+    while (used.has(name)) name = `${base}_${suffix++}`
+    labels.set(node.id, name)
+    used.add(name)
+  }
   for (const nodeId of [...order, ...fallbackIds]) {
     const node = graph.nodes.find((candidate) => candidate.id === nodeId)
     if (!node || SOURCE_TYPES.has(node.type) || isLossNode(node)) continue
+    if (labels.has(node.id)) continue
+    while (used.has(`z${index}`)) index += 1
     labels.set(node.id, `z${index}`)
+    used.add(`z${index}`)
     index += 1
   }
   return labels
@@ -1457,7 +1472,7 @@ function regularizationPseudocode(node: GraphNode, backward: boolean): string[] 
 }
 
 function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
-  if (TENSOR_OPERATION_TYPES.has(node.type)) return [formulaForNode(node, graph)]
+  if (node.params.outputName || node.type === 'standardize' || TENSOR_OPERATION_TYPES.has(node.type)) return [formulaForNode(node, graph)]
   if (node.type === 'input') return [`${node.label} = ${formatNumber(node.params.value)}`]
   if (node.type === 'weight' || node.type === 'bias') return [`${node.label} = Parameter(${formatNumber(node.params.value)})`]
   if (node.type === 'target') return [`${node.label} = ${formatNumber(node.params.value)}`]
@@ -1465,7 +1480,6 @@ function pseudocodeForNode(node: GraphNode, graph?: GraphModel): string[] {
   if (node.type === 'multiply') return ['z = product(inputs)']
   if (node.type === 'add') return ['z = sum(inputs)']
   if (node.type === 'arithmetic') return [formulaForNode(node, graph).replaceAll('^', '**')]
-  if (node.type === 'standardize') return ['z = (input - fitted_training_mean) / fitted_training_scale']
   if (node.type === 'dropout') return ['mask = Bernoulli(1 - p)', 'z = input * mask / (1 - p) if training else input']
   if (node.type === 'activation') return [`z = ${node.params.activation ?? 'identity'}(u)`]
   const lossKind = lossKindForNode(node, graph)

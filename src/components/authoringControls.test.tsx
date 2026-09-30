@@ -100,6 +100,19 @@ describe('scratch model authoring controls',()=>{
     expect(disclosure).toHaveTextContent('Value')
   })
 
+  it('sets and clears a computed output variable independently of its title', () => {
+    const node = createNode('standardize', 1), onParams = vi.fn()
+    const props = { ...callbacks, graph: { nodes: [node], edges: [], learningRate: .01 }, node, onParams }
+    const { rerender } = render(<ModelInspector {...props}/>)
+    fireEvent.change(screen.getByLabelText('Output variable'), { target: { value: 'u' } })
+    expect(onParams).toHaveBeenLastCalledWith(node.id, { outputName: 'u' })
+    node.params.outputName = 'u'
+    rerender(<ModelInspector {...props}/>)
+    fireEvent.change(screen.getByLabelText('Output variable'), { target: { value: '' } })
+    expect(onParams).toHaveBeenLastCalledWith(node.id, { outputName: undefined })
+    expect(screen.getByRole('heading', { name: 'Standardize features' })).toBeInTheDocument()
+  })
+
   it('renames a selected block from its title, without the old selection heading',()=>{
     const node=createNode('weight',1), onRename=vi.fn()
     render(<ModelInspector {...callbacks} graph={{nodes:[node],edges:[],learningRate:.01}} node={node} onRename={onRename}/>)

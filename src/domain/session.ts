@@ -225,6 +225,7 @@ function isNodeParams(value: unknown): value is NodeParams {
   if (!isRecord(value)) return false
   return (
     (value.value === undefined || isFiniteNumber(value.value) || isTensorValue(value.value)) &&
+    (value.outputName === undefined || (typeof value.outputName === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value.outputName))) &&
     (value.activation === undefined || ACTIVATION_KINDS.has(value.activation as ActivationKind)) &&
     (value.regularization === undefined || ['none','l1','l2'].includes(String(value.regularization))) &&
     (value.regularizationStrength === undefined || (isFiniteNumber(value.regularizationStrength) && value.regularizationStrength>=0)) &&
