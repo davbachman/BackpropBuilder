@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
-import { DATASET_MENU_OPTIONS, DATASET_OPTIONS } from './domain/datasets'
+import { DATASET_MENU_OPTIONS, DATASET_OPTIONS, datasetExamples } from './domain/datasets'
 import { createNode, createSingleNeuronGraph } from './domain/examples'
-import { formatFullTensor } from './domain/tensor'
+import { formatFullTensor, tensorValue } from './domain/tensor'
 
 function datasetModel(semanticZoom: boolean) {
   const graph = createSingleNeuronGraph('identity', { x: 1, w: 2, b: 0, target: 3 })
@@ -75,8 +75,12 @@ describe.each([true, false])('Dataset controls with continuous zoom %s', semanti
     expect(screen.queryByText('Ready to evaluate')).not.toBeInTheDocument()
     const expectResults = (kind: string) => {
       const dataset = DATASET_OPTIONS.find(option => option.kind === kind)!
-      expect(container.querySelector('[data-id="x"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', expect.stringContaining(formatFullTensor(dataset.featureValues[0]).slice(0, 8)))
-      expect(container.querySelector('[data-id="target"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', expect.stringContaining(formatFullTensor(dataset.targetValue).slice(0, 8)))
+      // Opening Train selects only training examples, including after changing datasets or undoing.
+      const examples = datasetExamples(dataset).filter(example => example.split === 'train')
+      const features = tensorValue([examples.length], examples.map(example => example.features[0].data[0]))
+      const targets = tensorValue([examples.length], examples.map(example => example.target.data[0]))
+      expect(container.querySelector('[data-id="x"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', 'out ' + formatFullTensor(features))
+      expect(container.querySelector('[data-id="target"] .node-metrics .tensor-hover-text')).toHaveAttribute('data-tooltip', 'out ' + formatFullTensor(targets))
     }
     await user.click(screen.getByRole('tab', { name: 'Train' }))
     await user.click(screen.getByRole('button', { name: 'Run forward' }))
