@@ -5,8 +5,9 @@ import { LESSONS } from '../learning/presets'
 import { projectDenseNeurons } from './neuronProjection'
 import { parseCustomCsv } from './customCsv'
 import { customCsvCardHeight, customCsvOutputTop } from './datasets'
-import { builderCardHeight, builderInputPortY } from './builderGeometry'
+import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPortY } from './builderGeometry'
 import { createNode } from './examples'
+import { mergePreservingLayout } from './mergeLayout'
 import { mergeNodesIntoVisualGroup, visualGroupInterface } from './grouping'
 import type { GraphModel } from './types'
 
@@ -209,6 +210,81 @@ describe('one continuous nested scene', () => {
     for (const id of group.nodeIds) {
       expect(after.nodes.get(id)!.x).toBeCloseTo(before.nodes.get(id)!.x + 28)
       expect(after.nodes.get(id)!.y).toBeCloseTo(before.nodes.get(id)!.y - 13)
+    }
+  })
+
+  it.each((['arithmetic', 'add', 'multiply', 'concat'] as const).flatMap(type =>
+    [1, .4].flatMap(savedScale => [4, 6, 64].map(count => ({ type, savedScale, count }))),
+  ))('keeps expanded $type ports aligned with $count inputs at scale $savedScale', ({ type, savedScale, count }) => {
+    const input = createNode('input', 1)
+    const arithmetic = createNode(type, 1)
+    const outputNode = createNode('activation', 1)
+    const original: GraphModel = {
+      nodes: [input, arithmetic, outputNode],
+      edges: [{ id: 'incoming', source: input.id, target: arithmetic.id, inputSlot: 0 }],
+      learningRate: .1,
+    }
+    const merged = mergePreservingLayout(original, [input.id, arithmetic.id, outputNode.id])
+    const graph = merged.graph
+    const saved = graph.view!.preservedLayouts![merged.group!.id][arithmetic.id]
+    saved.width *= savedScale
+    saved.height *= savedScale
+    saved.scale = savedScale
+    // Adding inputs grows the visible card after its layout was captured.
+    graph.nodes = graph.nodes.map(node => node.id === arithmetic.id
+      ? { ...node, params: { ...node.params, inputCount: count, expression: Array.from({ length: count }, (_, index) => 'x' + (index + 1)).join(' + ') } }
+      : node)
+    const expanded = graph.nodes.find(node => node.id === arithmetic.id)!
+    graph.edges = Array.from({ length: count }, (_, index) => ({
+      id: 'incoming-' + index, source: input.id, target: arithmetic.id, inputSlot: index,
+    }))
+    graph.edges.push({ id: 'outgoing', source: arithmetic.id, target: outputNode.id, inputSlot: 0 })
+    const scene = layoutContinuousScene(graph)
+    const rect = scene.nodes.get(arithmetic.id)!
+    const scale = scene.scales.get(arithmetic.id)!
+    const wires = routeContinuousScene(graph, scene)
+    for (let index = 0; index < count; index++) {
+      const endpoint = wires.find(wire => wire.edgeId === 'incoming-' + index)!.route.at(-1)!
+      expect(endpoint.y).toBeCloseTo(rect.y + builderInputPortY(expanded, index) * scale)
+    }
+    const output = wires.find(wire => wire.edgeId === 'outgoing')!.route[0]
+    expect(output.x).toBeCloseTo(rect.x + builderCardWidth(expanded) * scale)
+    expect(output.y).toBeCloseTo(rect.y + builderOutputPortY(expanded, 0) * scale)
+    expect(rect.height).toBeCloseTo(builderCardHeight(expanded) * scale)
+  })
+
+  it.each([1, .4])('keeps changed CSV output ports aligned in saved layouts at scale %s', savedScale => {
+    const dataset = createNode('dataset', 1)
+    dataset.params = { dataset: 'custom-csv', customCsv: parseCustomCsv('x,y\n1,2\n2,3\n', 'small.csv') }
+    const target = createNode('input', 1)
+    const original: GraphModel = {
+      nodes: [dataset, target],
+      edges: [{ id: 'column-0', source: dataset.id, target: target.id, inputSlot: 0 }],
+      learningRate: .1,
+    }
+    const merged = mergePreservingLayout(original, [dataset.id, target.id])
+    const graph = merged.graph
+    const saved = graph.view!.preservedLayouts![merged.group!.id][dataset.id]
+    saved.width *= savedScale
+    saved.height *= savedScale
+    saved.scale = savedScale
+    const expanded = { ...dataset, params: { ...dataset.params, customCsv: parseCustomCsv(
+      'a_much_longer_feature_column_name,b,c,d,e,target\n1,2,3,4,5,0\n2,3,4,5,6,1\n', 'expanded.csv',
+    ) } }
+    graph.nodes = [expanded, target]
+    graph.edges = Array.from({ length: 6 }, (_, index) => ({
+      id: 'column-' + index, source: dataset.id, sourceSlot: index, target: target.id, inputSlot: 0,
+    }))
+    const scene = layoutContinuousScene(graph)
+    const rect = scene.nodes.get(dataset.id)!
+    const scale = scene.scales.get(dataset.id)!
+    const wires = routeContinuousScene(graph, scene)
+    expect(rect.width).toBeCloseTo(builderCardWidth(expanded) * scale)
+    expect(rect.height).toBeCloseTo(builderCardHeight(expanded) * scale)
+    for (let index = 0; index < 6; index++) {
+      const endpoint = wires.find(wire => wire.edgeId === 'column-' + index)!.route[0]
+      expect(endpoint.x).toBeCloseTo(rect.x + builderCardWidth(expanded) * scale)
+      expect(endpoint.y).toBeCloseTo(rect.y + builderOutputPortY(expanded, index) * scale)
     }
   })
 

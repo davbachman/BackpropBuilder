@@ -111,7 +111,12 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
     const local = layoutSemanticGraph(localGraph, true, parent)
     const preserved = graph.view?.preservedLayouts?.[parent?.id ?? '']
     if (preserved) {
-      for (const [id, rect] of local.nodes) local.nodes.set(id, preserved[id] ?? rect)
+      for (const [id, rect] of local.nodes) {
+        const saved = preserved[id]
+        // Preserve placement and scale, but let the card grow when its ports
+        // change. Wire endpoints and the rendered card must use the same size.
+        if (saved) local.nodes.set(id, { ...saved, width: rect.width * saved.scale, height: rect.height * saved.scale })
+      }
       for (const [id, rect] of local.groups) local.groups.set(id, preserved[sceneGroupId(id)] ?? rect)
     }
     const rects = [...local.nodes.values(), ...local.groups.values()]
