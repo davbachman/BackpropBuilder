@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DATASET_MENU_OPTIONS, datasetExampleIndex, datasetExamples, datasetExamplesForNode, datasetForNode, datasetMode, datasetOutputLabelForSlot, datasetOutputValueForSlot } from '../domain/datasets'
+import { datasetInputPorts } from '../domain/datasetInputs'
 import { analyzeCustomCsv } from '../domain/customCsv'
 import { TextDatasetPanel } from './TextDatasetPanel'
 import { EditableBlockTitle } from './EditableBlockTitle'
@@ -31,12 +32,17 @@ export function DatasetWorkbench({ graph, node, onParams, onDataset, onRename, o
     try { analyzeCustomCsv(next); setCsvSettingsError(''); update({ customCsv: next }) }
     catch (error) { setCsvSettingsError(error instanceof Error ? error.message : 'Invalid CSV settings.') }
   }
+  const inputs = datasetInputPorts(graph).filter(port => port.nodeId === node.id)
+    .sort((a, b) => a.sourceSlot - b.sourceSlot).map(port => datasetOutputLabelForSlot(node, port.sourceSlot))
   const image = dataset.kind === 'digits-8x8' ? datasetOutputValueForSlot(node, 0) : undefined
   return <section className="dataset-workbench" aria-label="Dataset configuration">
     <EditableBlockTitle key={node.id} label={node.label} onRename={onRename ? label => onRename(node.id, label) : undefined}/>
     <label className="inspector-field">Source<select aria-label="Dataset selection" value={dataset.kind} onChange={event => onDataset(node.id, event.target.value as DatasetKind)}>
       {DATASET_MENU_OPTIONS.map(option => <option key={option.kind} value={option.kind}>{option.label}</option>)}
     </select></label>
+    <p className="coordinate-note" aria-label="Detected dataset inputs">{inputs.length
+      ? <>Connected inputs: <strong>{inputs.join(', ')}</strong>. Detected from the loss prediction path.</>
+      : 'Connect dataset outputs through your model to the loss prediction input to detect inputs automatically.'}</p>
     {dataset.description && <p className="coordinate-note">{dataset.description}</p>}
     {node.params.customCsv?.splits && <p>Training and held-out rows are fixed by the CSV split column.</p>}
     {!node.params.textData && !node.params.customCsv?.splits && <label className="inspector-field">Train / test split<select aria-label="Train/test split" value={node.params.trainPercent ?? 'default'} onChange={event => {

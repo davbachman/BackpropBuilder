@@ -43,3 +43,7 @@ For multiclass text, use `text,label,split` and select the multiclass task in th
 ## Feature standardization
 
 Place **Standardize features** after assembling numeric inputs and before trainable layers. Click **Fit on training rows** in its inspector. Training means and population standard deviations are saved and reused on held-out rows. Refit after changing the training split or feature construction. See [housing pilot](STANDARDIZATION-HOUSING-PILOT.md).
+
+## Automatically detected inputs
+
+Dataset outputs contributing to the prediction side of a Loss (or Cross entropy) block are detected as inputs, including paths through Standardize features, Arithmetic, and other operations. Dataset Details lists the connected inputs and updates when wiring changes. Unused columns and target columns are excluded. One- and two-feature visualizations use these inputs without requiring separate Input blocks; preprocessing remains part of the prediction.

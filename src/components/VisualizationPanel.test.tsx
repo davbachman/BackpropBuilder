@@ -58,6 +58,23 @@ describe('VisualizationPanel', () => {
     expect(container.querySelector('.visualization-prediction-line')).toHaveAttribute('data-sample-count', '80')
   })
 
+  it('recognizes dataset features without Input blocks, including through standardization', () => {
+    const graph = datasetBackedSingleInputGraph()
+    const reference = render(<VisualizationPanel graph={graph} />)
+    const expected = targetPointPositions(reference.container)
+    reference.unmount()
+    const input = graph.nodes.find(node => node.type === 'input')!
+    input.type = 'standardize'
+    input.params = { standardization: { mean: [2], scale: [3], count: 20 } }
+    const snapshot = structuredClone(graph)
+    const { container } = render(<VisualizationPanel graph={graph} />)
+    expect(screen.getByRole('img', { name: /Input-output visualization/i })).toBeInTheDocument()
+    expect(screen.getByText('x-axis: x')).toBeInTheDocument()
+    expect(targetPointPositions(container)).toEqual(expected)
+    expect(container.querySelector('.visualization-prediction-line')).toHaveAttribute('data-sample-count', '80')
+    expect(graph).toEqual(snapshot)
+  })
+
   it('plots all 20 dataset examples even when the canvas traces one example', () => {
     const graph = createModelPreset('linear')
     const { container } = render(<VisualizationPanel graph={graph} />)
@@ -90,6 +107,22 @@ describe('VisualizationPanel', () => {
     expect(screen.getByText('setosa')).toBeInTheDocument()
     expect(screen.getByText('versicolor')).toBeInTheDocument()
     expect(screen.getByText('virginica')).toBeInTheDocument()
+  })
+
+  it('plots direct dataset features with a Cross entropy block and no Input blocks', () => {
+    const graph = customCsvClassifierGraph()
+    const inputs = graph.nodes.filter(node => node.type === 'input')
+    for (const input of inputs) {
+      const source = graph.edges.find(edge => edge.target === input.id)!
+      graph.edges = graph.edges.filter(edge => edge.target !== input.id).map(edge => edge.source === input.id
+        ? { ...edge, source: source.source, sourceSlot: source.sourceSlot } : edge)
+    }
+    graph.nodes = graph.nodes.filter(node => node.type !== 'input')
+    graph.nodes.find(node => node.id === 'loss')!.type = 'cross-entropy'
+    const { container } = render(<VisualizationPanel graph={graph} />)
+    expect(screen.getByRole('img', { name: /Two-input prediction heatmap/i })).toBeInTheDocument()
+    expect(container.querySelectorAll('.visualization-target-point')).toHaveLength(6)
+    expect(container.querySelectorAll('.visualization-heatmap-cell')).toHaveLength(625)
   })
 
   it('plots one decision surface when several Input blocks reuse two CSV features', () => {

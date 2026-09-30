@@ -1,6 +1,7 @@
 import { useId, useMemo, type ReactElement } from 'react'
-import { formatNumber, forwardPass, lossKindForNode } from '../domain/engine'
+import { formatNumber, forwardPass, isLossNode, lossKindForNode } from '../domain/engine'
 import { datasetForNode, datasetOutputLabelForSlot, datasetTargetSlotForNode } from '../domain/datasets'
+import { withDatasetInputAliases } from '../domain/datasetInputs'
 import { evaluateDataset } from '../domain/datasetTraining'
 import { isScalarTensor, tensorValue, toTensor } from '../domain/tensor'
 import type { GraphEdge, GraphModel, GraphNode, TensorValue } from '../domain/types'
@@ -270,7 +271,7 @@ function VisualizationLegend(): ReactElement {
 function buildVisualizationData(graph: GraphModel): VisualizationData {
   let evaluatedGraph: GraphModel
   try {
-    evaluatedGraph = forwardPass(graph).graph
+    evaluatedGraph = forwardPass(withDatasetInputAliases(graph)).graph
   } catch {
     return {
       kind: 'unsupported',
@@ -278,7 +279,7 @@ function buildVisualizationData(graph: GraphModel): VisualizationData {
     }
   }
 
-  const lossNode = evaluatedGraph.nodes.find((node) => node.type === 'loss')
+  const lossNode = evaluatedGraph.nodes.find(isLossNode)
   if (!lossNode) {
     return { kind: 'unsupported', message: 'Add a loss node to define the prediction and target tensors.' }
   }
@@ -590,7 +591,8 @@ function inputNodesUpstreamOf(graph: GraphModel, nodeId: string): GraphNode[] {
     visited.add(currentId)
     const current = nodeById(graph, currentId)
     if (!current) return
-    if (current.type === 'input') {
+    const parents = incomingEdges(graph, currentId)
+    if (current.type === 'input' && (!parents.length || parents.some(edge => nodeById(graph, edge.source)?.type === 'dataset'))) {
       inputIds.add(current.id)
       return
     }

@@ -12,6 +12,7 @@ import type { GraphModel, GraphNode } from '../domain/types'
 import { ModelInspector } from './ModelInspector'
 import { DecoderControls } from './DecoderControls'
 import { ConvolutionInspector } from './ConvolutionInspector'
+import { parseCustomCsv } from '../domain/customCsv'
 import { DatasetWorkbench } from './DatasetWorkbench'
 
 const callbacks = {onParams:vi.fn(),onValue:vi.fn(),onDataset:vi.fn(),onOpen:vi.fn(),onInspectNeuron:vi.fn(),onGroup:vi.fn(),selectionCount:1}
@@ -98,6 +99,21 @@ describe('scratch model authoring controls',()=>{
     fireEvent.click(screen.getByText('Exact values and gradients'))
     expect(disclosure).toHaveAttribute('open')
     expect(disclosure).toHaveTextContent('Value')
+  })
+
+  it('shows inputs inferred from the loss path and updates after disconnecting it', () => {
+    const data = createNode('dataset', 0), operation = createNode('standardize', 0), loss = createNode('loss', 0)
+    data.params = { dataset: 'custom-csv', customCsv: parseCustomCsv('radius,unused,y\n1,9,0\n2,8,1\n', 'features.csv') }
+    const graph: GraphModel = { nodes: [data, operation, loss], learningRate: .1, edges: [
+      { id: 'feature', source: data.id, target: operation.id, inputSlot: 0 },
+      { id: 'prediction', source: operation.id, target: loss.id, inputSlot: 0 },
+      { id: 'target', source: data.id, sourceSlot: 2, target: loss.id, inputSlot: 1 },
+    ] }
+    const { rerender } = render(<DatasetWorkbench {...callbacks} graph={graph} node={data}/>)
+    expect(screen.getByLabelText('Detected dataset inputs')).toHaveTextContent('Connected inputs: radius.')
+    expect(screen.getByLabelText('Detected dataset inputs')).not.toHaveTextContent('unused')
+    rerender(<DatasetWorkbench {...callbacks} graph={{ ...graph, edges: graph.edges.filter(edge => edge.id !== 'prediction') }} node={data}/>)
+    expect(screen.getByLabelText('Detected dataset inputs')).not.toHaveTextContent('Connected inputs:')
   })
 
   it('sets and clears a computed output variable independently of its title', () => {
