@@ -47,7 +47,7 @@ import {
 } from '../domain/grouping'
 import { formatCompactTensor, formatFullTensor } from '../domain/tensor'
 import { builderCardHeight, builderCardWidth, builderInputPortY, builderOutputPortY } from '../domain/builderGeometry'
-import { blockPalette } from '../domain/blockPalette'
+import { blockSuggestions } from '../domain/blockPalette'
 import { appendArithmeticInput } from '../domain/arithmetic'
 import { codeForGroup } from '../domain/codeOutline'
 import type {
@@ -60,6 +60,7 @@ import type {
   GraphViewState,
   LossKind,
   NodeType,
+  NodeParams,
   Position as GraphPosition,
   TensorValue,
   TensorTransformKind,
@@ -108,7 +109,7 @@ interface GraphCanvasProps {
   onGraphChange: (graph: GraphModel) => void
   onViewChange?: (view: GraphViewState) => void
   onSelectionChange: (selection: CanvasSelection) => void
-  onCreateNode: (type: NodeType, position: GraphPosition, parentGroupId?: string, sceneScale?: number) => void
+  onCreateNode: (type: NodeType, position: GraphPosition, parentGroupId?: string, sceneScale?: number, params?: NodeParams) => void
   onCancelPendingPlacement: () => void
   onNodeValueChange: (nodeId: string, value: TensorValue) => void
   onActivationChange: (nodeId: string, activation: ActivationKind) => void
@@ -873,10 +874,11 @@ function GraphCanvasInner({
     .sort(([a], [b]) => semanticGroupDepth(renderedGraph, b) - semanticGroupDepth(renderedGraph, a))[0]?.[0]
   const navigationFocus = continuous ? cameraFocus : graph.view?.focusedGroupId
   const breadcrumb = navigationFocus ? groupAncestors(renderedGraph, navigationFocus) : []
-  const suggestions = blockPalette.filter(item => `${item.label} ${item.type}`.toLowerCase().includes(addQuery.trim().toLowerCase()))
-  const placeSuggestion = (type: NodeType) => {
+  const suggestions = blockSuggestions(addQuery)
+  const placeSuggestion = ({ type, params }: (typeof suggestions)[number]) => {
     if (!addMenu) return
-    if (addMenu.parentGroupId) onCreateNode(type, addMenu.position, addMenu.parentGroupId)
+    if (params) onCreateNode(type, addMenu.position, addMenu.parentGroupId, addMenu.sceneScale, params)
+    else if (addMenu.parentGroupId) onCreateNode(type, addMenu.position, addMenu.parentGroupId)
     else if (addMenu.sceneScale) onCreateNode(type, addMenu.position, undefined, addMenu.sceneScale)
     else onCreateNode(type, addMenu.position)
     setAddMenu(undefined)
@@ -994,16 +996,16 @@ function GraphCanvasInner({
           <Controls showInteractive={false} />
         </ReactFlow>
         {addMenu ? <div className="canvas-add-menu" role="dialog" aria-label="Add a block" style={{ left: addMenu.x, top: addMenu.y }} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-          <label className="canvas-add-search"><Search size={15} /><input ref={addSearch} type="search" aria-label="Search blocks" autoComplete="off" placeholder="Type a block name…" value={addQuery}
+          <label className="canvas-add-search"><Search size={15} /><input ref={addSearch} type="search" aria-label="Search blocks" autoComplete="off" placeholder="Type a block name or +, *, …" value={addQuery}
             onChange={event => { setAddQuery(event.target.value); setActiveSuggestion(0) }}
             onKeyDown={event => {
               if (event.key === 'Escape') { event.preventDefault(); setAddMenu(undefined) }
               if (event.key === 'ArrowDown') { event.preventDefault(); setActiveSuggestion(index => Math.min(index + 1, suggestions.length - 1)) }
               if (event.key === 'ArrowUp') { event.preventDefault(); setActiveSuggestion(index => Math.max(0, index - 1)) }
-              if (event.key === 'Enter' && suggestions.length) { event.preventDefault(); placeSuggestion(suggestions[activeSuggestion]?.type ?? suggestions[0].type) }
+              if (event.key === 'Enter' && suggestions.length) { event.preventDefault(); placeSuggestion(suggestions[activeSuggestion] ?? suggestions[0]) }
             }} /></label>
           <div className="canvas-add-results" role="listbox" aria-label="Block types">
-            {suggestions.length ? suggestions.map((item, index) => <button type="button" key={item.type} role="option" aria-selected={index === activeSuggestion} className={index === activeSuggestion ? 'is-active' : ''} onMouseEnter={() => setActiveSuggestion(index)} onClick={() => placeSuggestion(item.type)}><span>{item.label}</span><small>{item.type}</small></button>) : <p>No matching blocks</p>}
+            {suggestions.length ? suggestions.map((item, index) => <button type="button" key={item.type} role="option" aria-selected={index === activeSuggestion} className={index === activeSuggestion ? 'is-active' : ''} onMouseEnter={() => setActiveSuggestion(index)} onClick={() => placeSuggestion(item)}><span>{item.label}</span><small>{item.type}</small></button>) : <p>No matching blocks</p>}
           </div>
           <div className="canvas-add-hint">↑ ↓ choose · Enter place · Esc close</div>
         </div> : null}

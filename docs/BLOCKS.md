@@ -52,3 +52,7 @@ Fixed feature preprocessing: (x − training mean) / training standard deviation
 ## Finding blocks
 
 The Build sidebar groups blocks into Core model, Features and tensors, Neural networks, Sequences and attention, and Images. Core model is expanded initially; category choices are remembered in this browser. Search blocks searches all categories, including collapsed ones. Clear the search to restore your expanded categories. Block operations and existing saved models are unchanged.
+
+## Canvas arithmetic shortcuts
+
+Double-click empty canvas, type `+`, `-`, `*`, or `/`, then press Enter (or click the suggestion) to place an Arithmetic block with that operation prefilled. The symbols `−`, `×`, `·`, and `÷` work too. Type `^` or `**` to start with `x1 ^ 2`; numeric exponents are editable in the block.

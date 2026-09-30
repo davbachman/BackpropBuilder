@@ -149,6 +149,24 @@ describe('canvas movement gestures', () => {
     expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['+', 'x1 + x2'], ['-', 'x1 - x2'], ['*', 'x1 * x2'], ['/', 'x1 / x2'],
+    ['−', 'x1 - x2'], ['×', 'x1 * x2'], ['·', 'x1 * x2'], ['÷', 'x1 / x2'],
+    ['^', 'x1 ^ 2'], ['**', 'x1 ^ 2'], [' + ', 'x1 + x2'],
+  ])('places prefilled Arithmetic for the %s shortcut', (symbol, expression) => {
+    flow.screenToFlowPosition.mockImplementationOnce(() => ({ x: 417, y: -83 }))
+    const { container, getByRole, queryByRole, onCreateNode } = mountCanvas(createModelPreset('blank'))
+    const pane = document.createElement('div')
+    pane.className = 'react-flow__pane'
+    container.querySelector('.flow-shell')!.append(pane)
+    fireEvent.doubleClick(pane, { clientX: 523, clientY: 186 })
+    fireEvent.change(getByRole('searchbox', { name: 'Search blocks' }), { target: { value: symbol } })
+    expect(getByRole('option', { name: /Arithmetic/ })).toHaveTextContent(expression)
+    fireEvent.keyDown(getByRole('searchbox', { name: 'Search blocks' }), { key: 'Enter' })
+    expect(onCreateNode).toHaveBeenCalledExactlyOnceWith('arithmetic', { x: 417, y: -83 }, undefined, undefined, { expression })
+    expect(queryByRole('dialog', { name: 'Add a block' })).not.toBeInTheDocument()
+  })
+
   it('dismisses the blank-canvas block picker with Escape', () => {
     const { container, getByRole, queryByRole, onCreateNode } = mountCanvas(createModelPreset('blank'))
     const pane = document.createElement('div')

@@ -1,4 +1,4 @@
-import type { NodeType } from './types'
+import type { NodeParams, NodeType } from './types'
 
 export const blockPalette: Array<{ type: NodeType; label: string }> = [
   { type: 'dataset', label: 'Dataset' },
@@ -29,3 +29,23 @@ export const blockCategories: Array<{ id: string; label: string; types: NodeType
   { id: 'sequences', label: 'Sequences and attention', types: ['embedding', 'causal-mask'] },
   { id: 'images', label: 'Images', types: ['conv2d', 'avgpool2d'] },
 ]
+
+const arithmeticShortcuts: Record<string, string> = {
+  '+': 'x1 + x2',
+  '-': 'x1 - x2',
+  '−': 'x1 - x2',
+  '*': 'x1 * x2',
+  '×': 'x1 * x2',
+  '·': 'x1 * x2',
+  '/': 'x1 / x2',
+  '÷': 'x1 / x2',
+  '^': 'x1 ^ 2',
+  '**': 'x1 ^ 2',
+}
+
+export function blockSuggestions(query: string): Array<{ type: NodeType; label: string; params?: NodeParams }> {
+  const search = query.trim().toLowerCase()
+  const expression = Object.hasOwn(arithmeticShortcuts, search) ? arithmeticShortcuts[search] : undefined
+  if (expression) return [{ type: 'arithmetic', label: `Arithmetic · ${expression}`, params: { expression } }]
+  return blockPalette.filter(item => `${item.label} ${item.type}`.toLowerCase().includes(search))
+}

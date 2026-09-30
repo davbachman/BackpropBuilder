@@ -944,11 +944,11 @@ function App({
   }
 
   const placePaletteNode = useCallback(
-    (type: NodeType, position: { x: number; y: number }, parentGroupId?: string, sceneScale?: number) => {
+    (type: NodeType, position: { x: number; y: number }, parentGroupId?: string, sceneScale?: number, params?: NodeParams) => {
       pushHistory()
       clearRecordedExecution()
       const nextNode = createNode(type, nextNodeIndexForType(graph, type))
-      const placedNode = { ...nextNode, position }
+      const placedNode = { ...nextNode, position, params: { ...nextNode.params, ...params } }
       setGraph(placeCanvasNode(graph, placedNode, displayGraph, parentGroupId, sceneScale))
       selectSingleNode(placedNode.id)
       setPendingNodeType(undefined)
