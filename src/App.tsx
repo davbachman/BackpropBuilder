@@ -227,9 +227,13 @@ function App({
   const [isTraining, setIsTraining] = useState(false)
   const [trainingStatus, setTrainingStatus] = useState('')
   const trainingController = useRef<AbortController | null>(null)
+  const singleReportControllers = useRef(new Set<AbortController>())
+  const singleReportQueue = useRef<Promise<void>>(Promise.resolve())
   const operationRevision = useRef(0)
   const cancelActiveRun = useCallback(() => {
     operationRevision.current++
+    singleReportControllers.current.forEach(controller => controller.abort())
+    singleReportControllers.current.clear()
     trainingController.current?.abort()
     trainingController.current = null
     setIsTraining(false)
@@ -237,6 +241,8 @@ function App({
     setTestStatus('')
   }, [])
   useEffect(() => () => {
+    singleReportControllers.current.forEach(controller => controller.abort())
+    singleReportControllers.current.clear()
     trainingController.current?.abort()
     trainingController.current = null
   }, [])
@@ -537,8 +543,53 @@ function App({
     [pushHistory, selectSingleNode, clearRecordedExecution],
   )
 
+  const reportTrainingLoss = useCallback(async (sourceGraph: GraphModel, reportEpoch: number, controller: AbortController) => {
+    const isCurrent = () => trainingController.current === controller || singleReportControllers.current.has(controller)
+    const dataset = sourceGraph.nodes.find(node => node.type === 'dataset')
+    const hasHeldOut = dataset && datasetExamplesForNode(dataset).some(example => example.split === 'test')
+    const options = { signal: controller.signal, includePredictions: false }
+    const loss = dataset ? (await evaluateDatasetAsync(sourceGraph, dataset.id, 'train', options)).loss : forwardPass(sourceGraph).loss
+    controller.signal.throwIfAborted()
+    if (loss === null || loss === undefined || !Number.isFinite(loss)) throw new Error('Training diverged. Lower the learning rate and try again.')
+    let heldOutLoss: number | undefined
+    if (dataset && hasHeldOut) {
+      try { heldOutLoss = (await evaluateDatasetAsync(sourceGraph, dataset.id, 'test', options)).loss }
+      catch (error) {
+        controller.signal.throwIfAborted()
+        setReportingWarning(`Held-out loss unavailable: ${error instanceof Error ? error.message : 'evaluation failed.'}`)
+      }
+      if (heldOutLoss !== undefined && !Number.isFinite(heldOutLoss)) {
+        setReportingWarning('Held-out loss diverged. Reduce the learning rate or inspect the model inputs.')
+        heldOutLoss = undefined
+      } else if (heldOutLoss !== undefined) setReportingWarning(undefined)
+    }
+    controller.signal.throwIfAborted()
+    if (isCurrent()) setLossReports(reports => appendLossReport(reports, { epoch: reportEpoch, loss, heldOutLoss }))
+    return loss
+  }, [])
+
+  const recordSingleTrainingStep = useCallback((before: GraphModel, after: GraphModel) => {
+    const controller = new AbortController()
+    singleReportControllers.current.add(controller)
+    const isCurrent = () => singleReportControllers.current.has(controller)
+    // Keep rapid manual/Play updates in order without delaying the next step.
+    singleReportQueue.current = singleReportQueue.current.then(async () => {
+      try {
+        controller.signal.throwIfAborted()
+        setReportingWarning(undefined)
+        if (!lossReports.some(report => report.epoch === epoch)) await reportTrainingLoss(before, epoch, controller)
+        await reportTrainingLoss(after, epoch + 1, controller)
+      } catch (error) {
+        if (isCurrent() && !controller.signal.aborted)
+          setReportingWarning(error instanceof Error ? error.message : 'Loss evaluation failed.')
+      } finally {
+        singleReportControllers.current.delete(controller)
+      }
+    })
+  }, [epoch, lossReports, reportTrainingLoss])
+
   const stepForward = useCallback(() => {
-    if (blockingIssues.length > 0) return
+    if (blockingIssues.length > 0 || trainingController.current) return
     setInferenceResult(undefined)
 
     if (traceSteps.length > 0 && traceIndex < traceSteps.length - 1) {
@@ -608,6 +659,7 @@ function App({
       setPhase('update')
       setEpoch((value) => value + 1)
       setCurrentLoss(refreshed.loss ?? null)
+      void recordSingleTrainingStep(graph, refreshed.graph)
       selectSingleNode(updateSummary.nodeId)
     }
   }, [
@@ -615,6 +667,7 @@ function App({
     graph,
     hasLoss,
     heldOutSample,
+    recordSingleTrainingStep,
     phase,
     pushHistory,
     selectSingleNode,
@@ -623,16 +676,16 @@ function App({
   ])
 
   useEffect(() => {
-    if (!isPlaying) return
+    if (!isPlaying || isTraining) return
     const timeout = window.setTimeout(
       () => runCanvasAction(stepForward),
       speedSliderValueToDelay(speedSliderValue),
     )
     return () => window.clearTimeout(timeout)
-  }, [isPlaying, speedSliderValue, stepForward, runCanvasAction])
+  }, [isPlaying, isTraining, speedSliderValue, stepForward, runCanvasAction])
 
   const runOneTrainingStep = useCallback(() => {
-    if (blockingIssues.length > 0 || !hasLoss) return
+    if (blockingIssues.length > 0 || !hasLoss || trainingController.current) return
     if (heldOutSample) return
     setInferenceResult(undefined)
     pushHistory()
@@ -646,12 +699,14 @@ function App({
     setPhase('update')
     setEpoch((value) => value + 1)
     setCurrentLoss(result.loss ?? null)
+    void recordSingleTrainingStep(graph, result.graph)
     selectSingleNode(updateSummary.nodeId)
   }, [
     blockingIssues,
     graph,
     hasLoss,
     heldOutSample,
+    recordSingleTrainingStep,
     pushHistory,
     selectSingleNode,
   ])
@@ -690,29 +745,7 @@ function App({
     let nextGraph = graph, completed = 0, lastReported = 0
     const startEpoch = epoch
     const dataset = trainingDataset
-    const hasHeldOut = dataset && datasetExamplesForNode(dataset).some(example => example.split === 'test')
-    let lastLoss = currentLoss
-    const reportLosses = async (sourceGraph: GraphModel, reportEpoch: number) => {
-      const options = { signal: controller.signal, includePredictions: false }
-      const loss = dataset ? (await evaluateDatasetAsync(sourceGraph, dataset.id, 'train', options)).loss : lastLoss
-      controller.signal.throwIfAborted()
-      if (loss === null || loss === undefined || !Number.isFinite(loss)) throw new Error('Training diverged. Lower the learning rate and try again.')
-      let heldOutLoss: number | undefined
-      if (dataset && hasHeldOut) {
-        try { heldOutLoss = (await evaluateDatasetAsync(sourceGraph, dataset.id, 'test', options)).loss }
-        catch (error) {
-          controller.signal.throwIfAborted()
-          setReportingWarning(`Held-out loss unavailable: ${error instanceof Error ? error.message : 'evaluation failed.'}`)
-        }
-        if (heldOutLoss !== undefined && !Number.isFinite(heldOutLoss)) {
-          setReportingWarning('Held-out loss diverged. Reduce the learning rate or inspect the model inputs.')
-          heldOutLoss = undefined
-        } else if (heldOutLoss !== undefined) setReportingWarning(undefined)
-      }
-      controller.signal.throwIfAborted()
-      if (isCurrent()) setLossReports(reports => appendLossReport(reports, { epoch: reportEpoch, loss, heldOutLoss }))
-      return loss
-    }
+    const reportLosses = (sourceGraph: GraphModel, reportEpoch: number) => reportTrainingLoss(sourceGraph, reportEpoch, controller)
     const publish = async () => {
       const loss = await reportLosses(nextGraph, startEpoch + completed)
       if (!isCurrent()) return
@@ -727,6 +760,9 @@ function App({
       lastReported = completed
     }
     try {
+      await singleReportQueue.current
+      if (!isCurrent()) return
+      controller.signal.throwIfAborted()
       if (tensorTraining && dataset) {
         const {trainTensorGraph} = await import('./domain/tensorTraining')
         if (!isCurrent()) return
@@ -758,7 +794,6 @@ function App({
         } else {
           const result = runTrainingStep(nextGraph)
           nextGraph = result.graph
-          lastLoss = result.loss ?? null
           if (index % 8 === 7) await new Promise(resolve => setTimeout(resolve, 0))
         }
         if (!isCurrent()) return
@@ -800,7 +835,7 @@ function App({
         setIsTraining(false)
       }
     }
-  }, [batchSize, canRunEpochs, currentLoss, dismissPendingImports, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset, tensorTraining, training])
+  }, [batchSize, canRunEpochs, reportTrainingLoss, dismissPendingImports, epoch, epochCount, graph, pushHistory, reportInterval, shuffleEachEpoch, trainingDataset, tensorTraining, training])
 
   const runInference = useCallback(async () => {
     const dataset = graph.nodes.find(node => node.type === 'dataset')

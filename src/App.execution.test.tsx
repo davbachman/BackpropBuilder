@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as datasetTraining from './domain/datasetTraining'
+import { formatNumber, runTrainingStep } from './domain/engine'
 import { createStarterGraph } from './domain/examples'
 import { createModelPreset } from './domain/modelPresets'
 import { createProjectStateFile } from './domain/session'
@@ -35,6 +36,54 @@ function savedProject(graph: GraphModel, epoch: number): string {
 afterEach(() => vi.restoreAllMocks())
 
 describe('execution ownership and reports', () => {
+  it('adds single updates to the same dataset loss curves as epoch runs', async () => {
+    const graph = createModelPreset('linear')
+    const updated = runTrainingStep(graph).graph
+    const dataset = updated.nodes.find(node => node.type === 'dataset')!
+    const expected = datasetTraining.evaluateDataset(updated, dataset.id, 'train').loss
+    render(<App initialGraph={graph} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    fireEvent.click(screen.getByRole('button', { name: /Run one full training step/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Reported losses' })).getAllByRole('listitem')).toHaveLength(2))
+    let history = screen.getByRole('list', { name: 'Reported losses' })
+    expect(within(history).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(history).getAllByRole('listitem')[1]).toHaveTextContent('Train ' + formatNumber(expected))
+    expect(within(history).getAllByRole('listitem')[1]).toHaveTextContent('Held-out')
+    startTraining()
+    await waitFor(() => expect(screen.getByText('Completed 1 epoch.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /Run one full training step/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Reported losses' })).getAllByRole('listitem')).toHaveLength(4))
+    history = screen.getByRole('list', { name: 'Reported losses' })
+    expect(within(history).getAllByRole('listitem').map(item => item.querySelector('span')?.textContent)).toEqual(['Epoch 0', 'Epoch 1', 'Epoch 2', 'Epoch 3'])
+  })
+
+  it('records a manually stepped loop only after its parameter update', async () => {
+    render(<App initialGraph={createStarterGraph(true)} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    const step = screen.getByRole('button', { name: /^Step$/i })
+    fireEvent.click(step)
+    expect(screen.queryByRole('list', { name: 'Reported losses' })).not.toBeInTheDocument()
+    for (let i = 0; i < 100 && !screen.queryByText('Epoch 1'); i++) fireEvent.click(step)
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Reported losses' })).getAllByRole('listitem')).toHaveLength(2))
+    expect(within(screen.getByRole('list', { name: 'Reported losses' })).getAllByRole('listitem')).toHaveLength(2)
+  })
+
+  it('discards single-step loss evaluation after opening a new workspace', async () => {
+    const pending = deferred<ReturnType<typeof datasetTraining.evaluateDataset>>()
+    vi.spyOn(datasetTraining, 'evaluateDatasetAsync').mockReturnValueOnce(pending.promise)
+    render(<App initialGraph={createModelPreset('linear')} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    fireEvent.click(screen.getByRole('button', { name: /Run one full training step/ }))
+    await waitFor(() => expect(datasetTraining.evaluateDatasetAsync).toHaveBeenCalled())
+    newWorkspace()
+    await act(async () => { pending.resolve({ loss: 123, examples: 1, predictions: 0, rows: [] }); await pending.promise })
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    expect(screen.queryByRole('list', { name: 'Reported losses' })).not.toBeInTheDocument()
+  })
+
   it.each(['Cancel', 'Escape'])('discards a pending CSV read after %s', async action => {
     const pending = deferred<string>()
     const { container } = render(<App initialGraph={createStarterGraph(true)} />)
