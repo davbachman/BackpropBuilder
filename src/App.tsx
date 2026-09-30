@@ -902,7 +902,6 @@ function App({
     if (!heldOutSample) return
     const dataset = graph.nodes.find(node => node.type === 'dataset')
     if (!dataset) return
-    if (datasetMode(dataset) === 'batch' && dataset.params.datasetSplit !== 'test') return
     const firstTrainingExample = datasetExamplesForNode(dataset).findIndex(example => example.split === 'train')
     if (firstTrainingExample < 0) return
     cancelActiveRun()

@@ -90,6 +90,20 @@ describe('Neural Canvas app', () => {
     expect(screen.getByRole('heading', { name: /^Evaluate / })).toBeInTheDocument()
   })
 
+  it.each([undefined, 'all', 'test'] as const)('enables a full training step for a numeric dataset showing %s examples', async split => {
+    const graph = handBuiltLinearGraph()
+    const dataset = graph.nodes.find(node => node.type === 'dataset')!
+    dataset.params.datasetSplit = split
+    render(<App initialGraph={graph} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
+    const button = screen.getByRole('button', { name: /Run one full training step/ })
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+    expect(screen.getByText('Epoch 1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Reporting' }))
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Reported losses' })).getAllByRole('listitem')).toHaveLength(2))
+  })
+
   it('lets a numeric graph train in reshuffled mini-batches', async () => {
     render(<App initialGraph={handBuiltLinearGraph()} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Train' }))
