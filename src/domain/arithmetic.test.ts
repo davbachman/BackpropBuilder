@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendArithmeticInput, arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
+import { arithmeticVariableNames, canonicalArithmeticExpression, displayArithmeticExpression, appendArithmeticInput, arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
 import { backwardPass, forwardPass, runTrainingStep } from './engine'
 import { blockPalette } from './blockPalette'
 import { createNode } from './examples'
@@ -8,6 +8,18 @@ import { scalarValue, tensorValue } from './tensor'
 import type { GraphGroup, GraphModel } from './types'
 
 describe('editable arithmetic block', () => {
+  it('round-trips named expressions without confusing slots, labels, or numeric constants', () => {
+    for (const labels of [['x2', 'x1'], ['u', 'u'], ['mean radius', 'Param 1'], ['e3', 'x10'], ['a"b', 'x + y']]) {
+      const names = arithmeticVariableNames(labels)
+      const expression = 'x1 * x2 + 1e3'
+      expect(canonicalArithmeticExpression(displayArithmeticExpression(expression, names), names)).toBe(expression)
+    }
+    const names = arithmeticVariableNames(['u', 'w'])
+    expect(canonicalArithmeticExpression('u + w + x3', names)).toBe('x1 + x2 + x3')
+    expect(arithmeticVariableNames(['u', 'u'])).toEqual(['u', 'u_2'])
+    expect(displayArithmeticExpression('x1 + x2', arithmeticVariableNames(['mean radius', 'w']))).toBe('"mean radius" + w')
+  })
+
   it('replaces separate Add and Multiply entries with Arithmetic and Param', () => {
     expect(blockPalette.filter(item => ['weight', 'bias', 'add', 'multiply', 'arithmetic'].includes(item.type)))
       .toEqual([{ type: 'weight', label: 'Param' }, { type: 'arithmetic', label: 'Arithmetic' }])

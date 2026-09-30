@@ -97,6 +97,28 @@ export function appendArithmeticInput(source: string): string {
   return `${source.trim()} ${operator} x${parsed.inputCount + 1}`
 }
 
+/** Use quoted labels when a variable name contains spaces or punctuation. */
+export function arithmeticVariableNames(labels: string[]): string[] {
+  const used = new Set<string>()
+  return labels.map(label => {
+    let name = label, suffix = 2
+    while (used.has(name)) name = `${label}_${suffix++}`
+    used.add(name)
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : JSON.stringify(name)
+  })
+}
+
+export function displayArithmeticExpression(expression: string, names: string[]): string {
+  return expression.replace(/\bx([1-9]\d*)\b/g, (token, index: string) => names[Number(index) - 1] ?? token)
+}
+
+export function canonicalArithmeticExpression(expression: string, names: string[]): string {
+  const slots = new Map(names.map((name, index) => [name, `x${index + 1}`]))
+  // Tokenize numbers too, so an input called e3 cannot alter the constant 1e3.
+  return expression.replace(/"(?:\\.|[^"\\])*"|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_][A-Za-z0-9_]*/g,
+    token => slots.get(token) ?? token)
+}
+
 interface Evaluated { value: TensorValue; backward: (gradient: TensorValue) => void }
 
 export function evaluateArithmetic(source: string, inputs: TensorValue[], gradient?: TensorValue): { value: TensorValue; gradients: TensorValue[] } {

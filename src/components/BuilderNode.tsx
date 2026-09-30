@@ -23,7 +23,7 @@ import {
 import { DATASET_MENU_OPTIONS, customCsvCardHeight, customCsvCardWidth, customCsvLabelWidth, customCsvOutputTop, datasetTargetSlotForNode } from '../domain/datasets'
 import { builderCardHeight } from '../domain/builderGeometry'
 import { formatCompactTensor, formatFullTensor, formatTensorInput, parseTensorInput, toTensor } from '../domain/tensor'
-import { parseArithmetic } from '../domain/arithmetic'
+import { arithmeticVariableNames, canonicalArithmeticExpression, displayArithmeticExpression, parseArithmetic } from '../domain/arithmetic'
 import type { DatasetKind, GraphNode, LossKind, NodeType, TensorTransformKind, TensorValue } from '../domain/types'
 
 export interface BuilderNodeData extends Record<string, unknown> {
@@ -32,6 +32,7 @@ export interface BuilderNodeData extends Record<string, unknown> {
   showGradient: boolean
   formula: string
   fullFormula: string
+  arithmeticInputLabels?: string[]
   lossKind?: LossKind
   lossOptions?: Array<{ kind: LossKind; label: string }>
   active: boolean
@@ -106,12 +107,16 @@ export function BuilderNode(props: NodeProps): ReactElement {
   const draftValue = valueDraft.source === valueText ? valueDraft.text : valueText
   const valueIsValid = valueDraft.source === valueText ? valueDraft.valid : true
   const savedExpression = node.params.expression ?? 'x1 * x2'
-  const [expressionDraft, setExpressionDraft] = useState({ source: savedExpression, text: savedExpression, valid: true })
-  const expressionText = expressionDraft.source === savedExpression ? expressionDraft.text : savedExpression
-  const expressionValid = expressionDraft.source === savedExpression ? expressionDraft.valid : true
+  const expressionNames = arithmeticVariableNames(data.arithmeticInputLabels ?? [])
+  const displayedExpression = displayArithmeticExpression(savedExpression, expressionNames)
+  const expressionSource = JSON.stringify([savedExpression, expressionNames])
+  const [expressionDraft, setExpressionDraft] = useState({ source: expressionSource, text: displayedExpression, valid: true })
+  const expressionText = expressionDraft.source === expressionSource ? expressionDraft.text : displayedExpression
+  const expressionValid = expressionDraft.source === expressionSource ? expressionDraft.valid : true
   const [concatOutput, concatExpression] = node.type === 'concat' ? data.fullFormula.split(' = ', 2) : []
   const commitExpression = () => {
-    if (expressionValid && expressionText !== savedExpression) data.onExpressionChange(node.id, expressionText)
+    const canonical = canonicalArithmeticExpression(expressionText, expressionNames)
+    if (expressionValid && canonical !== savedExpression) data.onExpressionChange(node.id, canonical)
   }
 
   useEffect(() => {
@@ -197,8 +202,8 @@ export function BuilderNode(props: NodeProps): ReactElement {
             onChange={(event) => {
               const text = event.target.value
               let valid = true
-              try { parseArithmetic(text) } catch { valid = false }
-              setExpressionDraft({ source: savedExpression, text, valid })
+              try { parseArithmetic(canonicalArithmeticExpression(text, expressionNames)) } catch { valid = false }
+              setExpressionDraft({ source: expressionSource, text, valid })
             }}
             onBlur={commitExpression}
             onKeyDown={(event) => { if (event.key === 'Enter') { event.currentTarget.blur(); event.stopPropagation() } }}

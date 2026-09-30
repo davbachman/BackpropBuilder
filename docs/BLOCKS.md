@@ -56,3 +56,5 @@ The Build sidebar groups blocks into Core model, Features and tensors, Neural ne
 ## Canvas arithmetic shortcuts
 
 Double-click empty canvas, type `+`, `-`, `*`, or `/`, then press Enter (or click the suggestion) to place an Arithmetic block with that operation prefilled. The symbols `−`, `×`, `·`, and `÷` work too. Type `^` or `**` to start with `x1 ^ 2`; numeric exponents are editable in the block.
+
+Arithmetic expression fields display the names of connected variables (for example, `u * w`) and update when those variables are renamed or rewired. Edit using the displayed names; unconnected ports use `x1`, `x2`, etc. Names containing spaces or punctuation appear in double quotes. Repeated names receive a suffix to distinguish input slots.

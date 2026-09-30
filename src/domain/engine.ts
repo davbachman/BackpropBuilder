@@ -316,6 +316,15 @@ function inferredOutputShapes(graph: GraphModel): Map<string, number[]> {
   return shapeByNode
 }
 
+/** Connected variable names for the editable arithmetic input slots. */
+export function arithmeticInputLabels(node: GraphNode, graph: GraphModel): string[] {
+  const labels = Array.from({ length: inputArityForNode(node) }, (_, index) => `x${index + 1}`)
+  for (const edge of incomingEdges(graph, node.id)) {
+    labels[edge.inputSlot ?? 0] = outputLabelForFormula(graph.nodes.find(source => source.id === edge.source), graph, edge.sourceSlot ?? 0) ?? labels[edge.inputSlot ?? 0]
+  }
+  return labels
+}
+
 function inputLabelsForFormula(node: GraphNode, graph?: GraphModel): string[] {
   const fallback = fallbackInputLabels(node)
   if (!graph) return fallback
