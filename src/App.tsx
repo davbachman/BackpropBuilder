@@ -1766,9 +1766,9 @@ function App({
               ),
               inspectedNeuron:
                 existing.view?.inspectedNeuron &&
-                view.expandedGroupIds.includes(
+                (JSON.stringify(view.expandedGroupIds) === JSON.stringify(existing.view.expandedGroupIds) || view.expandedGroupIds.includes(
                   existing.view.inspectedNeuron.groupId,
-                )
+                ))
                   ? existing.view.inspectedNeuron
                   : undefined,
             },

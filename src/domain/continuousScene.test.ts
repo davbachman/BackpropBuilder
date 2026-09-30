@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds, sceneGroupId } from './continuousScene'
+import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneGroupId } from './continuousScene'
 import { createModelPreset } from './modelPresets'
 import { LESSONS } from '../learning/presets'
 import { projectDenseNeurons } from './neuronProjection'
@@ -74,7 +74,7 @@ describe('one continuous nested scene', () => {
     expect(targetWire.route).toHaveLength(2)
   })
 
-  it('brings misplaced weights, bias, and products back inside their neuron without altering the computation', () => {
+  it('respects saved positions outside a neuron until compact layout is requested', () => {
     const graph = compactVisualHierarchy(createModelPreset('linear'))
     const neuron = graph.groups![0]
     const before = layoutContinuousScene(graph)
@@ -86,15 +86,11 @@ describe('one continuous nested scene', () => {
     } }
     const original = structuredClone(graph)
     const scene = layoutContinuousScene(graph)
-    expect(scene.repairedOffsetIds).toEqual(new Set(['layer-0/weight-0-0', 'layer-0/bias-0', 'layer-0/neuron-0/product-0']))
-    const bounds = sceneContentBounds(scene, neuron.id)
     for (const id of neuron.nodeIds) {
-      const rect = scene.nodes.get(id)!
-      expect(rect).toEqual(before.nodes.get(id))
-      expect(rect.x).toBeGreaterThanOrEqual(bounds.x)
-      expect(rect.y).toBeGreaterThanOrEqual(bounds.y)
-      expect(rect.x + rect.width).toBeLessThanOrEqual(bounds.x + bounds.width)
-      expect(rect.y + rect.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+      const rect = scene.nodes.get(id)!, previous = before.nodes.get(id)!
+      const offset = graph.view.layoutOffsets?.[id] ?? { x: 0, y: 0 }
+      expect(rect.x).toBeCloseTo(previous.x + offset.x)
+      expect(rect.y).toBeCloseTo(previous.y + offset.y)
     }
     expect(scene.nodes.get('input-0')!.x).toBe(before.nodes.get('input-0')!.x - 20)
     expect(graph).toEqual(original)
@@ -142,7 +138,6 @@ describe('one continuous nested scene', () => {
       }
     }
     const wires = routeContinuousScene(graph, scene)
-    expect(scene.repairedOffsetIds.size).toBe(0)
     for (const edge of graph.edges) {
       const segments = wires.filter(wire => wire.edgeId === edge.id)
       expect(segments.length).toBeGreaterThan(0)

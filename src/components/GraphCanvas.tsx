@@ -69,6 +69,7 @@ import { BuilderNode, type BuilderNodeData } from './BuilderNode'
 import { GroupNode, type GroupNodeData } from './GroupNode'
 import { layoutSemanticGraph, semanticGroupDepth } from '../domain/semanticLayout'
 import { preserveLayoutForWiring } from '../domain/layoutState'
+import { captureCanvasLayout, preserveLayoutAfterDeletion } from '../domain/deletionLayout'
 import { cardReveal, compactVisualHierarchy, continuousSceneMaxZoom, layoutContinuousScene, routeContinuousScene, sceneContentBounds } from '../domain/continuousScene'
 import './modules.css'
 import './semanticCanvas.css'
@@ -163,7 +164,7 @@ function GraphCanvasInner({
 }: GraphCanvasProps): ReactElement {
   const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
   const sourceGraph = displayGraph ?? graph
-  const continuous = Boolean(sourceGraph.groups?.length)
+  const continuous = Boolean(sourceGraph.groups?.length || sourceGraph.view?.preservedLayouts)
   const semantic = continuous
   const renderedGraph = useMemo(() => continuous ? compactVisualHierarchy(sourceGraph) : sourceGraph, [sourceGraph, continuous])
   const geometryKey = JSON.stringify({
@@ -241,29 +242,22 @@ function GraphCanvasInner({
     else onGraphChange({ ...graph, view })
   }, [graph, onGraphChange, onViewChange])
   const compactLayout = useCallback(() => {
-    const cleanGraph = { ...renderedGraph, view: { ...renderedGraph.view!, preservedLayouts: undefined, preservedLayoutBounds: undefined, layoutOffsets: undefined, layoutEdges: undefined } }
+    const cleanGraph = { ...renderedGraph, view: { ...renderedGraph.view!, preservedLayouts: undefined, preservedLayoutBounds: undefined, layoutOffsets: undefined, layoutEdges: undefined, manualNodePlacements: undefined } }
     const clean = continuous ? layoutContinuousScene(cleanGraph) : layoutSemanticGraph(cleanGraph)
     const rects = [...clean.nodes.values(), ...clean.groups.values()]
     if (!rects.length) return
     const x = Math.min(...rects.map(rect => rect.x)), y = Math.min(...rects.map(rect => rect.y))
     const bounds = { x, y, width: Math.max(...rects.map(rect => rect.x + rect.width)) - x, height: Math.max(...rects.map(rect => rect.y + rect.height)) - y }
-    changeView({ ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], preservedLayouts: undefined, preservedLayoutBounds: undefined, layoutOffsets: undefined, layoutEdges: undefined, focusedGroupId: undefined,
+    changeView({ ...captureCanvasLayout(cleanGraph), expandedGroupIds: graph.view?.expandedGroupIds ?? [], layoutEdges: undefined, focusedGroupId: undefined,
       viewport: getViewportForBounds(bounds, canvasSize.width, canvasSize.height, .01, 1.5, .2) })
     onSelectionChange({ nodeIds: [] })
   }, [renderedGraph, continuous, graph.view, canvasSize, changeView, onSelectionChange])
+  // Freeze the initial arrangement (and the result of Compact layout). Edits
+  // can change card sizes and ports without reflowing existing neighbours.
   useEffect(() => {
-    if (!scene?.repairedOffsetIds.size || !graph.view?.layoutOffsets) return
-    const removed = new Set(scene.repairedOffsetIds)
-    // A compacted display group can inherit an offset from a skipped wrapper.
-    for (const id of scene.repairedOffsetIds) {
-      const groupId = groupIdFromNodeId(id)
-      if (groupId) for (const ancestor of groupAncestors(graph, groupId)) {
-        if (!scene.groups.has(ancestor.id)) removed.add(groupNodeId(ancestor.id))
-      }
-    }
-    const layoutOffsets = Object.fromEntries(Object.entries(graph.view.layoutOffsets).filter(([id]) => !removed.has(id)))
-    if (Object.keys(layoutOffsets).length !== Object.keys(graph.view.layoutOffsets).length) changeView({ ...graph.view, layoutOffsets })
-  }, [scene, graph, changeView])
+    if (!graph.groups?.length || graph.view?.preservedLayouts) return
+    changeView(captureCanvasLayout(graph))
+  }, [graph, changeView])
   const toggleGroup = useCallback((groupId: string) => {
     if (continuous && scene) {
       const displayed = renderedGraph.groups?.find(item => item.id === groupId)
@@ -691,11 +685,11 @@ function GraphCanvasInner({
       }
 
       if (nextGraph) {
-        onGraphChange(nextGraph)
+        onGraphChange(preserveLayoutAfterDeletion(graph, nextGraph, sourceGraph))
       }
       onNodesChangeBase(changes)
     },
-    [graph, nodes, onCancelPendingPlacement, onGraphChange, onNodesChangeBase, onSelectionChange],
+    [graph, sourceGraph, nodes, onCancelPendingPlacement, onGraphChange, onNodesChangeBase, onSelectionChange],
   )
 
   const onEdgesChange = useCallback(

@@ -6,12 +6,11 @@ import type { GraphGroup, GraphModel, Position } from './types'
 import type { WireEndpoint } from './wireRouting'
 
 export const sceneGroupId = (id: string) => `visual-group:${id}`
-export interface SceneLevel { parentId?: string; ids: string[]; scale: number; x: number; y: number }
+export interface SceneLevel { parentId?: string; ids: string[]; scale: number; x: number; y: number; bounds: SemanticRect }
 export interface ContinuousScene extends SemanticLayout {
   scales: Map<string, number>
   parents: Map<string, string | undefined>
   levels: SceneLevel[]
-  repairedOffsetIds: Set<string>
 }
 export interface SceneWire { id: string; edgeId: string; parentId?: string; scale: number; route: Position[]; sourceSide: WireEndpoint['side']; targetSide: WireEndpoint['side']; hidden?: boolean }
 
@@ -71,7 +70,7 @@ export function continuousSceneMaxZoom(scene: ContinuousScene): number {
 /** Each card reserves a permanent place for its contents. Camera movement never
  * changes this geometry: a child is simply a smaller drawing inside its parent. */
 export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
-  const scene: ContinuousScene = { nodes: new Map(), groups: new Map(), scales: new Map(), parents: new Map(), levels: [], repairedOffsetIds: new Set() }
+  const scene: ContinuousScene = { nodes: new Map(), groups: new Map(), scales: new Map(), parents: new Map(), levels: [] }
   const groups = graph.groups ?? []
   const groupById = new Map(groups.map(group => [group.id, group]))
   const ownerByNode = new Map<string, { id: string; depth: number }>()
@@ -135,25 +134,9 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       y = frame.y + 40 * outerScale + (availableHeight - height * scale) / 2 - top * scale
     }
     const ids: string[] = []
-    const entries = [...local.groups].map(([id, rect]) => ({ id, rect, group: true }))
-      .concat([...local.nodes].map(([id, rect]) => ({ id, rect, group: false })))
-    const bounds = parent && sceneContentBounds(scene, parent.id)
-    // Offsets from an earlier layout can put a weight or bias completely
-    // outside its neuron. Restore this level's connected arrangement, leaving
-    // the rest of the model and all of its numerical parameters untouched.
-    if (bounds && entries.some(({ id, rect, group }) => {
-      const offset = graph.view?.layoutOffsets?.[group ? sceneGroupId(id) : id]
-      const left = x + rect.x * scale + (offset?.x ?? 0), top = y + rect.y * scale + (offset?.y ?? 0)
-      return left < bounds.x - 1e-7 || top < bounds.y - 1e-7 || left + rect.width * scale > bounds.x + bounds.width + 1e-7 || top + rect.height * scale > bounds.y + bounds.height + 1e-7
-    })) {
-      for (const { id, group } of entries) {
-        const key = group ? sceneGroupId(id) : id
-        if (graph.view?.layoutOffsets?.[key]) scene.repairedOffsetIds.add(key)
-      }
-    }
     function place(id: string, rect: SemanticRect, group: boolean) {
       const key = group ? sceneGroupId(id) : id
-      const offset = scene.repairedOffsetIds.has(key) ? undefined : graph.view?.layoutOffsets?.[key]
+      const offset = graph.view?.layoutOffsets?.[key]
       const placed = { x: x + rect.x * scale + (offset?.x ?? 0), y: y + rect.y * scale + (offset?.y ?? 0), width: rect.width * scale, height: rect.height * scale }
       if (group) scene.groups.set(id, placed)
       else scene.nodes.set(id, placed)
@@ -178,7 +161,7 @@ export function layoutContinuousScene(graph: GraphModel): ContinuousScene {
       scene.parents.set(node.id, parent?.id)
       ids.push(node.id)
     }
-    scene.levels.push({ parentId: parent?.id, ids, scale, x, y })
+    scene.levels.push({ parentId: parent?.id, ids, scale, x, y, bounds: { x: left, y: top, width, height } })
     for (const child of children) level(child, new Set([...ancestors, ...(parent ? [parent.id] : [])]))
   }
   level()

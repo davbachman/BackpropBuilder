@@ -1,21 +1,17 @@
-import { compactVisualHierarchy, layoutContinuousScene, sceneContentBounds, sceneGroupId } from './continuousScene'
-import { layoutSemanticGraph } from './semanticLayout'
+import { compactVisualHierarchy, layoutContinuousScene, sceneContentBounds } from './continuousScene'
 import { builderCardHeight, builderCardWidth } from './builderGeometry'
-import type { GraphModel, GraphNode, Position } from './types'
+import type { GraphModel, GraphNode } from './types'
 
 /** Place a new calculation in the clicked visual level. Existing blocks keep
  * their world coordinates even when the surrounding hierarchy is nested. */
 export function placeCanvasNode(graph: GraphModel, node: GraphNode, displayGraph = graph, parentGroupId?: string, sceneScale?: number): GraphModel {
   const next = { ...graph, nodes: [...graph.nodes, node] }
-  const semantic = Boolean(displayGraph.groups?.length)
+  const semantic = Boolean(displayGraph.groups?.length || displayGraph.view?.preservedLayouts)
   if (!semantic) return next
 
-  const continuous = true
-  const rendered = continuous ? compactVisualHierarchy(displayGraph) : displayGraph
-  const layout = continuous ? layoutContinuousScene : layoutSemanticGraph
-  const before = layout(rendered)
-  if (continuous && parentGroupId && graph.groups?.some(group => group.id === parentGroupId) && before.groups.has(parentGroupId)) {
-    const scene = before as ReturnType<typeof layoutContinuousScene>
+  const before = layoutContinuousScene(compactVisualHierarchy(displayGraph))
+  if (parentGroupId && graph.groups?.some(group => group.id === parentGroupId) && before.groups.has(parentGroupId)) {
+    const scene = before
     const frame = scene.groups.get(parentGroupId)!
     const bounds = sceneContentBounds(scene, parentGroupId)
     const scale = scene.levels.find(level => level.parentId === parentGroupId)?.scale ?? 1
@@ -39,28 +35,10 @@ export function placeCanvasNode(graph: GraphModel, node: GraphNode, displayGraph
       } },
     }
   }
-  if (continuous && sceneScale && sceneScale > 0) {
-    return { ...next, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], manualNodePlacements: {
-      ...graph.view?.manualNodePlacements,
-      [node.id]: { offset: { ...node.position }, scale: sceneScale },
-    } } }
-  }
-  const after = layout({ ...rendered, nodes: [...rendered.nodes, node] })
-  const layoutOffsets = { ...graph.view?.layoutOffsets }
-  const hold = (id: string, desired: Position, arranged: Position) => {
-    const offset = layoutOffsets[id] ?? { x: 0, y: 0 }
-    layoutOffsets[id] = { x: offset.x + desired.x - arranged.x, y: offset.y + desired.y - arranged.y }
-  }
-
-  // A root group's offset carries every descendant with it. Applying the same
-  // compensation to its children would move them twice.
-  const roots = (rendered.groups ?? []).filter(group => !group.parentId)
-  const groupedIds = new Set(roots.flatMap(group => group.nodeIds))
-  for (const group of roots) hold(sceneGroupId(group.id), before.groups.get(group.id)!, after.groups.get(group.id)!)
-  for (const [id, rect] of before.nodes) {
-    if (!groupedIds.has(id)) hold(id, rect, after.nodes.get(id)!)
-  }
-  hold(node.id, node.position, after.nodes.get(node.id)!)
-
-  return { ...next, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], layoutOffsets } }
+  // New root blocks use the clicked position. Existing blocks never need a
+  // compensating automatic layout when a block is inserted.
+  return { ...next, view: { ...graph.view, expandedGroupIds: graph.view?.expandedGroupIds ?? [], manualNodePlacements: {
+    ...graph.view?.manualNodePlacements,
+    [node.id]: { offset: { ...node.position }, scale: sceneScale && sceneScale > 0 ? sceneScale : 1 },
+  } } }
 }

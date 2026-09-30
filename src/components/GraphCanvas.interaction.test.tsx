@@ -11,6 +11,7 @@ import type { GraphModel } from '../domain/types'
 import { LESSONS } from '../learning/presets'
 import { createNode } from '../domain/examples'
 import { placeCanvasNode } from '../domain/nodePlacement'
+import { parseCustomCsv } from '../domain/customCsv'
 import { DEFAULT_TRAINING } from '../domain/trainingSettings'
 import type { BuilderNodeData } from './BuilderNode'
 
@@ -230,6 +231,73 @@ describe('canvas movement gestures', () => {
     expect(geometry()).toEqual(before)
   })
 
+  it.each(['input', 'group', 'nested'])('keeps surviving blocks and camera still when deleting a %s block', kind => {
+    const graph = createModelPreset('linear')
+    const { onGraphChange, rerenderGraph } = mountCanvas(graph)
+    const before = new Map(flow.props!.nodes!.map(({ id, position, width, height }) => [id, { position, width, height }]))
+    const group = flow.props!.nodes!.find(node => node.type === 'groupNode')!
+    const nested = flow.props!.nodes!.find(node => node.type === 'builderNode' && (node.data as BuilderNodeData).graphNode.type === 'weight')!
+    const id = kind === 'input' ? 'input-0' : kind === 'group' ? group.id : nested.id
+    flow.fitView.mockClear()
+    flow.setViewport.mockClear()
+    act(() => flow.props!.onNodesChange!([{ type: 'remove', id }]))
+    const next = onGraphChange.mock.lastCall![0] as GraphModel
+    rerenderGraph(next)
+    expect(flow.props!.nodes!.some(node => node.id === id)).toBe(false)
+    for (const node of flow.props!.nodes!) {
+      const previous = before.get(node.id)
+      if (!previous) continue
+      expect(node.position.x).toBeCloseTo(previous.position.x, 8)
+      expect(node.position.y).toBeCloseTo(previous.position.y, 8)
+      expect(node.width).toBeCloseTo(previous.width!, 8)
+      expect(node.height).toBeCloseTo(previous.height!, 8)
+    }
+    expect(flow.fitView).not.toHaveBeenCalled()
+    expect(flow.setViewport).not.toHaveBeenCalled()
+    // The saved geometry survives reload, and undo returns the deleted block.
+    rerenderGraph(JSON.parse(JSON.stringify(next)))
+    for (const node of flow.props!.nodes!) {
+      expect(node.position.x).toBeCloseTo(before.get(node.id)!.position.x, 8)
+      expect(node.position.y).toBeCloseTo(before.get(node.id)!.position.y, 8)
+    }
+    rerenderGraph(graph)
+    expect(flow.props!.nodes!.some(node => node.id === id)).toBe(true)
+  })
+
+  it.each(['arithmetic', 'add', 'multiply', 'concat', 'dataset'] as const)('does not reflow neighbours when a %s block grows', type => {
+    const added = { ...createNode(type, 99), position: { x: 310, y: 200 } }
+    let graph = placeCanvasNode(createModelPreset('linear'), added)
+    const { onViewChange, onGraphChange, rerenderGraph, getByRole } = mountCanvas(graph)
+    graph = { ...graph, view: onViewChange.mock.lastCall![0] }
+    rerenderGraph(graph)
+    for (let pass = 0; pass < 2; pass++) {
+      const before = new Map(flow.props!.nodes!.map(node => [node.id, { position: node.position, width: node.width, height: node.height }]))
+      for (let count = 0; count < 6; count++) {
+        if (type === 'dataset') {
+          graph = { ...graph, nodes: graph.nodes.map(node => node.id === added.id ? { ...node, params: {
+            dataset: 'custom-csv', customCsv: parseCustomCsv('very_long_feature_column_name,b,c,d,target\n1,2,3,4,0\n2,3,4,5,1\n', 'larger.csv'),
+          } } : node) }
+        } else {
+          act(() => (nodeById(added.id).data as BuilderNodeData).onFlexibleInputAdd(added.id))
+          graph = onGraphChange.mock.lastCall![0]
+        }
+        rerenderGraph(graph)
+        for (const node of flow.props!.nodes!) {
+          const previous = before.get(node.id)!
+          expect(node.position.x).toBeCloseTo(previous.position.x, 8)
+          expect(node.position.y).toBeCloseTo(previous.position.y, 8)
+          if (node.id !== added.id) {
+            expect(node.width).toBeCloseTo(previous.width!, 8)
+            expect(node.height).toBeCloseTo(previous.height!, 8)
+          }
+        }
+      }
+      fireEvent.click(getByRole('button', { name: 'Compact layout' }))
+      graph = { ...graph, view: onViewChange.mock.lastCall![0] }
+      rerenderGraph(graph)
+    }
+  })
+
   it('fans out a group output without removing its existing wire', () => {
     const graph = createModelPreset('linear')
     const group = graph.groups!.find(candidate => candidate.kind === 'neuron')!
@@ -348,7 +416,7 @@ describe('canvas movement gestures', () => {
     expect(flow.setViewport).toHaveBeenLastCalledWith(restored)
   })
 
-  it('repairs a scattered neuron once and constrains its calculations to the enclosing frame', () => {
+  it('preserves a scattered neuron until Compact layout is requested', () => {
     const graph = createModelPreset('linear')
     graph.view = { ...graph.view!, layoutOffsets: {
       'layer-0/weight-0-0': { x: -300, y: 100 },
@@ -359,16 +427,13 @@ describe('canvas movement gestures', () => {
     expect(flow.props!.autoPanOnNodeDrag).toBe(false)
     expect(onViewChange).toHaveBeenCalledTimes(1)
     const view = onViewChange.mock.lastCall![0]
-    expect(view.layoutOffsets).toEqual({ 'input-0': { x: -20, y: 5 } })
+    const before = new Map(flow.props!.nodes!.map(node => [node.id, node.position]))
+    expect(view.preservedLayouts).toBeDefined()
     rerenderGraph({ ...graph, view })
     expect(onViewChange).toHaveBeenCalledTimes(1)
-    for (const id of ['layer-0/weight-0-0', 'layer-0/bias-0', 'layer-0/neuron-0/product-0', 'layer-0/neuron-0/sum', 'layer-0/neuron-0/activation']) {
-      const node = nodeById(id)
-      const [[left, top], [right, bottom]] = node.extent as [[number, number], [number, number]]
-      expect(node.position.x).toBeGreaterThanOrEqual(left)
-      expect(node.position.y).toBeGreaterThanOrEqual(top)
-      expect(node.position.x + node.width!).toBeLessThanOrEqual(right)
-      expect(node.position.y + node.height!).toBeLessThanOrEqual(bottom)
+    for (const node of flow.props!.nodes!) {
+      expect(node.position.x).toBeCloseTo(before.get(node.id)!.x, 8)
+      expect(node.position.y).toBeCloseTo(before.get(node.id)!.y, 8)
     }
     expect(nodeById('input-0').extent).toBeUndefined()
   })
