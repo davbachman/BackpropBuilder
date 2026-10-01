@@ -38,6 +38,24 @@ it('fits training rows only, handles a constant feature, and reuses saved statis
  }
  expect(generatePyTorchExport({...graph,training:undefined}).script).toContain('[2,7]')
 })
+it.each(['batch', undefined] as const)('fits directly concatenated columns in %s mode without reshapes or held-out leakage', async datasetMode => {
+ const {graph,add}=builder()
+ const csv=parseCustomCsv('radius,width,y,split\n1,10,0,train\n3,30,1,train\n1000,9000,2,test\n','direct.csv')
+ add('data','dataset',{dataset:'custom-csv',customCsv:csv,datasetMode})
+ add('joined','concat',{axis:1},[['data',0],['data',1]])
+ add('standard','standardize',{},['joined'])
+ const snapshot=structuredClone(graph)
+ const stats=await fitStandardizer(graph,'standard')
+ expect(stats).toEqual({mean:[2,20],scale:[1,10],count:2})
+ expect(graph).toEqual(snapshot)
+ graph.nodes.find(node=>node.id==='standard')!.params.standardization=stats
+ const result=forwardPass(graph,false).graph.nodes.find(node=>node.id==='standard')!.value!
+ expect(result.shape).toEqual([3,2])
+ expect(result.data).toEqual([-1,-1,1,1,998,898])
+ graph.nodes[0].params.datasetSplit='test'
+ expect(await fitStandardizer(graph,'standard')).toEqual(stats)
+})
+
 it('matches traced and accelerated values and all parameter gradients',async()=>{
  const graph=fixture()
  const source=graph.nodes.find(n=>n.id==='data')!

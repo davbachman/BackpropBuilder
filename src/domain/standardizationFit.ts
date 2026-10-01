@@ -1,6 +1,6 @@
 import type { GraphModel } from './types'
 import { forwardPass } from './engine'
-import { datasetExamplesForNode, datasetTargetSlotForNode } from './datasets'
+import { datasetExamplesForNode, datasetMode, datasetTargetSlotForNode } from './datasets'
 import { standardizationAccumulator, type StandardizationStats } from './standardization'
 
 /** Fit a fixed preprocessing graph, never model parameters or held-out rows.
@@ -36,11 +36,19 @@ export async function fitStandardizer(graph: GraphModel, id: string): Promise<St
   const key = (slot: number) => `fit:${source.id}:${slot}`
   const output = input.source === source.id ? key(input.sourceSlot ?? 0) : input.source
   const prefix: GraphModel = { ...graph, groups: [], nodes: nodes.filter(node => node.id !== source.id), edges: edges.map(edge => edge.source === source.id ? { ...edge, source: key(edge.sourceSlot ?? 0), sourceSlot: 0 } : edge) }
+  const batch = datasetMode(source) === 'batch'
   const rows = datasetExamplesForNode(source).filter(row => row.split === 'train')
   if (!rows.length) throw Error('The dataset needs training rows.')
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]
-    const constants = slots.map(slot => ({ id: key(slot), type: 'input' as const, label: key(slot), position: { x: 0, y: 0 }, params: { value: row.features[slot < targetSlot ? slot : slot - 1] } }))
+    const constants = slots.map(slot => {
+      const feature = row.features[slot < targetSlot ? slot : slot - 1]
+      // A batch column has shape [rows], even when fitting one row at a time.
+      // Keep that axis so direct column stacking and other shape-sensitive
+      // preprocessing see the same ranks as normal dataset execution.
+      const value = batch ? { shape: [1], data: [feature.data[0]] } : feature
+      return { id: key(slot), type: 'input' as const, label: key(slot), position: { x: 0, y: 0 }, params: { value } }
+    })
     const value = forwardPass({ ...prefix, nodes: [...constants, ...prefix.nodes] }, false).graph.nodes.find(node => node.id === output)!.value!
     accumulator.add(value)
     if (index % 100 === 0) await new Promise(resolve => setTimeout(resolve, 0))
