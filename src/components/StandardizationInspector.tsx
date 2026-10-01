@@ -12,9 +12,10 @@ export function StandardizationInspector({ graph, node, onParams }: { graph: Gra
     finally { setBusy(false) }
   }
   return <fieldset><legend>Feature standardization</legend>
-    <p>z = (x − training mean) / training standard deviation</p>
+    <p>z[row, column] = (x[row, column] − mean[column]) / scale[column]</p>
+    <p>For matrices, each column is a feature and each row is an observation. Columns are normalized independently.</p>
     <button type="button" disabled={busy} onClick={() => void fit()}>{busy ? 'Fitting…' : stats ? 'Refit on training rows' : 'Fit on training rows'}</button>
-    <p>Fit after connecting your features. Statistics stay fixed during training and prediction. Refit when changing the training split or feature construction. Do not refit on new test data.</p>
+    <p>Fit after connecting your features. Dataset connections use training rows only; a standalone Input matrix uses all its rows as training observations. Statistics stay fixed during training and prediction. Refit when changing the training split or feature construction. Do not refit on new test data.</p>
     {stats && <><p>Fitted on {stats.count} training observations. Constant columns use scale 1.</p><table><thead><tr><th>Feature</th><th>Mean</th><th>Scale</th></tr></thead><tbody>{stats.mean.map((mean, i) => <tr key={i}><td>{i + 1}</td><td>{mean.toPrecision(6)}</td><td>{stats.scale[i].toPrecision(6)}</td></tr>)}</tbody></table></>}
     {error && <p role="alert">{error}</p>}
   </fieldset>

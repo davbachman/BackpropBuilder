@@ -39,7 +39,11 @@ it('fits training rows only, handles a constant feature, and reuses saved statis
  expect(generatePyTorchExport({...graph,training:undefined}).script).toContain('[2,7]')
 })
 it('matches traced and accelerated values and all parameter gradients',async()=>{
- const graph=fixture();graph.nodes.find(n=>n.id==='standard')!.params.standardization=await fitStandardizer(graph,'standard')
+ const graph=fixture()
+ const source=graph.nodes.find(n=>n.id==='data')!
+ source.params.customCsv=parseCustomCsv('a,b,y,split\n1,7,2,train\n3,17,4,train\n1000,900,5,test\n','features.csv')
+ graph.nodes.find(n=>n.id==='standard')!.params.standardization=await fitStandardizer(graph,'standard')
+ expect(graph.nodes.find(n=>n.id==='standard')!.params.standardization?.scale).toEqual([1,5])
  const traced=backwardPass(forwardPass(graph).graph),model=new TensorGraph(graph)
  try{
   const result=model.gradients(model.examples.slice(0,1))
@@ -50,6 +54,49 @@ it('matches traced and accelerated values and all parameter gradients',async()=>
   await model.inference(model.examples,2)
   expect(graph.nodes.find(n=>n.id==='standard')!.params.standardization).toEqual(fit)
  }finally{model.dispose()}
+})
+it('fits a standalone matrix column by column, preserving shape and fixed statistics', async () => {
+ const {graph,add}=builder()
+ add('matrix','input',{value:{shape:[3,3],data:[1,10,7,3,20,7,5,30,7]}})
+ add('standard','standardize',{},['matrix'])
+ const stats=await fitStandardizer(graph,'standard')
+ expect(stats.mean).toEqual([3,20,7])
+ expect(stats.scale).toEqual([Math.sqrt(8/3),Math.sqrt(200/3),1])
+ expect(stats.count).toBe(3)
+ graph.nodes[1].params.standardization=stats
+ const result=forwardPass(graph,false).graph.nodes[1].value!
+ expect(result.shape).toEqual([3,3])
+ for(let column=0;column<3;column++){
+  const values=[0,1,2].map(row=>result.data[row*3+column])
+  expect(values.reduce((a,b)=>a+b,0)/3).toBeCloseTo(0)
+  expect(values.reduce((a,b)=>a+b*b,0)/3).toBeCloseTo(column===2?0:1)
+ }
+ const later=standardize({shape:[1,3],data:[5,30,8]},stats)
+ expect(later.value.data).toEqual([2/stats.scale[0],10/stats.scale[1],1])
+ expect(later.derivative.data).toEqual(stats.scale.map(scale=>1/scale))
+ expect(stats.mean).toEqual([3,20,7])
+})
+it('requires one fitted statistic per matrix column, including single-column matrices', async () => {
+ const {graph,add}=builder()
+ add('matrix','input',{value:{shape:[2,1],data:[2,6]}})
+ add('standard','standardize',{},['matrix'])
+ const stats=await fitStandardizer(graph,'standard')
+ expect(stats).toEqual({mean:[4],scale:[2],count:2})
+ expect(standardize({shape:[2,1],data:[2,6]},stats).value).toEqual({shape:[2,1],data:[-1,1]})
+ expect(()=>standardize({shape:[2,2],data:[2,6,4,8]},stats)).toThrow(/Refit/)
+ graph.nodes[0].params.value={shape:[2,2],data:[2,6,4,8]}
+ graph.nodes[1].params.standardization=stats
+ expect(validateGraph(graph,{requireLoss:false})).toContainEqual(expect.objectContaining({code:'shape-mismatch',nodeId:'standard'}))
+ expect(await fitStandardizer(graph,'standard')).toEqual({mean:[3,7],scale:[1,1],count:2})
+})
+it('fits matrices wider than the CSV column limit', async () => {
+ const {graph,add}=builder()
+ add('matrix','input',{value:{shape:[2,130],data:[...Array(130).fill(1),...Array(130).fill(3)]}})
+ add('standard','standardize',{},['matrix'])
+ const stats=await fitStandardizer(graph,'standard')
+ expect(stats.mean).toEqual(Array(130).fill(2))
+ expect(stats.scale).toEqual(Array(130).fill(1))
+ expect(stats.count).toBe(2)
 })
 it('uses population standard deviation, supports scalar/batch columns, and rejects invalid stats',()=>{
  const stats={mean:[2],scale:[2],count:4}

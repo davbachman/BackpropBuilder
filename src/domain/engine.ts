@@ -1,4 +1,4 @@
-import {isStandardizationStats, standardize} from './standardization'
+import {isStandardizationStats, standardize, standardizationShapeMatches} from './standardization'
 import {parameterPenalty,penaltyGradients} from './regularization'
 import { resolveReshape } from './reshape'
 import { arithmeticInputCount, evaluateArithmetic, parseArithmetic } from './arithmetic'
@@ -629,7 +629,9 @@ function validateTensorShapes(graph: GraphModel): ValidationIssue[] {
       ? ' Axis 1 treats vectors as single columns; all inputs must have the same row count. Higher-rank tensors need explicit reshapes.'
       : node.type === 'concat'
         ? ` Concatenation on axis ${axis} requires equal ranks and matching sizes on every other axis.`
-        : ' Use matching shapes or scalars.'
+        : node.type === 'standardize'
+          ? ' Standardize needs one fitted mean and scale per matrix column. Refit in Details after changing the feature count.'
+          : ' Use matching shapes or scalars.'
     issues.push({
       code: 'shape-mismatch',
       nodeId: node.id,
@@ -648,7 +650,7 @@ function outputShapeForNode(node: GraphNode, inputShapes: number[][]): number[] 
   }
   const [first, second, third] = inputShapes
   const axis = node.params.axis ?? (node.type === 'concat' ? 1 : 0)
-  if (node.type === 'standardize') return !isStandardizationStats(node.params.standardization) || node.params.standardization.mean.length === 1 || first.at(-1) === node.params.standardization.mean.length ? [...first] : undefined
+  if (node.type === 'standardize') return !isStandardizationStats(node.params.standardization) || standardizationShapeMatches(first, node.params.standardization.mean.length) ? [...first] : undefined
   if (node.type === 'dropout') return [...first]
   if (node.type === 'conv2d') return first.length === 3 && second.length === 4 && third.length === 1 && first[2] === second[3] && second[0] === third[0] && first[0] >= second[1] && first[1] >= second[2] ? [first[0] - second[1] + 1, first[1] - second[2] + 1, second[0]] : undefined
   if (node.type === 'avgpool2d') return first.length === 3 && first[0] >= 2 && first[1] >= 2 ? [Math.floor(first[0] / 2), Math.floor(first[1] / 2), first[2]] : undefined
